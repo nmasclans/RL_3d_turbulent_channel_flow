@@ -205,6 +205,7 @@ void myRHEA::calculateSourceTerms() {
 
 void myRHEA::temporalHookFunction() {
 
+    /// Custom temporal hook function
 
 };
 
