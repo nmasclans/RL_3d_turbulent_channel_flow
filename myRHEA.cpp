@@ -3,47 +3,74 @@
 #ifdef _OPENACC
 #include <openacc.h>
 #endif
+#include <numeric>
 
 using namespace std;
 
 ////////// COMPILATION DIRECTIVES //////////
 #define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
+#define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 
 /// AUXILIAR PARAMETERS ///
 //const double pi = 2.0*asin( 1.0 );				/// pi number (fixed)
 
 /// PROBLEM PARAMETERS ///
 //const double R_specific = 287.058;				/// Specific gas constant
-const double gamma_0    = 1.4;					/// Heat capacity ratio
+const double gamma_0    = 1.4;					    /// Heat capacity ratio
 //const double c_p        = gamma_0*R_specific/( gamma_0 - 1.0 );	/// Isobaric heat capacity
-const double delta      = 1.0;					/// Channel half-height
-const double Re_tau     = 180.0;				/// Friction Reynolds number
-const double Ma         = 3.0e-1;				/// Mach number
+const double delta      = 1.0;					    /// Channel half-height
+const double Re_tau     = 180.0;				    /// Friction Reynolds number
+const double Ma         = 3.0e-1;				    /// Mach number
 //const double Pr         = 0.71;					/// Prandtl number
-const double rho_0      = 1.0;					/// Reference density	
-const double u_tau      = 1.0;					/// Friction velocity
-const double tau_w      = rho_0*u_tau*u_tau;			/// Wall shear stress
-const double mu         = rho_0*u_tau*delta/Re_tau;		/// Dynamic viscosity	
-const double nu         = u_tau*delta/Re_tau;			/// Kinematic viscosity	
+const double rho_0      = 1.0;					    /// Reference density	
+const double u_tau      = 1.0;					    /// Friction velocity
+const double tau_w      = rho_0*u_tau*u_tau;		/// Wall shear stress
+const double mu         = rho_0*u_tau*delta/Re_tau;	/// Dynamic viscosity	
+const double nu         = u_tau*delta/Re_tau;		/// Kinematic viscosity	
 //const double kappa      = c_p*mu/Pr;				/// Thermal conductivity	
 const double Re_b       = pow( Re_tau/0.09, 1.0/0.88 );		/// Bulk (approximated) Reynolds number
-const double u_b        = nu*Re_b/( 2.0*delta );		/// Bulk (approximated) velocity
+const double u_b        = nu*Re_b/( 2.0*delta );		    /// Bulk (approximated) velocity
 const double P_0        = rho_0*u_b*u_b/( gamma_0*Ma*Ma );	/// Reference pressure
 //const double T_0        = P_0/( rho_0*R_specific );		/// Reference temperature
 //const double L_x        = 4.0*pi*delta;			/// Streamwise length
 //const double L_y        = 2.0*delta;				/// Wall-normal height
-//const double L_z        = 4.0*pi*delta/3.0;			/// Spanwise width
+//const double L_z        = 4.0*pi*delta/3.0;		/// Spanwise width
 const double kappa_vK   = 0.41;                                 /// von Kármán constant
 const double y_0        = nu/( 9.0*u_tau );                     /// Smooth-wall roughness
 const double u_0        = ( u_tau/kappa_vK )*( log( delta/y_0 ) + ( y_0/delta ) - 1.0 );        /// Volume average of a log-law velocity profile
-const double alpha_u    = 1.0;                                  /// Magnitude of velocity perturbations
-const double alpha_P    = 0.1;                                  /// Magnitude of pressure perturbations
+const double alpha_u    = 1.0;                      /// Magnitude of velocity perturbations
+const double alpha_P    = 0.1;                      /// Magnitude of pressure perturbations
 
 #if _FEEDBACK_LOOP_BODY_FORCE_
 /// Estimated uniform body force to drive the flow
-double controller_output = tau_w/delta;			        /// Initialize controller output
+double controller_output = tau_w/delta;			    /// Initialize controller output
 double controller_error  = 0.0;			        	/// Initialize controller error
 double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
+#endif
+
+#if _ACTIVE_CONTROL_BODY_FORCE_
+/// eigen-values barycentric map coordinates - corners of realizable region
+double EPS         = numeric_limits<double>::epsilon();
+/* Baricentric map coordinates, source: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
+ * Transform xmap -> lambda: lambda0,1 = Tinv * (xmap0,1 - t); lambda2 = 1 - lambda0 - lambda1
+ * Transform lambda -> xmap: xmap0,1   = T * lambda0,1 + t   
+ *                                     = lambda0 * x1c + lambda1 * x2c + lambda2 * x3c
+ * Realizability Condition (lambda): 0<=lambda_i<=1, sum(lambda_i)=1
+ * Realizability Condition (xmap):   xmap coord inside barycentric map triangle, defined by x1c, x2c, x3c 
+ */
+vector<double> x1c = {1.0, 0.0};                // corner x1c
+vector<double> x2c = {0.0, 0.0};                // corner x2c
+vector<double> x3c = {0.5, sqrt(3.0) / 2.0};    // corner x3c
+vector<double> t = {x3c[0], x3c[1]};
+vector<vector<double>> T = {
+    {x1c[0] - x3c[0], x2c[0] - x3c[0] },        // row 1, T[0][:]
+    {x1c[1] - x3c[1], x2c[1] - x3c[1]},         // row 2, T[1][:]
+};
+double Tdet = T[0][0] * T[1][1] - T[0][1] * T[1][0];
+vector<vector<double>> Tinv = {
+    {  T[1][1] / Tdet, - T[0][1] / Tdet},       // row 1, Tinv[0][:]
+    {- T[1][0] / Tdet,   T[0][0] / Tdet},       // row 2, Tinv[1][:]
+};
 #endif
 
 const double fixed_time_step = 1.0e-5;				/// Fixed time step
@@ -189,7 +216,80 @@ void myRHEA::calculateSourceTerms() {
     //f_rhow_field.update();
     //f_rhoE_field.update();
 
-    // Add RL active flow control terms in source terms
+#if _ACTIVE_CONTROL_BODY_FORCE_
+
+    /// Initialize variables
+    double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
+    double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
+    double Rkk_inv, Akk;
+    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+
+    /// Calculate Rij d.o.f.
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                
+                /// Rij trace (dof #1)
+                Rkk        = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                Rkk_inv    = 1.0 / Rkk;
+
+                /// Build anisotropy tensor (symmetric, trace-free)
+                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                Aij[1][0]  = Aij[0][1];
+                Aij[2][0]  = Aij[0][2];
+                Aij[2][1]  = Aij[1][2];
+
+                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                Aij[0][0] -= Akk / 3.0;
+                Aij[1][1] -= Akk / 3.0;
+                Aij[2][2] -= Akk / 3.0;
+
+                /// Aij eigen-decomposition
+                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
+                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
+
+                /// Eigen-vectors Euler Rotation angles (dof #2-4)
+                eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+        
+                /// Eigen-values Barycentric coordinates (dof #5-6)
+                eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
+
+                /// Get perturbation values
+                /// TODO: implement RL action here!
+                DeltaRkk    = 0.0;
+                DeltaThetaZ = 0.0;
+                DeltaThetaY = 0.0;
+                DeltaThetaX = 0.0;
+                DeltaXmap1  = 0.0;
+                DeltaXmap2  = 0.0;
+
+                /// Build perturbed Rij d.o.f.
+                Rkk    += DeltaRkk;
+                thetaZ += DeltaThetaZ;
+                thetaY += DeltaThetaY;
+                thetaX += DeltaThetaX;
+                xmap1  += DeltaXmap1;
+                xmap2  += DeltaXmap2;
+
+                /// Enforce realizability to perturbed Rij d.o.f
+                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2); // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+
+                /// TODO: continue from here!
+
+            }
+        }
+    }
+
+
+    /// Add RL active flow control terms in source terms
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -200,6 +300,7 @@ void myRHEA::calculateSourceTerms() {
             }
         }
     }
+#endif
 
 };
 
@@ -216,9 +317,324 @@ void myRHEA::calculateTimeStep() {
 
 };
 
+///////////////////////////////////////////////////////////////////////////////
+/** Symmetric diagonalization of a 3D matrix
+ * 
+ * The diagonal matrix D = QT * A * Q;  and  A = Q*D*QT
+ * obtained from: 
+ *       http://stackoverflow.com/questions/4372224/
+ *       fast-method-for-computing-3x3-symmetric-matrix-spectral-decomposition
+ * 
+ * @param A     \input matrix to diagonalize, must be a symmetric matrix
+ * @param Q     \output matrix of eigenvectors
+ * @param D     \output diagonal matrix of eigenvalues
+ */
+void myRHEA::symmetricDiagonalize(
+    const vector<vector<double>> &A, vector<vector<double>> &Q, vector<vector<double>> &D) {
 
+    const int maxsteps=24;
+    int k0, k1, k2;
+    double o[3], m[3];
+    double q [4] = {0.0,0.0,0.0,1.0};
+    double jr[4];
+    double sqw, sqx, sqy, sqz;
+    double tmp1, tmp2, mq;
+    double AQ[3][3];
+    double thet, sgn, t, c;
+    
+    for(int i=0;i < maxsteps;++i) {
+        // quat to matrix
+        sqx      = q[0]*q[0];
+        sqy      = q[1]*q[1];
+        sqz      = q[2]*q[2];
+        sqw      = q[3]*q[3];
+        Q[0][0]  = ( sqx - sqy - sqz + sqw);
+        Q[1][1]  = (-sqx + sqy - sqz + sqw);
+        Q[2][2]  = (-sqx - sqy + sqz + sqw);
+        tmp1     = q[0]*q[1];
+        tmp2     = q[2]*q[3];
+        Q[1][0]  = 2.0 * (tmp1 + tmp2);
+        Q[0][1]  = 2.0 * (tmp1 - tmp2);
+        tmp1     = q[0]*q[2];
+        tmp2     = q[1]*q[3];
+        Q[2][0]  = 2.0 * (tmp1 - tmp2);
+        Q[0][2]  = 2.0 * (tmp1 + tmp2);
+        tmp1     = q[1]*q[2];
+        tmp2     = q[0]*q[3];
+        Q[2][1]  = 2.0 * (tmp1 + tmp2);
+        Q[1][2]  = 2.0 * (tmp1 - tmp2);
 
-////////// MAIN //////////
+        // AQ = A * Q
+        AQ[0][0] = Q[0][0]*A[0][0]+Q[1][0]*A[0][1]+Q[2][0]*A[0][2];
+        AQ[0][1] = Q[0][1]*A[0][0]+Q[1][1]*A[0][1]+Q[2][1]*A[0][2];
+        AQ[0][2] = Q[0][2]*A[0][0]+Q[1][2]*A[0][1]+Q[2][2]*A[0][2];
+        AQ[1][0] = Q[0][0]*A[0][1]+Q[1][0]*A[1][1]+Q[2][0]*A[1][2];
+        AQ[1][1] = Q[0][1]*A[0][1]+Q[1][1]*A[1][1]+Q[2][1]*A[1][2];
+        AQ[1][2] = Q[0][2]*A[0][1]+Q[1][2]*A[1][1]+Q[2][2]*A[1][2];
+        AQ[2][0] = Q[0][0]*A[0][2]+Q[1][0]*A[1][2]+Q[2][0]*A[2][2];
+        AQ[2][1] = Q[0][1]*A[0][2]+Q[1][1]*A[1][2]+Q[2][1]*A[2][2];
+        AQ[2][2] = Q[0][2]*A[0][2]+Q[1][2]*A[1][2]+Q[2][2]*A[2][2];
+
+        // D = Qt * AQ
+        D[0][0] = AQ[0][0]*Q[0][0]+AQ[1][0]*Q[1][0]+AQ[2][0]*Q[2][0];
+        D[0][1] = AQ[0][0]*Q[0][1]+AQ[1][0]*Q[1][1]+AQ[2][0]*Q[2][1];
+        D[0][2] = AQ[0][0]*Q[0][2]+AQ[1][0]*Q[1][2]+AQ[2][0]*Q[2][2];
+        D[1][0] = AQ[0][1]*Q[0][0]+AQ[1][1]*Q[1][0]+AQ[2][1]*Q[2][0];
+        D[1][1] = AQ[0][1]*Q[0][1]+AQ[1][1]*Q[1][1]+AQ[2][1]*Q[2][1];
+        D[1][2] = AQ[0][1]*Q[0][2]+AQ[1][1]*Q[1][2]+AQ[2][1]*Q[2][2];
+        D[2][0] = AQ[0][2]*Q[0][0]+AQ[1][2]*Q[1][0]+AQ[2][2]*Q[2][0];
+        D[2][1] = AQ[0][2]*Q[0][1]+AQ[1][2]*Q[1][1]+AQ[2][2]*Q[2][1];
+        D[2][2] = AQ[0][2]*Q[0][2]+AQ[1][2]*Q[1][2]+AQ[2][2]*Q[2][2];
+        o[0]    = D[1][2];
+        o[1]    = D[0][2];
+        o[2]    = D[0][1];
+        m[0]    = std::abs(o[0]);
+        m[1]    = std::abs(o[1]);
+        m[2]    = std::abs(o[2]);
+
+        k0      = (m[0] > m[1] && m[0] > m[2])?0: (m[1] > m[2])? 1 : 2; // index of largest element of offdiag
+        k1      = (k0+1)%3;
+        k2      = (k0+2)%3;
+        if (o[k0]==0.0) {
+            break;  // diagonal already
+        }
+
+        thet    = (D[k2][k2]-D[k1][k1])/(2.0*o[k0]);
+        sgn     = (thet > 0.0)?1.0:-1.0;
+        thet   *= sgn; // make it positive
+        t       = sgn /(thet +((thet < 1.E6)? std::sqrt(thet*thet+1.0):thet)) ; // sign(T)/(|T|+sqrt(T^2+1))
+        c       = 1.0/std::sqrt(t*t+1.0); //  c= 1/(t^2+1) , t=s/c 
+        if(c==1.0) {
+            break;  // no room for improvement - reached machine precision.
+        }
+
+        jr[0 ]  = jr[1] = jr[2] = jr[3] = 0.0;
+        jr[k0]  = sgn*std::sqrt((1.0-c)/2.0);  // using 1/2 angle identity sin(a/2) = std::sqrt((1-cos(a))/2)  
+        jr[k0] *= -1.0; // since our quat-to-matrix convention was for v*M instead of M*v
+        jr[3 ]  = std::sqrt(1.0f - jr[k0] * jr[k0]);
+        if(jr[3]==1.0) {
+            break; // reached limits of floating point precision
+        }
+
+        q[0]    = (q[3]*jr[0] + q[0]*jr[3] + q[1]*jr[2] - q[2]*jr[1]);
+        q[1]    = (q[3]*jr[1] - q[0]*jr[2] + q[1]*jr[3] + q[2]*jr[0]);
+        q[2]    = (q[3]*jr[2] + q[0]*jr[1] - q[1]*jr[0] + q[2]*jr[3]);
+        q[3]    = (q[3]*jr[3] - q[0]*jr[0] - q[1]*jr[1] - q[2]*jr[2]);
+        mq      = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+        q[0]   /= mq;
+        q[1]   /= mq;
+        q[2]   /= mq;
+        q[3]   /= mq;
+    }
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/** Reconstruct matrix from eigen decomposition of a 3D matrix
+ * 
+ * The diagonal matrix D = QT * A * Q;  and  A = Q*D*QT
+ * 
+ * @param D     \input diagonal matrix of eigenvalues
+ * @param Q     \input matrix of eigenvectors
+ * @param A     \output reconstructed symmetric matrix
+ */
+void myRHEA::eigenDecomposition2Matrix(
+  const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &A)
+{
+
+    // A = Q*D*QT
+    vector<vector<double>> QT(3, vector<double>(3, 0.0));
+    vector<vector<double>> B(3, vector<double>(3, 0.0));
+
+    // compute QT
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            QT[j][i] = Q[i][j];
+        }
+    }
+
+    //mat-vec, B = Q*D
+    matrixMultiplicate(Q,D,B);
+
+    // mat-vec, A = (Q*D)*QT = B*QT
+    matrixMultiplicate(B,QT,A);
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/**
+ * Sort eigenvalues and eigenvectors 
+ * 
+ * Sort eigenvalues in decreasing order (and eigenvectors equivalently), with
+ * Qij[0][0] >= Qij[1][1] >= Qij[2][2]
+ * 
+ * @param Q   \inputoutput matrix of eigenvectors, with Qij[0][:] the first eigenvector
+ * @param D   \inputoutput diagonal matrix of eigenvalues
+ * 
+ */
+void myRHEA::sortEigenDecomposition(vector<vector<double>> &Q, vector<vector<double>> &D){
+
+    // create pairs of indices and eigenvalues for sorting
+    vector<pair<double,size_t>> sortedEigVal(3);
+    for (size_t i = 0; i < 3; ++i) {
+        sortedEigVal[i] = {D[i][i], i}; // {value, idx} pair
+    }
+
+    // sort eigenvalues in descending order
+    std::sort(sortedEigVal.begin(), sortedEigVal.end(), [](const std::pair<double, long unsigned int>& a, const std::pair<double, long unsigned int>& b) {
+        return a.first > b.first;
+    });
+
+    // Rearrange eigenvalues and eigenvectors based on the sorted indices
+    vector<vector<double>> tempQ(3, vector<double>(3, 0.0));
+    vector<vector<double>> tempD(3, vector<double>(3, 0.0));
+    for (size_t i = 0; i < 3; ++i) {
+        tempD[i][i] = D[sortedEigVal[i].second][sortedEigVal[i].second];
+        for (size_t j = 0; j < 3; j++){
+            tempQ[j][i] = Q[j][sortedEigVal[i].second];
+        }
+    }
+
+    // update matrices
+    Q = tempQ;
+    D = tempD;
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/** Matrix-Matrix Multiplication 3D
+ * 
+ * Matrix multiplication C = A*B
+ * 
+ * @param A     \input matrix
+ * @param B     \input matrix
+ * @param C     \output matrix result of matrix-matrix multiplication 
+ */
+void myRHEA::matrixMultiplicate(
+  const vector<vector<double>> &A, const vector<vector<double>> &B, vector<vector<double>> &C)
+{
+
+    // Perform multiplication C = A*B
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            double sum = 0;
+            for (int k = 0; k < 3; ++k) {
+                sum = sum + A[i][k] * B[k][j];
+            }
+            C[i][j] = sum;
+        }
+    }
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Truncate and normalize eigen-values if not satisfied ( 0 <= eigVal_i <= 1)
+void myRHEA::truncateAndNormalizeEigVal(vector<double> &lambda){
+    
+    // 1st: truncate coordinates within range [0,1]
+    for (double &coord : lambda) {
+        coord = min(max(coord, 0.0), 1.0); 
+    }
+    
+    // 2nd: normalize coordinates vector to sum(coordinates) = 1
+    double sumCoord = std::accumulate(lambda.begin(), lambda.end(), 0.0); // calculate eigen-values sum
+    if (sumCoord != 0.0) { // avoid division by zero
+        for (double &coord : lambda) {
+            coord /= sumCoord;
+        }
+    } else {               // if sumCoord is zero, handle setting all to 1/3
+        for (double &coord : lambda) {
+            coord = 1.0 / lambda.size();
+        }
+    }
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Enforce realizability conditions to Rij d.o.f.
+void myRHEA::enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, double &thetaX, double &xmap1, double &xmap2) {
+    
+    /// Realizability condition Rkk: Rkk >= 0.0
+    Rkk = max(Rkk, 0.0);
+
+    /// Realizability condition thetaZ, thetaY, thetaX: none
+
+    /// Realizability condition xmap1, xmap2: 0 <= eigen-values <= 1
+    vector<double> lambda(3, 0.0);
+    barycentricCoord2eigVal(xmap1, xmap2, lambda);  // update lambda
+    if ( !(0.0 <= lambda[0] && lambda[0] <= 1.0 &&
+           0.0 <= lambda[1] && lambda[1] <= 1.0 &&
+           0.0 <= lambda[2] && lambda[2] <= 1.0) ){ 
+        // Enforce realizability by truncating & normalizing eigen-values
+        truncateAndNormalizeEigVal(lambda);         // update lambda
+    }
+    eigVal2barycentricCoord(lambda, xmap1, xmap2);  // update xmap1, xmap2
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/* Calculate rotation angles from rotation matrix of eigenvectors
+   Attention: the rotation matrix of eigen-vectors must be indeed a proper rotation matrix. 
+   A proper rotation matrix is orthogonal (meaning its inverse is its transpose) and has a determinant of +1.
+   This ensures that the matrix represents a rotation without improper reflection or scaling.
+   This has been check to be satisfied (+ computational error) at 15 feb. 2024 
+*/
+void myRHEA::eigVect2eulerAngles(const vector<vector<double>> &Q, double &thetaZ, double &thetaY, double &thetaX){
+    
+    // thetaY         has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
+    // thetaZ, thetaX has range (-pi, pi]     (range of 'atan2' function used in their calculation)
+    thetaY = std::asin(-Q[2][0]);
+    if (std::abs(std::cos(thetaY)) > EPS) { // Avoid gimbal lock
+        thetaZ = std::atan2(Q[1][0], Q[0][0]);
+        thetaX = std::atan2(Q[2][1], Q[2][2]);
+    } else {                                  // Gimbal lock, set yaw to 0 and calculate roll
+        thetaZ = 0;
+        thetaX = std::atan2(-Q[0][1], Q[1][1]);
+    }
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Direct barycentric mapping: from eigenvalues diagonal matrix to barycentric coordinates
+/// TODO: check this is equivalent to transformation eigVal2barycentricCoord
+void myRHEA::eigValMatrix2barycentricCoord(const vector<vector<double>> &D, double &xmap1, double &xmap2){
+    // Assuming D is always size [3,3]
+    xmap1 = x1c[0] * (    D[0][0] - D[1][1]) \
+          + x2c[0] * (2.0*D[1][1] - 2.0*D[2][2]) \
+          + x3c[0] * (3.0*D[2][2] + 1.0);
+    xmap2 = x1c[1] * (    D[0][0] - D[1][1]) \
+          + x2c[1] * (2.0*D[1][1] - 2.0*D[2][2]) \
+          + x3c[1] * (3.0*D[2][2] + 1.0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Transform eigen-values vector (lambda) to barycentric map coordinates (xmap1, xmap2) 
+void myRHEA::eigVal2barycentricCoord(const vector<double> &lambda, double &xmap1, double &xmap2){
+    // Assuming lambda is always of size 3
+    xmap1 = lambda[0] * x1c[0] + lambda[1] * x2c[0] + lambda[2] * x3c[0];
+    xmap2 = lambda[0] * x1c[1] + lambda[1] * x2c[1] + lambda[2] * x3c[1];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/* Transform barycentric map coordinates (xmap1, xmap2) to eigen-values vector (lambda)
+        xmap1,2:     barycentric map coordinates
+        lambda1,2,3: eigen-values, satifying lambda1 + lambda2 + lambda3 = 1
+        transformation:  lambda1,2 = Tinv * (xmapping1,2 - t) 
+ */
+void myRHEA::barycentricCoord2eigVal(const double &xmap1, const double &xmap2, vector<double> &lambda){
+    // Assuming lambda is always of size 3
+    vector<double> xmap = {xmap1, xmap2};
+    for (int i = 0; i < 2; i++){
+        for (int j = 0; j < 2; j++){
+            lambda[i] += Tinv[i][j] * (xmap[j] - t[j]);
+        }
+    }
+    lambda[2] = 1.0 - lambda[0] - lambda[1];    // from barycentric coord. condition sum(lambda_i) = 1.0
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// MAIN
 int main(int argc, char** argv) {
 
     /// Initialize MPI
