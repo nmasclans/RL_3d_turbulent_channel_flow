@@ -76,14 +76,19 @@ vector<vector<double>> Deltaij = {
     {1.0, 0.0, 0.0},
     {0.0, 1.0, 0.0},
     {0.0, 0.0, 1.0},
-} 
+};
 /// DeltaRij fields
-DeltaRxx_field.setTopology(topo, "DeltaRxx")
-DeltaRxy_field.setTopology(topo, "DeltaRxy")
-DeltaRxz_field.setTopology(topo, "DeltaRxz")
-DeltaRyy_field.setTopology(topo, "DeltaRyy")
-DeltaRyz_field.setTopology(topo, "DeltaRyz")
-DeltaRzz_field.setTopology(topo, "DeltaRzz")
+/// DeltaRxx_field.setTopology(topo, "DeltaRxx");
+/// DeltaRxy_field.setTopology(topo, "DeltaRxy");
+/// DeltaRxz_field.setTopology(topo, "DeltaRxz");
+/// DeltaRyy_field.setTopology(topo, "DeltaRyy");
+/// DeltaRyz_field.setTopology(topo, "DeltaRyz");
+/// DeltaRzz_field.setTopology(topo, "DeltaRzz");
+/// TODO: is it correct to comment previous lines? - uncommenting the lines causes compilation error: 
+/*  myRHEA.cpp:81:1: error: ‘DeltaRxx_field’ does not name a type
+81 | DeltaRxx_field.setTopology(topo, "DeltaRxx");
+      | ^~~~~~~~~~~~~~
+*/
 #endif
 
 const double fixed_time_step = 1.0e-5;				/// Fixed time step
@@ -321,22 +326,24 @@ void myRHEA::calculateSourceTerms() {
                 delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                 
                 /// Calculate DeltaRij derivatives
-                d_DeltaRxx_x = ( DeltaRxx[I1D(i+1,j,k)] - DeltaRxx[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-                d_DeltaRxy_x = ( DeltaRxy[I1D(i+1,j,k)] - DeltaRxy[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-                d_DeltaRxz_x = ( DeltaRxz[I1D(i+1,j,k)] - DeltaRxz[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-                d_DeltaRxy_y = ( DeltaRxy[I1D(i,j+1,z)] - DeltaRxy[I1D(i,j-1,z)] ) / ( 2.0 * delta_y);
-                d_DeltaRyy_y = ( DeltaRyy[I1D(i,j+1,z)] - DeltaRyy[I1D(i,j-1,z)] ) / ( 2.0 * delta_y);
-                d_DeltaRyz_y = ( DeltaRyz[I1D(i,j+1,z)] - DeltaRyz[I1D(i,j-1,z)] ) / ( 2.0 * delta_y);
-                d_DeltaRxz_z = ( DeltaRxz[I1D(i,j,z+1)] - DeltaRxz[I1D(i,j,z-1)] ) / ( 2.0 * delta_z);
-                d_DeltaRyz_z = ( DeltaRyz[I1D(i,j,z+1)] - DeltaRyz[I1D(i,j,z-1)] ) / ( 2.0 * delta_z);
-                d_DeltaRzz_z = ( DeltaRzz[I1D(i,j,z+1)] - DeltaRzz[I1D(i,j,z-1)] ) / ( 2.0 * delta_z);
+                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
+                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
+                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
+                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
+                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
+                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
 
                 /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
                 f_rhou_field[I1D(i,j,k)] += - d_DeltaRxx_x - d_DeltaRxy_y - d_DeltaRxz_z;
                 f_rhov_field[I1D(i,j,k)] += - d_DeltaRxy_x - d_DeltaRyy_y - d_DeltaRyz_z;
                 f_rhow_field[I1D(i,j,k)] += - d_DeltaRxz_x - d_DeltaRyz_y - d_DeltaRzz_z;
                 f_rhoE_field[I1D(i,j,k)] += 0.0;
-
+            }
+        }
+    }
 #endif
 
     /// Update halo values
@@ -353,12 +360,12 @@ void myRHEA::temporalHookFunction() {
 
 };
 
-void myRHEA::calculateTimeStep() {
-
-    /// Set new time step
-    delta_t = fixed_time_step;
-
-};
+/// void myRHEA::calculateTimeStep() {
+/// 
+///     /// Set new time step
+///     delta_t = fixed_time_step;
+/// 
+/// };
 
 ///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
@@ -594,19 +601,6 @@ void myRHEA::truncateAndNormalizeEigVal(vector<double> &lambda){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Transform Rij d.o.f. to Rij matrix
-void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &R){
-    /// Assume R has dimensions [3][3]
-    vector<vector<double>> A(3, vector<double>(3, 0.0));
-    eigenDecomposition2Matrix(D, Q, A); // update A
-    for (int q = 0; q < 3; q++){
-        for (int r = 0; r < 3; r++){
-            R[q][r] = Rkk * ((1.0 / 3.0) * Deltaij[q][r] + A[q][r]);
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
 /// Enforce realizability conditions to Rij d.o.f.
 void myRHEA::enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, double &thetaX, double &xmap1, double &xmap2) {
     
@@ -674,6 +668,14 @@ void myRHEA::eulerAngles2eigVect(const double &thetaZ, const double &thetaY, con
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// Transform eigen-values vector (lambda) to barycentric map coordinates (xmap1, xmap2) 
+void myRHEA::eigVal2barycentricCoord(const vector<double> &lambda, double &xmap1, double &xmap2){
+    // Assuming lambda is always of size 3
+    xmap1 = lambda[0] * x1c[0] + lambda[1] * x2c[0] + lambda[2] * x3c[0];
+    xmap2 = lambda[0] * x1c[1] + lambda[1] * x2c[1] + lambda[2] * x3c[1];
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// Direct barycentric mapping: from eigenvalues diagonal matrix to barycentric coordinates
 /// TODO: check this is equivalent to transformation eigVal2barycentricCoord
 void myRHEA::eigValMatrix2barycentricCoord(const vector<vector<double>> &D, double &xmap1, double &xmap2){
@@ -684,14 +686,6 @@ void myRHEA::eigValMatrix2barycentricCoord(const vector<vector<double>> &D, doub
     xmap2 = x1c[1] * (    D[0][0] - D[1][1]) \
           + x2c[1] * (2.0*D[1][1] - 2.0*D[2][2]) \
           + x3c[1] * (3.0*D[2][2] + 1.0);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// Transform eigen-values vector (lambda) to barycentric map coordinates (xmap1, xmap2) 
-void myRHEA::eigVal2barycentricCoord(const vector<double> &lambda, double &xmap1, double &xmap2){
-    // Assuming lambda is always of size 3
-    xmap1 = lambda[0] * x1c[0] + lambda[1] * x2c[0] + lambda[2] * x3c[0];
-    xmap2 = lambda[0] * x1c[1] + lambda[1] * x2c[1] + lambda[2] * x3c[1];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -722,6 +716,19 @@ void myRHEA::barycentricCoord2eigValMatrix(const double &xmap1, const double &xm
         }
     }
     D[2][2] = 1.0 - D[0][0] - D[1][1];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Transform Rij d.o.f. to Rij matrix
+void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &R){
+    /// Assume R has dimensions [3][3]
+    vector<vector<double>> A(3, vector<double>(3, 0.0));
+    eigenDecomposition2Matrix(D, Q, A); // update A
+    for (int q = 0; q < 3; q++){
+        for (int r = 0; r < 3; r++){
+            R[q][r] = Rkk * ((1.0 / 3.0) * Deltaij[q][r] + A[q][r]);
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

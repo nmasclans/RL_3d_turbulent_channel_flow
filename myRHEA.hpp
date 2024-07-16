@@ -3,6 +3,7 @@
 
 ////////// INCLUDES //////////
 #include "src/FlowSolverRHEA.hpp"
+#include "src/DistributedArray.hpp"
 #include <vector>
 
 ////////// USING //////////
@@ -29,7 +30,7 @@ class myRHEA : public FlowSolverRHEA {
         void temporalHookFunction();
 	
  	    /// Calculate fixed time step
-        void calculateTimeStep();
+///         void calculateTimeStep();
 
     protected:
 
@@ -52,9 +53,12 @@ class myRHEA : public FlowSolverRHEA {
         void truncateAndNormalizeEigVal(vector<double> &lambda);
         void enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, double &thetaX, double &xmap1, double &xmap2);
         void eigVect2eulerAngles(const vector<vector<double>> &Q, double &thetaZ, double &thetaY, double &thetaX);
-        void eigValMatrix2barycentricCoord(const vector<vector<double>> &D, double &xmap1, double &xmap2);
+        void eulerAngles2eigVect(const double &thetaZ, const double &thetaY, const double &thetaX, vector<vector<double>> &Q);        
         void eigVal2barycentricCoord(const vector<double> &lambda, double &xmap1, double &xmap2);
+        void eigValMatrix2barycentricCoord(const vector<vector<double>> &D, double &xmap1, double &xmap2);
         void barycentricCoord2eigVal(const double &xmap1, const double &xmap2, vector<double> &lambda);
+        void barycentricCoord2eigValMatrix(const double &xmap1, const double &xmap2, vector<vector<double>> &D);
+        void Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &R);
 
 };
 
