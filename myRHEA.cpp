@@ -130,6 +130,14 @@ void myRHEA::setInitialConditions() {
     P_field.update();
     T_field.update();
 
+    /// DeltaRij fields TODO: move to myRHEA initializer/constructor
+    DeltaRxx_field.setTopology(topo, "DeltaRxx");
+    DeltaRxy_field.setTopology(topo, "DeltaRxy");
+    DeltaRxz_field.setTopology(topo, "DeltaRxz");
+    DeltaRyy_field.setTopology(topo, "DeltaRyy");
+    DeltaRyz_field.setTopology(topo, "DeltaRyz");
+    DeltaRzz_field.setTopology(topo, "DeltaRzz");
+
 };
 
 void myRHEA::calculateSourceTerms() {
@@ -246,38 +254,7 @@ void myRHEA::calculateSourceTerms() {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 
-                /// Rij trace (dof #1)
-                Rkk        = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                Rkk_inv    = 1.0 / Rkk;
-
-                /// Build anisotropy tensor (symmetric, trace-free)
-                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                Aij[1][0]  = Aij[0][1];
-                Aij[2][0]  = Aij[0][2];
-                Aij[2][1]  = Aij[1][2];
-
-                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                Aij[0][0] -= Akk / 3.0;
-                Aij[1][1] -= Akk / 3.0;
-                Aij[2][2] -= Akk / 3.0;
-
-                /// Aij eigen-decomposition
-                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
-                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
-
-                /// Eigen-vectors Euler Rotation angles (dof #2-4)
-                eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
-        
-                /// Eigen-values Barycentric coordinates (dof #5-6)
-                eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
-
-                /// Get perturbation values
+                /// Get perturbation values from RL agent
                 /// TODO: implement RL action here!
                 DeltaRkk    = 0.0;
                 DeltaThetaZ = 0.0;
@@ -286,64 +263,106 @@ void myRHEA::calculateSourceTerms() {
                 DeltaXmap1  = 0.0;
                 DeltaXmap2  = 0.0;
 
-                /// Build perturbed Rij d.o.f.
-                Rkk    += DeltaRkk;
-                thetaZ += DeltaThetaZ;
-                thetaY += DeltaThetaY;
-                thetaX += DeltaThetaX;
-                xmap1  += DeltaXmap1;
-                xmap2  += DeltaXmap2;
+                // Check if action is negligible
+                // if (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS) {
+                if (false) {
+                    DeltaRxx_field[I1D(i,j,k)] = 0.0;
+                    DeltaRyy_field[I1D(i,j,k)] = 0.0;
+                    DeltaRzz_field[I1D(i,j,k)] = 0.0;
+                    DeltaRxy_field[I1D(i,j,k)] = 0.0;
+                    DeltaRxz_field[I1D(i,j,k)] = 0.0;
+                    DeltaRyz_field[I1D(i,j,k)] = 0.0;
+                } else {
+                    /// Rij trace (dof #1)
+                    Rkk        = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                    Rkk_inv    = 1.0 / Rkk;
 
-                /// Enforce realizability to perturbed Rij d.o.f
-                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+                    /// Build anisotropy tensor (symmetric, trace-free)
+                    Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                    Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                    Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                    Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                    Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                    Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                    Aij[1][0]  = Aij[0][1];
+                    Aij[2][0]  = Aij[0][2];
+                    Aij[2][1]  = Aij[1][2];
 
-                /// Calculate perturbed & realizable Rij
-                eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
-                barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
-                sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
-                Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+                    /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                    Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                    Aij[0][0] -= Akk / 3.0;
+                    Aij[1][1] -= Akk / 3.0;
+                    Aij[2][2] -= Akk / 3.0;
 
-                /// Calculate perturbed & realizable DeltaRij
-                DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
-                DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
-                DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
-                DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
-                DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+                    /// Aij eigen-decomposition
+                    symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
+                    sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
+                    /// Eigen-vectors Euler Rotation angles (dof #2-4)
+                    eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+            
+                    /// Eigen-values Barycentric coordinates (dof #5-6)
+                    eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
+
+                    /// Build perturbed Rij d.o.f.
+                    Rkk    += DeltaRkk;
+                    thetaZ += DeltaThetaZ;
+                    thetaY += DeltaThetaY;
+                    thetaX += DeltaThetaX;
+                    xmap1  += DeltaXmap1;
+                    xmap2  += DeltaXmap2;
+
+                    /// Enforce realizability to perturbed Rij d.o.f
+                    enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+
+                    /// Calculate perturbed & realizable Rij
+                    eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                    barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
+                    sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
+                    Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+
+                    /// Calculate perturbed & realizable DeltaRij
+                    DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
+                    DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                    DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                    DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                    DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                    DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+                }
+                cout << "[" << i << "," << j << "," << k << "]: " << DeltaRxx_field[I1D(i,j,k)] << ", " << DeltaRyy_field[I1D(i,j,k)] << ", " << DeltaRzz_field[I1D(i,j,k)] << ", " << DeltaRxy_field[I1D(i,j,k)] << ", " << DeltaRxz_field[I1D(i,j,k)] << ", " << DeltaRyz_field[I1D(i,j,k)] << endl;
             }
         }
     }
 
-    /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+    // /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
+    // for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+    //     for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+    //         for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 
-                /// Geometric stuff
-                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+    //             /// Geometric stuff
+    //             delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+    //             delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+    //             delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                 
-                /// Calculate DeltaRij derivatives
-                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
-                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
-                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
-                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
-                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
-                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
+    //             /// Calculate DeltaRij derivatives
+    //             d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+    //             d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+    //             d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+    //             d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
+    //             d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
+    //             d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
+    //             d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
+    //             d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
+    //             d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
 
-                /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                f_rhou_field[I1D(i,j,k)] += - d_DeltaRxx_x - d_DeltaRxy_y - d_DeltaRxz_z;
-                f_rhov_field[I1D(i,j,k)] += - d_DeltaRxy_x - d_DeltaRyy_y - d_DeltaRyz_z;
-                f_rhow_field[I1D(i,j,k)] += - d_DeltaRxz_x - d_DeltaRyz_y - d_DeltaRzz_z;
-                f_rhoE_field[I1D(i,j,k)] += 0.0;
-            }
-        }
-    }
+    //             /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+    //             f_rhou_field[I1D(i,j,k)] += - d_DeltaRxx_x - d_DeltaRxy_y - d_DeltaRxz_z;
+    //             f_rhov_field[I1D(i,j,k)] += - d_DeltaRxy_x - d_DeltaRyy_y - d_DeltaRyz_z;
+    //             f_rhow_field[I1D(i,j,k)] += - d_DeltaRxz_x - d_DeltaRyz_y - d_DeltaRzz_z;
+    //             f_rhoE_field[I1D(i,j,k)] += 0.0;
+    //         }
+    //     }
+    // }
 #endif
 
     /// Update halo values
@@ -367,6 +386,7 @@ void myRHEA::temporalHookFunction() {
 /// 
 /// };
 
+#if _ACTIVE_CONTROL_BODY_FORCE_
 ///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
  * 
@@ -730,6 +750,7 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
         }
     }
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 /// MAIN

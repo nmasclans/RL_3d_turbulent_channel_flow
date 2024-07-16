@@ -3,7 +3,6 @@
 
 ////////// INCLUDES //////////
 #include "src/FlowSolverRHEA.hpp"
-#include "src/DistributedArray.hpp"
 #include <vector>
 
 ////////// USING //////////
