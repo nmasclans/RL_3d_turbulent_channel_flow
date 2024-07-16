@@ -33,6 +33,13 @@ class myRHEA : public FlowSolverRHEA {
 
     protected:
 
+        DistributedArray DeltaRxx_field;        /// 3-D field of DeltaRxx
+        DistributedArray DeltaRxy_field;        /// 3-D field of DeltaRxy
+        DistributedArray DeltaRxz_field;        /// 3-D field of DeltaRxz
+        DistributedArray DeltaRyy_field;        /// 3-D field of DeltaRyy
+        DistributedArray DeltaRyz_field;        /// 3-D field of DeltaRyz
+        DistributedArray DeltaRzz_field;        /// 3-D field of DeltaRzz
+
     private:
 
         /// Eigen-decomposition

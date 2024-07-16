@@ -61,7 +61,7 @@ double EPS         = numeric_limits<double>::epsilon();
 vector<double> x1c = {1.0, 0.0};                // corner x1c
 vector<double> x2c = {0.0, 0.0};                // corner x2c
 vector<double> x3c = {0.5, sqrt(3.0) / 2.0};    // corner x3c
-vector<double> t = {x3c[0], x3c[1]};
+vector<double> t   = {x3c[0], x3c[1]};
 vector<vector<double>> T = {
     {x1c[0] - x3c[0], x2c[0] - x3c[0] },        // row 1, T[0][:]
     {x1c[1] - x3c[1], x2c[1] - x3c[1]},         // row 2, T[1][:]
@@ -71,6 +71,19 @@ vector<vector<double>> Tinv = {
     {  T[1][1] / Tdet, - T[0][1] / Tdet},       // row 1, Tinv[0][:]
     {- T[1][0] / Tdet,   T[0][0] / Tdet},       // row 2, Tinv[1][:]
 };
+/// Kronecker delta
+vector<vector<double>> Deltaij = {
+    {1.0, 0.0, 0.0},
+    {0.0, 1.0, 0.0},
+    {0.0, 0.0, 1.0},
+} 
+/// DeltaRij fields
+DeltaRxx_field.setTopology(topo, "DeltaRxx")
+DeltaRxy_field.setTopology(topo, "DeltaRxy")
+DeltaRxz_field.setTopology(topo, "DeltaRxz")
+DeltaRyy_field.setTopology(topo, "DeltaRyy")
+DeltaRyz_field.setTopology(topo, "DeltaRyz")
+DeltaRzz_field.setTopology(topo, "DeltaRzz")
 #endif
 
 const double fixed_time_step = 1.0e-5;				/// Fixed time step
@@ -210,23 +223,20 @@ void myRHEA::calculateSourceTerms() {
         }
     }
 
-    /// Update halo values
-    //f_rhou_field.update();
-    //f_rhov_field.update();
-    //f_rhow_field.update();
-    //f_rhoE_field.update();
-
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
     /// Initialize variables
     double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
     double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
+    double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
+    double delta_x, delta_y, delta_z;
     double Rkk_inv, Akk;
     vector<vector<double>> Aij(3, vector<double>(3, 0.0));
     vector<vector<double>> Dij(3, vector<double>(3, 0.0));
     vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+    vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
 
-    /// Calculate Rij d.o.f.
+    /// Calculate DeltaRij = Rij_perturbated - Rij_original
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -280,27 +290,60 @@ void myRHEA::calculateSourceTerms() {
                 xmap2  += DeltaXmap2;
 
                 /// Enforce realizability to perturbed Rij d.o.f
-                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2); // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
 
-                /// TODO: continue from here!
+                /// Calculate perturbed & realizable Rij
+                eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
+                sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
+                Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+
+                /// Calculate perturbed & realizable DeltaRij
+                DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
+                DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
 
             }
         }
     }
 
-
-    /// Add RL active flow control terms in source terms
+    /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-		        f_rhou_field[I1D(i,j,k)] += 0.0;
-                f_rhov_field[I1D(i,j,k)] += 0.0;
-                f_rhow_field[I1D(i,j,k)] += 0.0;
+                
+                /// Geometric stuff
+                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                
+                /// Calculate DeltaRij derivatives
+                d_DeltaRxx_x = ( DeltaRxx[I1D(i+1,j,k)] - DeltaRxx[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+                d_DeltaRxy_x = ( DeltaRxy[I1D(i+1,j,k)] - DeltaRxy[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+                d_DeltaRxz_x = ( DeltaRxz[I1D(i+1,j,k)] - DeltaRxz[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
+                d_DeltaRxy_y = ( DeltaRxy[I1D(i,j+1,z)] - DeltaRxy[I1D(i,j-1,z)] ) / ( 2.0 * delta_y);
+                d_DeltaRyy_y = ( DeltaRyy[I1D(i,j+1,z)] - DeltaRyy[I1D(i,j-1,z)] ) / ( 2.0 * delta_y);
+                d_DeltaRyz_y = ( DeltaRyz[I1D(i,j+1,z)] - DeltaRyz[I1D(i,j-1,z)] ) / ( 2.0 * delta_y);
+                d_DeltaRxz_z = ( DeltaRxz[I1D(i,j,z+1)] - DeltaRxz[I1D(i,j,z-1)] ) / ( 2.0 * delta_z);
+                d_DeltaRyz_z = ( DeltaRyz[I1D(i,j,z+1)] - DeltaRyz[I1D(i,j,z-1)] ) / ( 2.0 * delta_z);
+                d_DeltaRzz_z = ( DeltaRzz[I1D(i,j,z+1)] - DeltaRzz[I1D(i,j,z-1)] ) / ( 2.0 * delta_z);
+
+                /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+                f_rhou_field[I1D(i,j,k)] += - d_DeltaRxx_x - d_DeltaRxy_y - d_DeltaRxz_z;
+                f_rhov_field[I1D(i,j,k)] += - d_DeltaRxy_x - d_DeltaRyy_y - d_DeltaRyz_z;
+                f_rhow_field[I1D(i,j,k)] += - d_DeltaRxz_x - d_DeltaRyz_y - d_DeltaRzz_z;
                 f_rhoE_field[I1D(i,j,k)] += 0.0;
-            }
-        }
-    }
+
 #endif
+
+    /// Update halo values
+    //f_rhou_field.update();
+    //f_rhov_field.update();
+    //f_rhow_field.update();
+    //f_rhoE_field.update();
 
 };
 
@@ -551,6 +594,19 @@ void myRHEA::truncateAndNormalizeEigVal(vector<double> &lambda){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// Transform Rij d.o.f. to Rij matrix
+void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &R){
+    /// Assume R has dimensions [3][3]
+    vector<vector<double>> A(3, vector<double>(3, 0.0));
+    eigenDecomposition2Matrix(D, Q, A); // update A
+    for (int q = 0; q < 3; q++){
+        for (int r = 0; r < 3; r++){
+            R[q][r] = Rkk * ((1.0 / 3.0) * Deltaij[q][r] + A[q][r]);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// Enforce realizability conditions to Rij d.o.f.
 void myRHEA::enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, double &thetaX, double &xmap1, double &xmap2) {
     
@@ -595,6 +651,29 @@ void myRHEA::eigVect2eulerAngles(const vector<vector<double>> &Q, double &thetaZ
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// Transform Euler angles to rotation matrix of eigen-vectors
+void myRHEA::eulerAngles2eigVect(const double &thetaZ, const double &thetaY, const double &thetaX, vector<vector<double>> &Q) {
+    Q.assign(3, vector<double>(3, 0.0));
+    // Calculate trigonometric values
+    double cz = cos(thetaZ);
+    double sz = sin(thetaZ);
+    double cy = cos(thetaY);
+    double sy = sin(thetaY);
+    double cx = cos(thetaX);
+    double sx = sin(thetaX);
+    // Calculate the elements of the rotation matrix
+    Q[0][0] = cy * cz;
+    Q[0][1] = cy * sz;
+    Q[0][2] = -sy;
+    Q[1][0] = (sx * sy * cz) - (cx * sz);
+    Q[1][1] = (sx * sy * sz) + (cx * cz);
+    Q[1][2] = sx * cy;
+    Q[2][0] = (cx * sy * cz) + (sx * sz);
+    Q[2][1] = (cx * sy * sz) - (sx * cz);
+    Q[2][2] = cx * cy;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// Direct barycentric mapping: from eigenvalues diagonal matrix to barycentric coordinates
 /// TODO: check this is equivalent to transformation eigVal2barycentricCoord
 void myRHEA::eigValMatrix2barycentricCoord(const vector<vector<double>> &D, double &xmap1, double &xmap2){
@@ -630,7 +709,19 @@ void myRHEA::barycentricCoord2eigVal(const double &xmap1, const double &xmap2, v
         }
     }
     lambda[2] = 1.0 - lambda[0] - lambda[1];    // from barycentric coord. condition sum(lambda_i) = 1.0
+}
 
+///////////////////////////////////////////////////////////////////////////////
+/// Transform barycentric map coordinates (xmap1, xmap2) to eigen-values diagonal matrix (D)
+void myRHEA::barycentricCoord2eigValMatrix(const double &xmap1, const double &xmap2, vector<vector<double>> &D){
+    D.assign(3, vector<double>(3, 0.0));
+    vector<double> xmap = {xmap1, xmap2};
+    for (int i = 0; i < 2; i++){
+        for (int j = 0; j < 2; j++){
+            D[i][i] += Tinv[i][j] * (xmap[j] - t[j]);
+        }
+    }
+    D[2][2] = 1.0 - D[0][0] - D[1][1];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
