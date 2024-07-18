@@ -244,6 +244,7 @@ void myRHEA::calculateSourceTerms() {
     double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
     double delta_x, delta_y, delta_z;
     double Rkk_inv, Akk;
+    bool   isNegligibleAction, isNegligibleRkk;
     vector<vector<double>> Aij(3, vector<double>(3, 0.0));
     vector<vector<double>> Dij(3, vector<double>(3, 0.0));
     vector<vector<double>> Qij(3, vector<double>(3, 0.0));
@@ -263,9 +264,10 @@ void myRHEA::calculateSourceTerms() {
                 DeltaXmap1  = 0.0;
                 DeltaXmap2  = 0.0;
 
-                // Check if action is negligible
-                // if (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS) {
-                if (false) {
+                isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                isNegligibleRkk    = (abs(Rkk) < EPS);
+                if (isNegligibleAction || isNegligibleRkk) {
                     DeltaRxx_field[I1D(i,j,k)] = 0.0;
                     DeltaRyy_field[I1D(i,j,k)] = 0.0;
                     DeltaRzz_field[I1D(i,j,k)] = 0.0;
@@ -273,9 +275,8 @@ void myRHEA::calculateSourceTerms() {
                     DeltaRxz_field[I1D(i,j,k)] = 0.0;
                     DeltaRyz_field[I1D(i,j,k)] = 0.0;
                 } else {
-                    /// Rij trace (dof #1)
-                    Rkk        = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                    Rkk_inv    = 1.0 / Rkk;
+                    /// Rkk is Rij trace (dof #1)
+                    Rkk_inv = 1.0 / Rkk;
 
                     /// Build anisotropy tensor (symmetric, trace-free)
                     Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
@@ -300,7 +301,7 @@ void myRHEA::calculateSourceTerms() {
 
                     /// Eigen-vectors Euler Rotation angles (dof #2-4)
                     eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
-            
+
                     /// Eigen-values Barycentric coordinates (dof #5-6)
                     eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
 
@@ -329,7 +330,6 @@ void myRHEA::calculateSourceTerms() {
                     DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
                     DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
                 }
-                cout << "[" << i << "," << j << "," << k << "]: " << DeltaRxx_field[I1D(i,j,k)] << ", " << DeltaRyy_field[I1D(i,j,k)] << ", " << DeltaRzz_field[I1D(i,j,k)] << ", " << DeltaRxy_field[I1D(i,j,k)] << ", " << DeltaRxz_field[I1D(i,j,k)] << ", " << DeltaRyz_field[I1D(i,j,k)] << endl;
             }
         }
     }
@@ -751,6 +751,18 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
     }
 }
 #endif
+
+////////// ADDITIONAL FUNCTIONS //////////
+void printMatrix(const string &name, const vector<vector<double>> &matrix) {
+    cout << name << " = " << endl;
+    for (int ii = 0; ii < 3; ii++) {
+        cout << "[" << ii << "][:] ";
+        for (int jj = 0; jj < 3; jj++) {
+            cout << matrix[ii][jj] << " ";
+        }
+        cout << endl;
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 /// MAIN
