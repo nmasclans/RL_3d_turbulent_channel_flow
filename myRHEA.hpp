@@ -14,7 +14,7 @@ class myRHEA : public FlowSolverRHEA {
     public:
 
         ////////// CONSTRUCTORS & DESTRUCTOR //////////
-        myRHEA(const std::string configuration_file) : FlowSolverRHEA(configuration_file) {};	/// Parametrized constructor
+        myRHEA(const std::string name_configuration_file);	/// Parametrized constructor
         virtual ~myRHEA() {};									/// Destructor
 
 	////////// SOLVER METHODS //////////
@@ -29,7 +29,7 @@ class myRHEA : public FlowSolverRHEA {
         void temporalHookFunction();
 	
  	    /// Calculate fixed time step
-///         void calculateTimeStep();
+        void calculateTimeStep();
 
     protected:
 

@@ -10,6 +10,7 @@ using namespace std;
 ////////// COMPILATION DIRECTIVES //////////
 #define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
+#define _FIXED_TIME_STEP_ 0                         /// Activate fixed time step
 
 /// AUXILIAR PARAMETERS ///
 //const double pi = 2.0*asin( 1.0 );				/// pi number (fixed)
@@ -48,6 +49,8 @@ double controller_error  = 0.0;			        	/// Initialize controller error
 double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 #endif
 
+const double fixed_time_step = 1.0e-5;				/// Fixed time step
+
 #if _ACTIVE_CONTROL_BODY_FORCE_
 /// eigen-values barycentric map coordinates - corners of realizable region
 double EPS         = numeric_limits<double>::epsilon();
@@ -77,23 +80,22 @@ vector<vector<double>> Deltaij = {
     {0.0, 1.0, 0.0},
     {0.0, 0.0, 1.0},
 };
-/// DeltaRij fields
-/// DeltaRxx_field.setTopology(topo, "DeltaRxx");
-/// DeltaRxy_field.setTopology(topo, "DeltaRxy");
-/// DeltaRxz_field.setTopology(topo, "DeltaRxz");
-/// DeltaRyy_field.setTopology(topo, "DeltaRyy");
-/// DeltaRyz_field.setTopology(topo, "DeltaRyz");
-/// DeltaRzz_field.setTopology(topo, "DeltaRzz");
-/// TODO: is it correct to comment previous lines? - uncommenting the lines causes compilation error: 
-/*  myRHEA.cpp:81:1: error: ‘DeltaRxx_field’ does not name a type
-81 | DeltaRxx_field.setTopology(topo, "DeltaRxx");
-      | ^~~~~~~~~~~~~~
-*/
 #endif
 
-const double fixed_time_step = 1.0e-5;				/// Fixed time step
-
 ////////// myRHEA CLASS //////////
+
+myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_configuration_file) {
+
+    /// DeltaRij fields TODO: move to myRHEA initializer/constructor
+    DeltaRxx_field.setTopology(topo, "DeltaRxx");
+    DeltaRxy_field.setTopology(topo, "DeltaRxy");
+    DeltaRxz_field.setTopology(topo, "DeltaRxz");
+    DeltaRyy_field.setTopology(topo, "DeltaRyy");
+    DeltaRyz_field.setTopology(topo, "DeltaRyz");
+    DeltaRzz_field.setTopology(topo, "DeltaRzz");
+
+};
+
 
 void myRHEA::setInitialConditions() {
 
@@ -129,14 +131,6 @@ void myRHEA::setInitialConditions() {
     w_field.update();
     P_field.update();
     T_field.update();
-
-    /// DeltaRij fields TODO: move to myRHEA initializer/constructor
-    DeltaRxx_field.setTopology(topo, "DeltaRxx");
-    DeltaRxy_field.setTopology(topo, "DeltaRxy");
-    DeltaRxz_field.setTopology(topo, "DeltaRxz");
-    DeltaRyy_field.setTopology(topo, "DeltaRyy");
-    DeltaRyz_field.setTopology(topo, "DeltaRyz");
-    DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
 };
 
@@ -334,35 +328,35 @@ void myRHEA::calculateSourceTerms() {
         }
     }
 
-    // /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-    // for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-    //     for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-    //         for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+    /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 
-    //             /// Geometric stuff
-    //             delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-    //             delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-    //             delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                /// Geometric stuff
+                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                 
-    //             /// Calculate DeltaRij derivatives
-    //             d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-    //             d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-    //             d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x);
-    //             d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
-    //             d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
-    //             d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y);
-    //             d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
-    //             d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
-    //             d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z);
+                /// Calculate DeltaRij derivatives
+                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
 
-    //             /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-    //             f_rhou_field[I1D(i,j,k)] += - d_DeltaRxx_x - d_DeltaRxy_y - d_DeltaRxz_z;
-    //             f_rhov_field[I1D(i,j,k)] += - d_DeltaRxy_x - d_DeltaRyy_y - d_DeltaRyz_z;
-    //             f_rhow_field[I1D(i,j,k)] += - d_DeltaRxz_x - d_DeltaRyz_y - d_DeltaRzz_z;
-    //             f_rhoE_field[I1D(i,j,k)] += 0.0;
-    //         }
-    //     }
-    // }
+                /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+                f_rhou_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                f_rhov_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                f_rhow_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                f_rhoE_field[I1D(i,j,k)] += 0.0;
+            }
+        }
+    }
 #endif
 
     /// Update halo values
@@ -379,12 +373,16 @@ void myRHEA::temporalHookFunction() {
 
 };
 
-/// void myRHEA::calculateTimeStep() {
-/// 
-///     /// Set new time step
-///     delta_t = fixed_time_step;
-/// 
-/// };
+void myRHEA::calculateTimeStep() {
+
+#if _FIXED_TIME_STEP_
+    /// Set new time step
+    delta_t = fixed_time_step;
+#else
+    FlowSolverRHEA::calculateTimeStep();
+#endif
+
+};
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
 ///////////////////////////////////////////////////////////////////////////////
@@ -765,6 +763,7 @@ void printMatrix(const string &name, const vector<vector<double>> &matrix) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 /// MAIN
 int main(int argc, char** argv) {
 
