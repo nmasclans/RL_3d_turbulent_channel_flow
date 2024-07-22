@@ -5,29 +5,30 @@ SRC_DIR      = $(PROJECT_PATH)/src
 CXX          = mpicxx
 # CPU FLAGS
 #CXXFLAGS     = -O3 -Wall -std=c++0x -Wno-unknown-pragmas -Wno-unused-variable -I$(PROJECT_PATH)
-CXXFLAGS     = -Ofast -Wall -std=c++0x -Wno-unknown-pragmas -Wno-unused-variable -I$(PROJECT_PATH)
+CXXFLAGS     = -Ofast -Wall -std=c++17 -Wno-unknown-pragmas -Wno-unused-variable -I$(PROJECT_PATH) # -std=c++17 required for redisai compilation
 # CPU-GPU FLAGS
 #CXXFLAGS     = -fast -acc -ta=tesla:managed -Minfo=accel -O3 -Wall -std=c++0x -I$(PROJECT_PATH)
 #CXXFLAGS     = -fast -acc -ta=tesla,pinned -Minfo=accel -O3 -Wall -std=c++0x -I$(PROJECT_PATH)
 # UBUNTU - LINUX
-INC_LIB_YAML =
-INC_DIR_YAML =
-INC_LIB_HDF5 = -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi 
-INC_DIR_HDF5 = -I/usr/include/hdf5/openmpi
+INC_LIB_YAML        =
+INC_DIR_YAML        =
+INC_LIB_HDF5        = -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi 
+INC_DIR_HDF5        = -I/usr/include/hdf5/openmpi
+INC_LIB_SMARTREDIS  = -L/home/jofre/Nuria/repositories/SmartRHEA/utils/smartredis-0.4.0-f2003/install/lib
+INC_DIR_SMARTREDIS  = -I/home/jofre/Nuria/repositories/SmartRHEA/utils/smartredis-0.4.0-f2003/install/include
+INC_INSTALL_REDISAI = /home/jofre/Nuria/repositories/SmartRHEA/utils/redisai-1.2.5/install-cpu # dir. of dynamic redisai.so
 # MAC - OS X
 #INC_LIB_YAML = -L/usr/local/lib
 #INC_DIR_YAML = -I/usr/local/include
 #INC_LIB_HDF5 =
 #INC_DIR_HDF5 =
-LDFLAGS      = -lyaml-cpp -lhdf5
-
-
 
 # !! THE LINES BELOW SHOULD NOT BE MODIFIED !! #
 
 OBJS = $(SRC_DIR)/*.cpp
-INC_LIB = $(INC_LIB_YAML) $(INC_LIB_HDF5)
-INC_DIR = $(INC_DIR_YAML) $(INC_DIR_HDF5)
+INC_LIB = $(INC_LIB_YAML) $(INC_LIB_HDF5) $(INC_LIB_SMARTREDIS)
+INC_DIR = $(INC_DIR_YAML) $(INC_DIR_HDF5) $(INC_DIR_SMARTREDIS) -I$(INC_INSTALL_REDISAI)
+LDFLAGS      = -lyaml-cpp -lhdf5 -lsmartredis #-Wl,-rpath,$(INC_INSTALL_REDISAI)
 
 $(EXECUTABLE): $(OBJS)
 	$(CXX) $(MAIN) $(CXXFLAGS) $(OBJS) -o $@ $(INC_LIB) $(INC_DIR) $(LDFLAGS)
@@ -35,4 +36,3 @@ $(EXECUTABLE): $(OBJS)
 .PHONY: clean
 clean:
 	$(RM) $(EXECUTABLE) *.o
-

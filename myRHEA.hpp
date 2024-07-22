@@ -4,6 +4,7 @@
 ////////// INCLUDES //////////
 #include "src/FlowSolverRHEA.hpp"
 #include <vector>
+#include "client.h"
 
 ////////// USING //////////
 using namespace std;

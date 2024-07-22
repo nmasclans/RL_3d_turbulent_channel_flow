@@ -762,6 +762,13 @@ void printMatrix(const string &name, const vector<vector<double>> &matrix) {
     }
 }
 
+void testSmartRedisClient() {
+    std::cout << "Testing SmartRedis..." << std::endl;
+    SmartRedis::Client client(false);
+    std::cout << "SmartRedis test completed." << std::endl;
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /// MAIN
@@ -769,6 +776,8 @@ int main(int argc, char** argv) {
 
     /// Initialize MPI
     MPI_Init(&argc, &argv);
+
+    testSmartRedisClient();
 
 #ifdef _OPENACC
     /// OpenACC distribution on multiple accelerators (GPU)

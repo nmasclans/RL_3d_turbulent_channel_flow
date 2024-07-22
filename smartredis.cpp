@@ -1,7 +1,16 @@
+#include "client.h"
 #include "smartredis.h"
 #include <iostream>
 
 /// TODO: C++: The C++ class SmartRedisManager initializes MPI in the constructor and finalizes it in the destructor. This might be redundant if MPI is already initialized elsewhere in your application.
+void testSmartRedis() {
+    std::cout << "Testing SmartRedis..." << std::endl;
+    // Create a SmartRedis client and test basic functionality
+    smartredis::Client client;
+    client.connect(); // or other SmartRedis client methods as appropriate
+    std::cout << "SmartRedis test completed." << std::endl;
+}
+
 
 SmartRedisManager::SmartRedisManager() {
     /* MPI Initialized in myRHEA main
@@ -167,3 +176,11 @@ void SmartRedisManager::writeTime(double time, const std::string& key) {
         client.PutTensor(key, time_tensor);
     }
 }
+*/
+
+int main() {
+    testSmartRedis();
+    return 0;
+}
+
+
