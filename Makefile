@@ -14,9 +14,9 @@ INC_LIB_YAML        =
 INC_DIR_YAML        =
 INC_LIB_HDF5        = -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi 
 INC_DIR_HDF5        = -I/usr/include/hdf5/openmpi
-INC_LIB_SMARTREDIS  = -L/home/jofre/Nuria/repositories/SmartRHEA/utils/smartredis-0.4.0-f2003/install/lib
-INC_DIR_SMARTREDIS  = -I/home/jofre/Nuria/repositories/SmartRHEA/utils/smartredis-0.4.0-f2003/install/include
-INC_INSTALL_REDISAI = /home/jofre/Nuria/repositories/SmartRHEA/utils/redisai-1.2.5/install-cpu # dir. of dynamic redisai.so
+INC_LIB_SMARTREDIS  = -L/apps/smartredis/0.4.0/lib
+INC_DIR_SMARTREDIS  = -I/apps/smartredis/0.4.0/include
+INC_INSTALL_REDISAI = /apps/redisai/1.2.5/ # dir. of dynamic redisai.so
 # MAC - OS X
 #INC_LIB_YAML = -L/usr/local/lib
 #INC_DIR_YAML = -I/usr/local/include
@@ -28,7 +28,7 @@ INC_INSTALL_REDISAI = /home/jofre/Nuria/repositories/SmartRHEA/utils/redisai-1.2
 OBJS = $(SRC_DIR)/*.cpp
 INC_LIB = $(INC_LIB_YAML) $(INC_LIB_HDF5) $(INC_LIB_SMARTREDIS)
 INC_DIR = $(INC_DIR_YAML) $(INC_DIR_HDF5) $(INC_DIR_SMARTREDIS) -I$(INC_INSTALL_REDISAI)
-LDFLAGS      = -lyaml-cpp -lhdf5 -lsmartredis #-Wl,-rpath,$(INC_INSTALL_REDISAI)
+LDFLAGS      = -lyaml-cpp -lhdf5 -lsmartredis -Wl,-rpath,$(INC_INSTALL_REDISAI)
 
 $(EXECUTABLE): $(OBJS)
 	$(CXX) $(MAIN) $(CXXFLAGS) $(OBJS) -o $@ $(INC_LIB) $(INC_DIR) $(LDFLAGS)

@@ -14,7 +14,6 @@ URL="https://github.com/RedisAI/RedisAI"
 # module purge
 # module load gcc cmake
 
-
 ## Installation workflow
 # Clone github repo
 git clone --recursive ${URL} ${FOLDER}
@@ -27,6 +26,6 @@ make -j $(getconf _NPROCESSORS_ONLN)
 make install
 
 # Copy 'install' directory
-# cd ..
-# sudo mkdir -p ${PREFIX}
-# sudo cp -r install-cpu/* $PREFIX/
+cd ..
+sudo mkdir -p ${PREFIX}
+sudo cp -r install-cpu/* $PREFIX/

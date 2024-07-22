@@ -33,6 +33,6 @@ make -j $(getconf _NPROCESSORS_ONLN)
 make install
 
 # Copy 'install' directory
-# cd ..
-# sudo mkdir -p ${PREFIX}
-# sudo cp -r install/* $PREFIX/
+cd ..
+sudo mkdir -p ${PREFIX}
+sudo cp -r install/* $PREFIX/
