@@ -29,3 +29,8 @@ make install
 cd ..
 sudo mkdir -p ${PREFIX}
 sudo cp -r install-cpu/* $PREFIX/
+
+# redisAI has dependency of Redis - install Redis
+# sudo apt update
+# sudo apt upgrade
+sudo apt install redis-server

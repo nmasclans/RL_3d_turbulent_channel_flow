@@ -764,8 +764,31 @@ void printMatrix(const string &name, const vector<vector<double>> &matrix) {
 
 void testSmartRedisClient() {
     std::cout << "Testing SmartRedis..." << std::endl;
-    SmartRedis::Client client(false);
-    std::cout << "SmartRedis test completed." << std::endl;
+
+    /// check SSDB environment variable
+    const char* ssdb_env = std::getenv("SSDB");
+    if (ssdb_env) {
+        std::cout << "SSDB: " << ssdb_env << std::endl;
+    } else {
+        std::cerr << "SSDB environment variable is not set!" << std::endl;
+        return;
+    }
+
+    /// Set environment variables for SmartRedis logging
+    setenv("SR_LOG_FILE", "nohup.out", 1);
+    setenv("SR_LOG_LEVEL", "DEBUG", 1);
+    
+    /// Create smartredis client
+    try {
+        SmartRedis::Client client(false);
+        std::cout << "SmartRedis test completed." << std::endl;
+    } catch (const SmartRedis::RuntimeException& e) {
+        std::cerr << "SmartRedis RuntimeException: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Standard Exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Unknown exception occurred." << std::endl;
+    }
 }
 
 
