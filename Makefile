@@ -1,3 +1,5 @@
+# TODO: include SmartRedisManager.cpp to compilation, not compiled currently!
+
 # Environment paths
 RHEA_PATH    = /home/jofre/Nuria/flowsolverrhea
 
@@ -28,7 +30,7 @@ INC_INSTALL_REDISAI = /apps/redisai/1.2.5/ # dir. of dynamic redisai.so
 
 # !! THE LINES BELOW SHOULD NOT BE MODIFIED !! #
 
-OBJS = $(SRC_DIR)/*.cpp
+OBJS = $(SRC_DIR)/*.cpp SmartRedisManager.cpp
 INC_LIB = $(INC_LIB_YAML) $(INC_LIB_HDF5) $(INC_LIB_SMARTREDIS)
 INC_DIR = $(INC_DIR_YAML) $(INC_DIR_HDF5) $(INC_DIR_SMARTREDIS) -I$(INC_INSTALL_REDISAI)
 LDFLAGS      = -lyaml-cpp -lhdf5 -lsmartredis -Wl,-rpath,$(INC_INSTALL_REDISAI)

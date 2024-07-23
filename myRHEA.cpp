@@ -86,13 +86,23 @@ vector<vector<double>> Deltaij = {
 
 myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_configuration_file) {
 
-    /// DeltaRij fields TODO: move to myRHEA initializer/constructor
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
     DeltaRyy_field.setTopology(topo, "DeltaRyy");
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
+
+    /// TODO: replace example arguments for actual arg
+    /// SmartRedisManager example arguments
+    int state_local_size = 100; // Example value, replace with actual
+    int action_global_size = 200; // Example value, replace with actual
+    int n_pseudo_envs = 10; // Example value, replace with actual
+    std::string tag = "example_tag"; // Example value, replace with actual
+    bool db_clustered = true; // Example value, replace with actual
+    /// Construct instance of SmartRedisManager
+    SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
+    /// No need to delete manager explicitly; it will be destroyed automatically when it goes out of scope
 
 };
 
@@ -762,36 +772,6 @@ void printMatrix(const string &name, const vector<vector<double>> &matrix) {
     }
 }
 
-void testSmartRedisClient() {
-    std::cout << "Testing SmartRedis..." << std::endl;
-
-    /// check SSDB environment variable
-    const char* ssdb_env = std::getenv("SSDB");
-    if (ssdb_env) {
-        std::cout << "SSDB: " << ssdb_env << std::endl;
-    } else {
-        std::cerr << "SSDB environment variable is not set!" << std::endl;
-        return;
-    }
-
-    /// Set environment variables for SmartRedis logging
-    setenv("SR_LOG_FILE", "nohup.out", 1);
-    setenv("SR_LOG_LEVEL", "DEBUG", 1);
-    
-    /// Create smartredis client
-    try {
-        SmartRedis::Client client(false);
-        std::cout << "SmartRedis test completed." << std::endl;
-    } catch (const SmartRedis::RuntimeException& e) {
-        std::cerr << "SmartRedis RuntimeException: " << e.what() << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Standard Exception: " << e.what() << std::endl;
-    } catch (...) {
-        std::cerr << "Unknown exception occurred." << std::endl;
-    }
-}
-
-
 ///////////////////////////////////////////////////////////////////////////////
 
 /// MAIN
@@ -799,8 +779,6 @@ int main(int argc, char** argv) {
 
     /// Initialize MPI
     MPI_Init(&argc, &argv);
-
-    testSmartRedisClient();
 
 #ifdef _OPENACC
     /// OpenACC distribution on multiple accelerators (GPU)

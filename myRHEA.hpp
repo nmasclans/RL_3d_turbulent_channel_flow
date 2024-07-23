@@ -3,8 +3,9 @@
 
 ////////// INCLUDES //////////
 #include "src/FlowSolverRHEA.hpp"
-#include <vector>
 #include "client.h"
+#include "SmartRedisManager.hpp"
+#include <vector>
 
 ////////// USING //////////
 using namespace std;
@@ -42,6 +43,8 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray DeltaRzz_field;        /// 3-D field of DeltaRzz
 
     private:
+
+        SmartRedisManager manager;
 
         /// Eigen-decomposition
         void symmetricDiagonalize(const vector<vector<double>> &A, vector<vector<double>> &Q, vector<vector<double>> &D);

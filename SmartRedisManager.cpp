@@ -1,37 +1,15 @@
-#include "client.h"
-#include "smartredis.h"
-#include <iostream>
+#include "SmartRedisManager.hpp"
 
-/// TODO: C++: The C++ class SmartRedisManager initializes MPI in the constructor and finalizes it in the destructor. This might be redundant if MPI is already initialized elsewhere in your application.
-void testSmartRedis() {
-    std::cout << "Testing SmartRedis..." << std::endl;
-    // Create a SmartRedis client and test basic functionality
-    smartredis::Client client;
-    client.connect(); // or other SmartRedis client methods as appropriate
-    std::cout << "SmartRedis test completed." << std::endl;
+/// Default constructor
+SmartRedisManager::SmartRedisManager() : client(nullptr) {
 }
 
-
-SmartRedisManager::SmartRedisManager() {
-    /* MPI Initialized in myRHEA main
-    // Constructor can initialize MPI or other necessary components
-    MPI_Init(NULL, NULL);
-    */
-}
-
-SmartRedisManager::~SmartRedisManager() {
-    /* MPI Finalized in myRHEA main
-    // Destructor should finalize MPI and clean up resources
-    MPI_Finalize();
-    */
-    /// Finalize client
-    finalize()
-}
-
-void SmartRedisManager::init(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered) {
-    int mpi_rank, mpi_size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+/// Constructor
+SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
+    : client(nullptr) 
+{
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
     state_sizes.resize(mpi_size);
     state_displs.resize(mpi_size);
@@ -75,7 +53,7 @@ void SmartRedisManager::init(int state_local_size2, int action_global_size2, int
         /// Initialize client
         /// if db_slustered, the client is initialize to utilize a SmartRedis Orchestrator in cluster configuration
         try {
-            client.Initialize(db_clustered);
+            client = std::make_unique<SmartRedis::Client>(db_clustered, "client0");
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error putting tensor" << ex.what() << std::endl; 
         }
@@ -90,23 +68,21 @@ void SmartRedisManager::init(int state_local_size2, int action_global_size2, int
                         const SRMemoryLayout mem_layout)
         */
         try {
-            client.put_tensor("state_size", &state_global_size, {1}, SRTensorType::INT64, SRMemoryLayout::CONTIGUOUS);
-            client.put_tensor("action_size", action_global_size, {1}, SRTensorType::INT64, SRMemoryLayout::CONTIGUOUS);
+            client->put_tensor("state_size",  &state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
+            client->put_tensor("action_size", &action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error putting tensor" << ex.what() << std::endl; 
         }
     }
 }
 
-/* TODO: continue checking work from here!
-void SmartRedisManager::finalize() {
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    if (mpi_rank == 0) {
-        client.~Client();
-    }
+/// Destructor
+SmartRedisManager::~SmartRedisManager() {
+    /// MPI Finalized in myRHEA main
+    /// No need to explicitly call client.~Client(), the destructor for client is automatically called.
 }
 
+/* TODO: continue checking class from here
 void SmartRedisManager::writeState(const std::vector<double>& state_local, const std::string& key) {
     int mpi_rank, mpi_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
@@ -178,9 +154,32 @@ void SmartRedisManager::writeTime(double time, const std::string& key) {
 }
 */
 
-int main() {
-    testSmartRedis();
-    return 0;
+/// Test function, for testing SmartRedis, RedisAI and Redis installation and compilation
+void testSmartRedisClient() {
+    std::cout << "Testing SmartRedis..." << std::endl;
+
+    /// check SSDB environment variable
+    const char* ssdb_env = std::getenv("SSDB");
+    if (ssdb_env) {
+        std::cout << "SSDB: " << ssdb_env << std::endl;
+    } else {
+        std::cerr << "SSDB environment variable is not set!" << std::endl;
+        return;
+    }
+
+    /// Set environment variables for SmartRedis logging
+    setenv("SR_LOG_FILE", "nohup.out", 1);
+    setenv("SR_LOG_LEVEL", "DEBUG", 1);
+    
+    /// Create smartredis client
+    try {
+        SmartRedis::Client client(false);
+        std::cout << "SmartRedis test completed." << std::endl;
+    } catch (const SmartRedis::RuntimeException& e) {
+        std::cerr << "SmartRedis RuntimeException: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Standard Exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Unknown exception occurred." << std::endl;
+    }
 }
-
-
