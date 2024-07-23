@@ -8,6 +8,7 @@
 using namespace std;
 
 ////////// COMPILATION DIRECTIVES //////////
+/// TODO: move these env parameters to an .h file for the _ACTIVE_CONTROL_BODY_FORCE_ to be included by SmartRedisManager.cpp & .h files 
 #define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _FIXED_TIME_STEP_ 0                         /// Activate fixed time step
@@ -59,8 +60,7 @@ double EPS         = numeric_limits<double>::epsilon();
  * Transform lambda -> xmap: xmap0,1   = T * lambda0,1 + t   
  *                                     = lambda0 * x1c + lambda1 * x2c + lambda2 * x3c
  * Realizability Condition (lambda): 0<=lambda_i<=1, sum(lambda_i)=1
- * Realizability Condition (xmap):   xmap coord inside barycentric map triangle, defined by x1c, x2c, x3c 
- */
+ * Realizability Condition (xmap):   xmap coord inside barycentric map triangle, defined by x1c, x2c, x3c */
 vector<double> x1c = {1.0, 0.0};                // corner x1c
 vector<double> x2c = {0.0, 0.0};                // corner x2c
 vector<double> x3c = {0.5, sqrt(3.0) / 2.0};    // corner x3c
@@ -94,6 +94,7 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
     /// TODO: replace example arguments for actual arg
+    /// TODO: include SmartRedisManager input arguments into the configuration_file as case parameters
     /// SmartRedisManager example arguments
     int state_local_size = 100; // Example value, replace with actual
     int action_global_size = 200; // Example value, replace with actual

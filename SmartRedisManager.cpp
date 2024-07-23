@@ -8,6 +8,9 @@ SmartRedisManager::SmartRedisManager() : client(nullptr) {
 SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
     : client(nullptr) 
 {
+
+    /// TODO: understand the input arguments, and custom its values to current implementation 
+
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
@@ -16,8 +19,8 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     action_global.resize(action_global_size2, 0.0);
     action_global_previous.resize(action_global_size2, 0.0);
 
-    // Gather the individual sizes to get total size and offsets in root process (0)
-    /*  sendbuf(const void*) = state_local_size2 : pointer to the data that each process sends to the root process,
+    /* Gather the individual sizes to get total size and offsets in root process (0)
+        sendbuf(const void*) = state_local_size2 : pointer to the data that each process sends to the root process,
             in this case the size of local state array of each mpi process
         sendcount(int) = 1 : number of elements to send from each process
         sendtype(MPI_Datatype) = MPI_INT : MPI datatype for integers 
@@ -27,8 +30,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         recvtype(MPI_Datatype) = MPI_int: datatype of the elements received by the root process
         root(int) = 0 : rank of the root process that will receive the gathered data
         comm(MPI_Comm) = MPI_COMM_WORLD: communicator that defines the group of process involved in the communication, 
-            which for MPI_COMM_WORLD includes all MPI process in the application
-    */
+            which for MPI_COMM_WORLD includes all MPI process in the application */
     MPI_Gather(&state_local_size2, 1, MPI_INT, state_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     // Compute displacements - global state idxs corresponding to the local state of each MPI process
