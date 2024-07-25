@@ -8,16 +8,13 @@ SmartRedisManager::SmartRedisManager() : client(nullptr) {
 SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
     : client(nullptr) 
 {
-
-    /// TODO: understand the input arguments, and custom its values to current implementation 
-
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
-    state_sizes.resize(mpi_size);
-    state_displs.resize(mpi_size);
-    action_global.resize(action_global_size2, 0.0);
-    action_global_previous.resize(action_global_size2, 0.0);
+    state_sizes.resize(mpi_size);                            // vector<int>
+    state_displs.resize(mpi_size);                           // vector<int>
+    action_global.resize(action_global_size2, 0.0);          // vector<double>
+    action_global_previous.resize(action_global_size2, 0.0); // vector<double>
 
     /* Gather the individual sizes to get total size and offsets in root process (0)
         sendbuf(const void*) = state_local_size2 : pointer to the data that each process sends to the root process,
@@ -31,7 +28,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         root(int) = 0 : rank of the root process that will receive the gathered data
         comm(MPI_Comm) = MPI_COMM_WORLD: communicator that defines the group of process involved in the communication, 
             which for MPI_COMM_WORLD includes all MPI process in the application */
-    MPI_Gather(&state_local_size2, 1, MPI_INT, state_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Gather(&state_local_size2, 1, MPI_INT, state_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD); // update state_sizes
 
     // Compute displacements - global state idxs corresponding to the local state of each MPI process
     if (mpi_rank == 0) {
@@ -43,12 +40,11 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     }
 
     /// Store local parameters (input arguments of each process) to class variables
-    n_pseudo_envs = n_pseudo_envs2;
+    n_pseudo_envs      = n_pseudo_envs2;
     action_global_size = action_global_size2;
-    state_local_size = state_local_size2;
-    /// Sum the local state_local_size of each process in MPI_COMM_WORLD to obtain state_global_size, 
-    /// with result state_global_size distributed to all processes in MPI_COMM_WORLD
-    MPI_Allreduce(&state_local_size, &state_global_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    state_local_size   = state_local_size2;
+    /// Calculate state_global_size: sum the local state_local_size of each process in MPI_COMM_WORLD, and distribute state_global_size result to all processes in MPI_COMM_WORLD
+    MPI_Allreduce(&state_local_size, &state_global_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update state_global_size
 
     /// Init client (only root process!), and write global state and action sizes into DB.
     if (mpi_rank == 0) {
@@ -57,25 +53,36 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         try {
             client = std::make_unique<SmartRedis::Client>(db_clustered, "client0");
         } catch (const SmartRedis::Exception& ex) {
-            std::cerr << "Error putting tensor" << ex.what() << std::endl; 
+            std::cerr << "Error initializing SmartRedis client: " << ex.what() << std::endl; 
+            return;
         }
 
-        /// Write global state and action sizes into DB
-        /* (SmartRedis C++ API)
-        https://www.craylabs.org/docs/api/smartredis_api.html
-        void put_tensor(const std::string &name, 
+        /* Write global state and action sizes into DB:
+            void put_tensor(const std::string &name, 
                         const void *data, 
                         const std::vector<size_t> &dims,
                         const SRTensorType type, 
-                        const SRMemoryLayout mem_layout)
-        */
+                        const SRMemoryLayout mem_layout) */
         try {
+            /* General code to put tensor into database
+                std::vector<int> state_global_size_tensor  = {state_global_size};
+                std::vector<size_t> scalar_dims = {1}; 
+                client->put_tensor("state_size",  state_global_size_tensor.data(),  scalar_dims, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous); */
+            /// Partiicular code to put scalar into database
             client->put_tensor("state_size",  &state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
             client->put_tensor("action_size", &action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
         } catch (const SmartRedis::Exception& ex) {
-            std::cerr << "Error putting tensor" << ex.what() << std::endl; 
+            std::cerr << "Error putting tensor: " << ex.what() << std::endl; 
+            return;
         }
     }
+
+    // (optional) Print database tensor contents
+    printDatabaseDetails();
+
+    // Debugging
+    if (mpi_rank==0)
+        std::cout << "SmartRedis manager constructed" << std::endl << std::endl;
 }
 
 /// Destructor
@@ -156,23 +163,10 @@ void SmartRedisManager::writeTime(double time, const std::string& key) {
 }
 */
 
-/// Test function, for testing SmartRedis, RedisAI and Redis installation and compilation
+/// Check I: test SmartRedis, RedisAI and Redis installation and compilation
 void testSmartRedisClient() {
     std::cout << "Testing SmartRedis..." << std::endl;
-
-    /// check SSDB environment variable
-    const char* ssdb_env = std::getenv("SSDB");
-    if (ssdb_env) {
-        std::cout << "SSDB: " << ssdb_env << std::endl;
-    } else {
-        std::cerr << "SSDB environment variable is not set!" << std::endl;
-        return;
-    }
-
-    /// Set environment variables for SmartRedis logging
-    setenv("SR_LOG_FILE", "nohup.out", 1);
-    setenv("SR_LOG_LEVEL", "DEBUG", 1);
-    
+  
     /// Create smartredis client
     try {
         SmartRedis::Client client(false);
@@ -183,5 +177,59 @@ void testSmartRedisClient() {
         std::cerr << "Standard Exception: " << e.what() << std::endl;
     } catch (...) {
         std::cerr << "Unknown exception occurred." << std::endl;
+    }
+}
+
+/// Check II: Print database contents
+void SmartRedisManager::printDatabaseDetails() {
+    if (mpi_rank==0){
+        try{
+            std::vector<std::string> tensor_keys = {"state_size", "action_size"};
+            std::cout << "Database contents:" << std::endl;
+            for (const auto& key : tensor_keys) {
+                if (client->tensor_exists(key)){
+                    // Get tensor
+                    void* data;
+                    std::vector<size_t> dims;
+                    size_t total_elements = 1;
+                    SRTensorType type;
+                    client->get_tensor(key, data, dims, type, SRMemoryLayout::SRMemLayoutContiguous);
+                    // Verify data pointer is not null
+                    if (data == nullptr) {
+                        std::cerr << "Error: data pointer is null for key " << key << std::endl;
+                        continue;
+                    }
+                    // Print tensor details
+                    std::cout << "Tensor key: " << key << std::endl;
+                    std::cout << "Tensor dimensions: ";
+                    for (const auto& dim : dims) {
+                        std::cout << dim << " ";
+                        total_elements *= dim;
+                    }
+                    std::cout << std::endl;
+                    std::cout << "Tensor #elements: " << total_elements << std::endl;
+                    // Print tensor data based on type (concatenated data, use total_elements to go through data elements)
+                    std::cout << "Data: ";
+                    if (type==SRTensorType::SRTensorTypeDouble) {
+                        for (size_t i = 0; i < total_elements; ++i)
+                            std::cout << ((double*)data)[i] << " ";
+                    } else if (type==SRTensorType::SRTensorTypeFloat) {
+                        for (size_t i = 0; i < total_elements; ++i)
+                            std::cout << ((float*)data)[i] << " ";
+                    } else if (type==SRTensorType::SRTensorTypeInt64) {
+                        for (size_t i = 0; i < total_elements; ++i)
+                            std::cout << ((int*)data)[i] << " ";
+                    // Add cases for other tensor types as needed
+                    } else {
+                        std::cout << "Unsupported tensor type" << std::endl;
+                    }
+                    std::cout << std::endl;
+                } else {
+                    std::cout << "Tensor key '" << key << "' does not exist" << std::endl;
+                }
+            }
+        } catch (const SmartRedis::Exception& ex) {
+            std::cerr << "Error retrieving database contents: " << ex.what() << std::endl;
+        }
     }
 }

@@ -23,6 +23,8 @@ public:
     void writeTime(double time, const std::string& key);
 
 private:
+    void printDatabaseDetails();
+
     std::unique_ptr<SmartRedis::Client> client; // Use a unique pointer for conditional initialization
     std::vector<int> state_sizes;
     std::vector<int> state_displs;

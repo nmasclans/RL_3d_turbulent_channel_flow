@@ -34,3 +34,6 @@ sudo cp -r install-cpu/* $PREFIX/
 # sudo apt update
 # sudo apt upgrade
 sudo apt install redis-server
+
+# Give execution permissions to redisai.so file
+sudo chmod +x $PREFIX/redisai.so

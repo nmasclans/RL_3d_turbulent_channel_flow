@@ -43,14 +43,14 @@ const double u_0        = ( u_tau/kappa_vK )*( log( delta/y_0 ) + ( y_0/delta ) 
 const double alpha_u    = 1.0;                      /// Magnitude of velocity perturbations
 const double alpha_P    = 0.1;                      /// Magnitude of pressure perturbations
 
+const double fixed_time_step = 1.0e-5;				/// Fixed time step
+
 #if _FEEDBACK_LOOP_BODY_FORCE_
 /// Estimated uniform body force to drive the flow
 double controller_output = tau_w/delta;			    /// Initialize controller output
 double controller_error  = 0.0;			        	/// Initialize controller error
 double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 #endif
-
-const double fixed_time_step = 1.0e-5;				/// Fixed time step
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
 /// eigen-values barycentric map coordinates - corners of realizable region
@@ -86,6 +86,7 @@ vector<vector<double>> Deltaij = {
 
 myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_configuration_file) {
 
+#if _ACTIVE_CONTROL_BODY_FORCE_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -93,17 +94,16 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
+    /// Construct SmartRedis client to communicate with Redis database
     /// TODO: replace example arguments for actual arg
     /// TODO: include SmartRedisManager input arguments into the configuration_file as case parameters
-    /// SmartRedisManager example arguments
     int state_local_size = 100; // Example value, replace with actual
     int action_global_size = 200; // Example value, replace with actual
     int n_pseudo_envs = 10; // Example value, replace with actual
     std::string tag = "example_tag"; // Example value, replace with actual
-    bool db_clustered = true; // Example value, replace with actual
-    /// Construct instance of SmartRedisManager
+    bool db_clustered = false; // if true, execution ERROR: Unable to connect to backend database: ERR This instance has cluster support disabled
     SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
-    /// No need to delete manager explicitly; it will be destroyed automatically when it goes out of scope
+#endif
 
 };
 
@@ -395,7 +395,6 @@ void myRHEA::calculateTimeStep() {
 
 };
 
-#if _ACTIVE_CONTROL_BODY_FORCE_
 ///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
  * 
@@ -759,7 +758,6 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
         }
     }
 }
-#endif
 
 ////////// ADDITIONAL FUNCTIONS //////////
 void printMatrix(const string &name, const vector<vector<double>> &matrix) {

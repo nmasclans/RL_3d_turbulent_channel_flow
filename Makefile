@@ -1,5 +1,3 @@
-# TODO: include SmartRedisManager.cpp to compilation, not compiled currently!
-
 # Environment paths
 RHEA_PATH    = /home/jofre/Nuria/flowsolverrhea
 
@@ -27,6 +25,7 @@ INC_INSTALL_REDISAI = /apps/redisai/1.2.5/ # dir. of dynamic redisai.so
 #INC_DIR_YAML = -I/usr/local/include
 #INC_LIB_HDF5 =
 #INC_DIR_HDF5 =
+# TODO: include SmartRedis & RedisAi for Mac system
 
 # !! THE LINES BELOW SHOULD NOT BE MODIFIED !! #
 
