@@ -103,6 +103,11 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     std::string tag = "example_tag"; // Example value, replace with actual
     bool db_clustered = false; // if true, execution ERROR: Unable to connect to backend database: ERR This instance has cluster support disabled
     SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
+
+    /// Test manager
+    vector<double> state_local(state_local_size,0.0);
+    std::generate(state_local.begin(), state_local.end(), std::rand);
+    manager.writeState(state_local, "state_key");
 #endif
 
 };

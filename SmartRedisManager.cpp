@@ -91,25 +91,19 @@ SmartRedisManager::~SmartRedisManager() {
     /// No need to explicitly call client.~Client(), the destructor for client is automatically called.
 }
 
-/* TODO: continue checking class from here
 void SmartRedisManager::writeState(const std::vector<double>& state_local, const std::string& key) {
-    int mpi_rank, mpi_size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-
-    std::vector<double> state_global(state_global_size);
-    
     // Gather the local states into a global state
+    std::vector<double> state_global(state_global_size);
     MPI_Gatherv(state_local.data(), state_local_size, MPI_DOUBLE,
                 state_global.data(), state_sizes.data(), state_displs.data(), MPI_DOUBLE,
                 0, MPI_COMM_WORLD);
-
     // Write global state into DB
     if (mpi_rank == 0) {
-        client.PutTensor(key, state_global);
+        client->put_tensor(key, &state_global, state_global_size, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
     }
 }
 
+/* TODO: continue checking class from here
 void SmartRedisManager::readAction(const std::string& key) {
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
