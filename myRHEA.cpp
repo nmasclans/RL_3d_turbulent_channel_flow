@@ -94,21 +94,41 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
+    ////////////////////////////////////////////// Test manager //////////////////////////////////////////////
+
+    int mpi_size;
+    int mpi_rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+
     /// Construct SmartRedis client to communicate with Redis database
     /// TODO: replace example arguments for actual arg
     /// TODO: include SmartRedisManager input arguments into the configuration_file as case parameters
-    int state_local_size = 100; // Example value, replace with actual
-    int action_global_size = 200; // Example value, replace with actual
+    int state_local_size = 10; // Example value, replace with actual
+    int action_global_size = 25; // Example value, replace with actual
     int n_pseudo_envs = 10; // Example value, replace with actual
-    std::string tag = "example_tag"; // Example value, replace with actual
+    std::string tag = "client_name"; // Example value, replace with actual
     bool db_clustered = false; // if true, execution ERROR: Unable to connect to backend database: ERR This instance has cluster support disabled
     SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
 
-    /// Test manager
-    vector<double> state_local(state_local_size,0.0);
-    std::generate(state_local.begin(), state_local.end(), std::rand);
-    manager.writeState(state_local, "state_key");
+    // write and read local states, and compare to original local states
+    vector<double> original_state_local(state_local_size,0.0);
+    // Fill the vector with sequential values starting from 0.0
+    std::iota(original_state_local.begin(), original_state_local.end(), 0.0);   // 0.0, 1.0, 2.0, etc
+    // Sum 50.0 * mpi_rank to all elements
+    transform(original_state_local.begin(), original_state_local.end(), original_state_local.begin(),
+                [mpi_rank](double val) { return val + 50.0 * static_cast<double>(mpi_rank); });
+    manager.writeState(original_state_local, "state_key");
+    manager.printDatabaseContent();
     manager.readState("state_key");
+    manager.printDatabaseContent();
+
+    double reward = 1.43; int step_type = 2; double time = 45.67;
+    manager.writeReward(reward, "reward_key");
+    manager.writeStepType(step_type, "step_type_key");
+    manager.writeTime(time, "time_key");
+    manager.printDatabaseContent();
+
     manager.readAction("action_key");
 #endif
 
@@ -766,18 +786,6 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
         for (int r = 0; r < 3; r++){
             R[q][r] = Rkk * ((1.0 / 3.0) * Deltaij[q][r] + A[q][r]);
         }
-    }
-}
-
-////////// ADDITIONAL FUNCTIONS //////////
-void printMatrix(const string &name, const vector<vector<double>> &matrix) {
-    cout << name << " = " << endl;
-    for (int ii = 0; ii < 3; ii++) {
-        cout << "[" << ii << "][:] ";
-        for (int jj = 0; jj < 3; jj++) {
-            cout << matrix[ii][jj] << " ";
-        }
-        cout << endl;
     }
 }
 

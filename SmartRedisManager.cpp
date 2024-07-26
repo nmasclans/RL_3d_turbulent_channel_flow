@@ -61,10 +61,9 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
 
     /// Init client (only root process!), and write global state and action sizes into DB.
     if (mpi_rank == 0) {
-        /// Initialize client
-        /// if db_slustered, the client is initialize to utilize a SmartRedis Orchestrator in cluster configuration
+        /// Initialize client, the client is initialized to utilize a SmartRedis Orchestrator in cluster configuration if db_clustered
         try {
-            client = std::make_unique<SmartRedis::Client>(db_clustered, "client0");
+            client = std::make_unique<SmartRedis::Client>(db_clustered, tag);
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error initializing SmartRedis client: " << ex.what() << std::endl; 
             return;
@@ -84,9 +83,6 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
             return;
         }
     }
-
-    // (optional) Print database tensor contents
-    printDatabaseDetails();
 
     // Debugging
     if (mpi_rank==0)
@@ -134,8 +130,7 @@ void SmartRedisManager::readState(const std::string& key) {
         bool found = client->poll_tensor(key, read_interval, read_tries);
         if (!found) {
             std::cerr << "ERROR in readState, state array not found." << std::endl;
-            return;
-            //MPI_Abort(MPI_COMM_WORLD, 1);
+                MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
         /* void Client::get_tensor(const std::string& name,
@@ -150,35 +145,36 @@ void SmartRedisManager::readState(const std::string& key) {
             client->get_tensor(key, get_data_ptr, get_dims, get_SRTensorType, SRMemoryLayout::SRMemLayoutContiguous);
         } catch (const SmartRedis::RuntimeException& e) {
             std::cerr << "SmartRedis RuntimeException: " << e.what() << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         
-        /// Check received action data
+        /// Check received state data
         if (get_data_ptr == nullptr) {
             std::cerr << "ERROR in readState, data pointer is null for key " << key << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         if (get_dims != state_global_size_vec) {
             std::cerr << "ERROR in readState, dimensions mismatch for key " << key << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         if (get_SRTensorType != SRTensorType::SRTensorTypeDouble) {
             std::cerr << "ERROR in readState, unexpected tensor type for key " << key << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        /// Total elements of action (required in case action has >1 dimension)
+        /// Total elements of state (required in case action has >1 dimension)
         size_t total_elements = 1;
         for (const size_t& dim : state_global_size_vec) {
             total_elements *= dim;
         }
 
-        /// Update action data
+        /// Update state data
         for (size_t i=0; i<total_elements; i++) {
             state_global[i] = ((double*)get_data_ptr)[i];
         }
 
-        // void Client::delete_tensor(const std::string& name)
+        /// Delete action data from database
+        //  void Client::delete_tensor(const std::string& name)
         client->delete_tensor(key);
     }
 
@@ -203,8 +199,7 @@ void SmartRedisManager::readAction(const std::string& key) {
         bool found = client->poll_tensor(key, read_interval, read_tries);
         if (!found) {
             std::cerr << "ERROR in readAction, actions array not found." << std::endl;
-            return;
-            //MPI_Abort(MPI_COMM_WORLD, 1);
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
         /* void Client::get_tensor(const std::string& name,
@@ -219,21 +214,21 @@ void SmartRedisManager::readAction(const std::string& key) {
             client->get_tensor(key, get_data_ptr, get_dims, get_SRTensorType, SRMemoryLayout::SRMemLayoutContiguous);
         } catch (const SmartRedis::RuntimeException& e) {
             std::cerr << "SmartRedis RuntimeException: " << e.what() << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         
         /// Check received action data
         if (get_data_ptr == nullptr) {
             std::cerr << "ERROR in readAction, data pointer is null for key " << key << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         if (get_dims != action_global_size_vec) {
             std::cerr << "ERROR in readAction, dimensions mismatch for key " << key << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         if (get_SRTensorType != SRTensorType::SRTensorTypeDouble) {
             std::cerr << "ERROR in readAction, unexpected tensor type for key " << key << std::endl;
-            return;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
         /// Total elements of action (required in case action has >1 dimension)
@@ -247,7 +242,8 @@ void SmartRedisManager::readAction(const std::string& key) {
             action_global[i] = ((double*)get_data_ptr)[i];
         }
 
-        // void Client::delete_tensor(const std::string& name)
+        /// Delete action data from database
+        //  void Client::delete_tensor(const std::string& name)
         client->delete_tensor(key);
     }
 
@@ -263,37 +259,36 @@ void SmartRedisManager::readAction(const std::string& key) {
     }
 }
 
-/*
-void SmartRedisManager::writeReward(const std::vector<double>& Ftau_neg, const std::string& key) {
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-
+void SmartRedisManager::writeReward(const double reward, const std::string& key) {
     if (mpi_rank == 0) {
-        client.PutTensor(key, Ftau_neg);
+        std::vector<double> reward_tensor = {reward};
+        client->put_tensor(key, reward_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
     }
 }
 
-void SmartRedisManager::writeStepType(int step_type, const std::string& key) {
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-
+/// TODO: necessary method? delete if not used
+void SmartRedisManager::writeStepType(const int step_type, const std::string& key) {
     if (mpi_rank == 0) {
         std::vector<int64_t> step_type_tensor = {step_type};
-        client.PutTensor(key, step_type_tensor);
+        client->put_tensor(key, step_type_tensor.data(), {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
     }
-    step_type_mod = step_type;
 }
 
-void SmartRedisManager::writeTime(double time, const std::string& key) {
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-
+void SmartRedisManager::writeTime(const double time, const std::string& key) {
     if (mpi_rank == 0) {
         std::vector<double> time_tensor = {time};
-        client.PutTensor(key, time_tensor);
+        client->put_tensor(key, time_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
     }
 }
-*/
+
+/// Get methods
+std::vector<double> SmartRedisManager::getStateGlobal(){
+    return state_global;
+}
+
+std::vector<double> SmartRedisManager::getActionGlobal(){
+    return action_global;
+}
 
 /// Check I: test SmartRedis, RedisAI and Redis installation and compilation
 void testSmartRedisClient() {
@@ -313,10 +308,11 @@ void testSmartRedisClient() {
 }
 
 /// Check II: Print database contents
-void SmartRedisManager::printDatabaseDetails() {
+void SmartRedisManager::printDatabaseContent() {
     if (mpi_rank==0){
         try{
-            std::vector<std::string> tensor_keys = {"state_size", "action_size"};
+            std::vector<std::string> tensor_keys = {"state_size", "action_size", "state_key", "action_key",
+                                                    "reward_key", "step_type_key", "time_key"};
             std::cout << "Database contents:" << std::endl;
             for (const auto& key : tensor_keys) {
                 if (client->tensor_exists(key)){
@@ -341,14 +337,17 @@ void SmartRedisManager::printDatabaseDetails() {
                     std::cout << std::endl;
                     std::cout << "Tensor #elements: " << total_elements << std::endl;
                     // Print tensor data based on type (concatenated data, use total_elements to go through data elements)
-                    std::cout << "Data: ";
+                    std::cout << "Data ";
                     if (type==SRTensorType::SRTensorTypeDouble) {
+                        std::cout << "(type SRTensorTypeDouble): ";
                         for (size_t i = 0; i < total_elements; ++i)
                             std::cout << ((double*)data)[i] << " ";
                     } else if (type==SRTensorType::SRTensorTypeFloat) {
+                        std::cout << "(type SRTensorTypeFloat): ";
                         for (size_t i = 0; i < total_elements; ++i)
                             std::cout << ((float*)data)[i] << " ";
                     } else if (type==SRTensorType::SRTensorTypeInt64) {
+                        std::cout << "(type SRTensorTypeInt64): ";
                         for (size_t i = 0; i < total_elements; ++i)
                             std::cout << ((int*)data)[i] << " ";
                     // Add cases for other tensor types as needed
@@ -360,6 +359,7 @@ void SmartRedisManager::printDatabaseDetails() {
                     std::cout << "Tensor key '" << key << "' does not exist" << std::endl;
                 }
             }
+            std::cout << std::endl;
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error retrieving database contents: " << ex.what() << std::endl;
         }

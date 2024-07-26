@@ -16,15 +16,20 @@ public:
     SmartRedisManager();
     SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered);
     ~SmartRedisManager();
+    
     void writeState(const std::vector<double>& state_local, const std::string& key);
     void readState(const std::string& key);
     void readAction(const std::string& key);
-    void writeReward(const std::vector<double>& Ftau_neg, const std::string& key);
-    void writeStepType(int step_type, const std::string& key);
-    void writeTime(double time, const std::string& key);
+    void writeReward(const double reward, const std::string& key);
+    void writeStepType(const int step_type, const std::string& key);
+    void writeTime(const double time, const std::string& key);
+
+    std::vector<double> getStateGlobal();
+    std::vector<double> getActionGlobal();
+
+    void printDatabaseContent();
 
 private:
-    void printDatabaseDetails();
                  
     std::unique_ptr<SmartRedis::Client> client; // Use a unique pointer for conditional initialization
     std::vector<int> state_sizes;
