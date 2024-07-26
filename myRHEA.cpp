@@ -108,6 +108,8 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     vector<double> state_local(state_local_size,0.0);
     std::generate(state_local.begin(), state_local.end(), std::rand);
     manager.writeState(state_local, "state_key");
+    manager.readState("state_key");
+    manager.readAction("action_key");
 #endif
 
 };
@@ -267,6 +269,7 @@ void myRHEA::calculateSourceTerms() {
                 
                 /// Get perturbation values from RL agent
                 /// TODO: implement RL action here!
+                // TODO: readAction()
                 DeltaRkk    = 0.0;
                 DeltaThetaZ = 0.0;
                 DeltaThetaY = 0.0;
@@ -380,6 +383,8 @@ void myRHEA::calculateSourceTerms() {
     //f_rhov_field.update();
     //f_rhow_field.update();
     //f_rhoE_field.update();
+
+
 
 };
 
