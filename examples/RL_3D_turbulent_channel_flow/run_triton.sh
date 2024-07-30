@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# add shared dynamic libraries
+export SMARTREDIS_DIR=/apps/smartredis/0.4.0/
+export RAI_PATH=/apps/redisai/1.2.5/redisai.so
+export SMARTSIM_REDISAI=1.2.5
+
+# Set RedisAi required environment variables
+#export REDIS_PORT=6380
+#export SSDB="tcp://127.0.0.1:$REDIS_PORT"
+export SR_LOG_FILE="nohup.out"
+export SR_LOG_LEVEL="INFO"
+
+# Activate conda environment for the current session
+eval "$(conda shell.bash hook)"
+conda activate smartrhea-env
+
+# Run training
+python3 run.py
