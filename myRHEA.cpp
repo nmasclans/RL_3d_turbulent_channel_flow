@@ -94,8 +94,8 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
+    /*
     ////////////////////////////////////////////// Test manager //////////////////////////////////////////////
-
     int mpi_size;
     int mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -128,8 +128,8 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     manager.writeStepType(step_type, "step_type_key");
     manager.writeTime(time, "time_key");
     manager.printDatabaseContent();
-
     manager.readAction("action_key");
+    */
 #endif
 
 };
