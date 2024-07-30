@@ -17,7 +17,7 @@ pip install smartsim==0.4.2     # (requires Python version >=3.8, <3.11)
 pip install smartredis
 pip install scipy==1.6.0
 pip install matplotlib==3.7.0
-pip install numpy==1.20.0
+pip install numpy==1.21.0
 pip install tensorflow==2.8.0
 pip install tf_agents==0.10.0
 pip install tensorflow-probability==0.14.1
