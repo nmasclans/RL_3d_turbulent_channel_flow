@@ -62,6 +62,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     /// Init client (only root process!), and write global state and action sizes into DB.
     if (mpi_rank == 0) {
         /// Initialize client, the client is initialized to utilize a SmartRedis Orchestrator in cluster configuration if db_clustered
+        ///     Client(bool cluster, const std::string& logger_name = "default");
         try {
             client = std::make_unique<SmartRedis::Client>(db_clustered, tag);
         } catch (const SmartRedis::Exception& ex) {

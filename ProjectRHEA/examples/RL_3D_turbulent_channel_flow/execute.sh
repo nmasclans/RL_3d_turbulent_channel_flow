@@ -6,8 +6,8 @@ export SMARTSIM_REDISAI=1.2.5
 export LD_LIBRARY_PATH=$SMARTREDIS_DIR/lib:$LD_LIBRARY_PATH
 
 # Set RedisAi required environment variables
-export REDIS_PORT=6380
-export SSDB="tcp://127.0.0.1:$REDIS_PORT"
+export REDIS_PORT=6380                          # TODO: rm if necessary, defined in rhea_env initializer
+export SSDB="tcp://127.0.0.1:$REDIS_PORT"       # TODO: rm if necessary, defined in rhea_env initializer
 export SR_LOG_FILE="nohup.out"
 export SR_LOG_LEVEL="INFO"
 

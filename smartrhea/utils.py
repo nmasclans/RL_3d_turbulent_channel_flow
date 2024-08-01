@@ -11,9 +11,19 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
+def n_witness_points(fname):
+    return sum([1 for l in open(fname,"r").readlines() if l.strip()])  # num. witness points = num. lines of fname
+
+
+def n_rectangles(fname):
+    return int(open(fname,"r").readline())  # first line of fname contains info num. rectangles
+
+
 def print_params(params, title=None):
     if title: print(f"{bcolors.OKGREEN}{title}{bcolors.ENDC}")
     print(params_str(params))
+    
 
 def params_str(params, title=None):
     my_str = ""
@@ -24,6 +34,11 @@ def params_str(params, title=None):
     my_str += "\n"
     return my_str
 
+
+def numpy_str(a, precision=2):
+    return np.array2string(a, precision=precision, floatmode='fixed')
+
+
 # --- TensorFlow utils ---
 def deactivate_tf_gpus():
     import tensorflow as tf
@@ -31,3 +46,4 @@ def deactivate_tf_gpus():
     visible_devices = tf.config.get_visible_devices()
     for device in visible_devices:
         assert device.device_type != 'GPU'
+

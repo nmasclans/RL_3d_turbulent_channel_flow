@@ -1,12 +1,15 @@
+import absl.logging
 import os
 import tensorflow as tf
+import time
 
 from smartsim.log import get_logger
-import absl.logging
+from socket import gethostname
 
 from params import params, env_params
 from smartrhea.init_smartsim import init_smartsim
 from smartrhea.utils import print_params, deactivate_tf_gpus
+from smartrhea.rhea_env import RheaEnv
 
 #--------------------------- Utils ---------------------------
 
@@ -22,13 +25,20 @@ if params["use_XLA"]:   # activate XLA (Accelerated Linear Algebra) for performa
     tf.config.optimizer.set_jit(True)               # Enables JIT compilation globally within Tensorflow for the current session
     tf.function(jit_compile=True)                   # Enables JIT compilation for specific Tensorflow functions
 
-# Write summary to TensorBoard
+""" Write summary to TensorBoard: 
+    creates ./train directory, if necessary
+    creates file events.out.tfevents.<timestamp>.<host_name>.<pid>, where
+        <timestamp>: time when the file is created
+        <host_name>: host name of the machine where TensorFlow process runs, e.g. triton
+        <pid>: pid of the TensorFlow process that created the event file    """
 train_dir = os.path.join(cwd, "train")
 summary_writer = tf.summary.create_file_writer(train_dir, flush_millis=1000)
 summary_writer.set_as_default()
+print("")
+logger.info(f"Tensorboard event file created: {train_dir}/events.out.tfevents.{int(time.time())}.{gethostname()}.{os.getpid()}")
 
 # Print simulation params
-print_params(params)
+print_params(params, "RUN PARAMETERS:")
 
 #--------------------------- RL setup ---------------------------
 # Init SmartSim framework: Experiment and Orchestrator (database)
@@ -39,18 +49,18 @@ exp, hosts, db, db_is_clustered = init_smartsim(
     run_command = params["run_command"],
 )
 
-"""
 # Init environment
-collect_py_env = SodEnv(
+collect_py_env = RheaEnv(
     exp,
     db,
     hosts,
-    "sod2d",
+    "RHEA.exe",
+    "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/ProjectRHEA/examples",
     cwd,
-    cfd_n_envs=params["cfd_n_envs"],
-    mode="collect",
+    mode = "collect",
     **env_params,
 )
+"""
 collect_env = tf_py_environment.TFPyEnvironment(collect_py_env)
 
 global_step = tf.compat.v1.train.get_or_create_global_step()

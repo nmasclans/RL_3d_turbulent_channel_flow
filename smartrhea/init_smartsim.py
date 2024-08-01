@@ -188,6 +188,9 @@ def init_smartsim(
         logger.info(f"$(smart dbcli) -h {db_host} -p {port} shutdown")
 
     logger.info(f"DB address: {db.get_address()[0]}")
-
+    
+    logger.info("Created 'rhea_exp' directory containing files: 'orchestrator_0.err', 'orchestrator_0.out', 'smartsim_db.dat'")
+    logger.info("New file 'rhea_exp/smartsim_db.dat' example content: \n{'db': <smartsim.database.orchestrator.Orchestrator object at 0x7a8ae990b880>, 'db_jobs': {'orchestrator_0': <smartsim._core.control.job.Job object at 0x7a8ae8d26520>}, 'steps': [StepMap(step_id=None, task_id='498093', managed=False)]}")
+    
     # we run the model on a single host, and have
     return exp, hosts, db, db_is_clustered

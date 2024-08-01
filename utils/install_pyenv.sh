@@ -28,7 +28,7 @@ export CC=gcc CXX=g++ NO_CHECKS=1
 # Build SmartSim 
 smart build --device cpu --no_pt --no_tf
 
-# Navigate to the directory where this script is located - directory containing setup.py
+# Navigate to the directory where setup.py is located - directory containing setup.py
 cd "$(dirname "$0")/.."
 
 # Install package smartrhea in editable mode - uses setup.py internally
