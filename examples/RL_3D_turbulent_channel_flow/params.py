@@ -52,7 +52,7 @@ params = {
     "reward_norm": 153.6, # non-actuated lx in coarse mesh, # TODO: set custom value
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local, # TODO: set custom value
 ###    "restart_file": 3, # 3: random. 1: restart 1. 2: restart 2
-###    "net": (128, 128),
+    "net": (128, 128),              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
 ###    "learning_rate": 5e-4,
 ###    "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # trajectories buffer
 ###    "log_interval": 1, # save model, policy, metrics, interval

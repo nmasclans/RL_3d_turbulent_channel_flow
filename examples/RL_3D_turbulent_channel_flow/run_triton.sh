@@ -10,6 +10,7 @@ export SMARTSIM_REDISAI=1.2.5
 #export SSDB="tcp://127.0.0.1:$REDIS_PORT"
 export SR_LOG_FILE="nohup.out"
 export SR_LOG_LEVEL="INFO"
+export SMARTSIM_LOG_LEVEL="DEBUG"
 
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"

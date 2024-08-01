@@ -3,7 +3,16 @@ import os
 import tensorflow as tf
 import time
 
+from tf_agents.drivers import dynamic_episode_driver
 from tf_agents.environments import tf_py_environment
+from tf_agents.utils import common
+from tf_agents.metrics import tf_metrics
+from tf_agents.replay_buffers import tf_uniform_replay_buffer
+from tf_agents.train.utils import spec_utils, strategy_utils
+from tf_agents.agents.ppo import ppo_actor_network, ppo_clip_agent
+from tf_agents.networks import value_network
+from tf_agents.eval import metric_utils
+from tf_agents.policies import policy_saver
 
 from smartsim.log import get_logger
 from socket import gethostname
@@ -69,24 +78,60 @@ collect_py_env = RheaEnv(
         isolation: bool = False
     )   """
 collect_env = tf_py_environment.TFPyEnvironment(collect_py_env)
+""" get_or_create_global_step(graph=None)
+    Returns and create (if necessary) the global step tensor.    
+    Args:
+      graph: The graph in which to create the global step tensor. If missing, use default graph.
+    Returns:
+      The global step tensor.
 """
 global_step = tf.compat.v1.train.get_or_create_global_step()
+""" get_tensor_specs(env)
+        Returns observation, action and time step TensorSpecs from passed env.        
+        Args:
+          env: environment instance used for collection.    """
 observation_tensor_spec, action_tensor_spec, time_step_tensor_spec = (
       spec_utils.get_tensor_specs(collect_env)
 )
+""" Example logging output:
+    Observation Spec:
+    TensorSpec(shape=(216,), dtype=tf.float32, name='observation')
 
+    Action Spec:
+    BoundedTensorSpec(shape=(1,), dtype=tf.float32, name='action', minimum=array(-0.3, dtype=float32), maximum=array(0.3, dtype=float32))
+
+    Time Spec:
+    TimeStep(
+    {'discount': BoundedTensorSpec(shape=(), dtype=tf.float32, name='discount', minimum=array(0., dtype=float32), maximum=array(1., dtype=float32)),
+    'observation': TensorSpec(shape=(216,), dtype=tf.float32, name='observation'),
+    'reward': TensorSpec(shape=(), dtype=tf.float32, name='reward'),
+    'step_type': TensorSpec(shape=(), dtype=tf.int32, name='step_type')})
+"""
 logger.info(f'Observation Spec:\n{observation_tensor_spec}')
 logger.info(f'Action Spec:\n{action_tensor_spec}')
 logger.info(f'Time Spec:\n{time_step_tensor_spec}')
 
-actor_net_builder = ppo_actor_network.PPOActorNetwork() # Check ActorDistributionRnnNetwork otherwise
+
+""" Actor Network:
+    ppo_actor_network.PPOActorNetwork.__init__(self, seed_stream_class=<class 'tensorflow_probability.python.util.seed_stream.SeedStream'>)
+    PPOActorNetwork.create_sequential_actor_net(self, fc_layer_units, action_tensor_spec, seed=None)
+"""
+actor_net_builder = ppo_actor_network.PPOActorNetwork() # TODO: Check ActorDistributionRnnNetwork otherwise
 actor_net = actor_net_builder.create_sequential_actor_net(params["net"], action_tensor_spec)
+""" Value Network:    
+    value_network.ValueNetwork.__init__(self, input_tensor_spec, preprocessing_layers=None, 
+        preprocessing_combiner=None, conv_layer_params=None, fc_layer_params=(75, 40), 
+        dropout_layer_params=None, activation_fn=<function relu at 0x79f78275c280>, 
+        kernel_initializer=None, batch_squash=True, dtype=tf.float32, name='ValueNetwork')
+"""
 value_net = value_network.ValueNetwork(
     observation_tensor_spec,
     fc_layer_params=params["net"],
     kernel_initializer=tf.keras.initializers.Orthogonal()
 )
+logger.debug("Actor & Value networks initialized")
 
+"""
 # For distribution strategy, networks and agent have to be initialized within strategy.scope
 # optimizer = tf.keras.optimizers.Adam(learning_rate=params["learning_rate"])
 optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=params["learning_rate"])

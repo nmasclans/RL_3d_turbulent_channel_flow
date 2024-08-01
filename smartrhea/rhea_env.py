@@ -1,7 +1,9 @@
 import os
 import glob
+import logging
 import random
 import numpy as np
+import coloredlogs
 
 from tf_agents.specs import array_spec
 from tf_agents.environments import py_environment
@@ -102,6 +104,7 @@ class RheaEnv(py_environment.PyEnvironment):
         ### Not in **env_params:
         mode = "collect",           # TODO: consider using params['mode'], which is currently train/eval
     ):
+
         # Store input parameters
         self.exp = exp
         self.db = db
@@ -214,7 +217,13 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         Stops all RHEA instances inside launched in this environment.
         """
-        if self.exp: self._stop_exp()
+        if self.exp is not None: 
+            try:
+                self._stop_exp()
+            except Exception as e:
+                logger.error(f"Exception during environment stop: {e}")
+        else:
+            print("WARNING: Experiment not stoped because self.exp is None")
 
 
     def start(self, new_ensamble=False, restart_file=0, global_step=0):
@@ -463,21 +472,38 @@ class RheaEnv(py_environment.PyEnvironment):
     def _stop_exp(self):
         """
         Stop RHEA experiment (ensemble of models) with SmartSim
+        Safely handles potential exceptions during the cleanup process.
         """
-        # delete data from database
-        self.client.delete_tensor(self.state_size_key)
-        self.client.delete_tensor(self.action_size_key)
-        for i in range(self.cfd_n_envs):
-            self.client.delete_tensor(self.step_type_key[i])
-        # stop ensemble run
-        self.exp.stop(self.ensemble)
+        if self.client is not None:
+            try:
+                self.client.delete_tensor(self.state_size_key)
+                self.client.delete_tensor(self.action_size_key)
+                for i in range(self.cfd_n_envs):
+                    self.client.delete_tensor(self.step_type_key[i])
+            except Exception as e:
+                logger.error(f"Exception while deleting tensors: {e}")
+        else:
+            print("WARNING: Client is None, skipping tensor deletion.")
 
+        if self.exp is not None and self.ensemble is not None:
+            try:
+                self.exp.stop(self.ensemble)
+            except TypeError as e:
+                logger.error(f"TypeError in stopping ensemble: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected exception while stopping ensemble: {e}")
+        else:
+            print("WARNING: Experiment or ensemble is None, skipping stopping ensemble.")
+        
 
     def __del__(self):
         """
-        Properly finalize all launched SOD2D instances within the SmartSim experiment.
+        Properly finalize all launched RHEA instances within the SmartSim experiment.
         """
-        self.stop()
+        try:
+            self.stop()
+        except Exception as e:
+            logger.error(f"Exception in environment __del__: {e}")
 
 
     ### PyEnvironment methods override
@@ -562,4 +588,23 @@ class RheaEnv(py_environment.PyEnvironment):
 
 
     def action_spec(self):
-        return self._action_spec
+        return self._action_spec    
+
+
+    @property
+    def batched(self):
+        """
+        Multi-environment flag. Override batched property to indicate that this environment is batched.
+        Even if n_envs=1, we run it as a muti-environment (for consistency).
+        """
+        return True
+
+
+    @property
+    def batch_size(self):
+        """
+        Override batch size property according to chosen batch size
+        """
+        return self.n_envs
+
+    ### End PyEnvironment methods override
