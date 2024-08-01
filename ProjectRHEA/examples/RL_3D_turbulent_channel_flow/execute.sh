@@ -10,6 +10,7 @@ export REDIS_PORT=6380                          # TODO: rm if necessary, defined
 export SSDB="tcp://127.0.0.1:$REDIS_PORT"       # TODO: rm if necessary, defined in rhea_env initializer
 export SR_LOG_FILE="nohup.out"
 export SR_LOG_LEVEL="INFO"
+export SMARTSIM_LOG_LEVEL="DEBUG"
 
 # Start Redis server on port 6380 with the RedisAI module
 redis-server --port $REDIS_PORT --loadmodule $RAI_PATH &

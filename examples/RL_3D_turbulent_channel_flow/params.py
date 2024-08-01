@@ -29,7 +29,8 @@ params = {
     "rl_neighbors": 1,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
-    "poll_time": 3600,                  # db query time [seconds], # TODO: set custom value
+    "poll_n_tries": 1000,               # num. tries of database poll
+    "poll_freq_ms": 100,                # time between database poll tries [miliseconds]
     "time_key": "time",
     "step_type_key": "step_type",
     "state_key": "state",
@@ -85,7 +86,8 @@ env_params = {
     "rl_neighbors": params["rl_neighbors"],
     "model_dtype": params["model_dtype"],
     "rhea_dtype": params["rhea_dtype"],
-    "poll_time": params["poll_time"],
+    "poll_n_tries": params["poll_n_tries"],
+    "poll_freq_ms": params["poll_freq_ms"],
     "f_action": params["f_action"],
     "t_episode": params["t_episode"],
     "t_begin_control": params["t_begin_control"],

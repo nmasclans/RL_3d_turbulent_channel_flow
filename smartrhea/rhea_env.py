@@ -40,7 +40,8 @@ class RheaEnv(py_environment.PyEnvironment):
     - rl_neighbors: number of witness blocks selected to compose the state
     - model_dtype: data type for the model
     - rhea_dtype: data type for arrays to be sent to RHEA (actions)
-    - poll_time: time waiting for an array to appear in the database (in seconds)
+    - poll_n_tries: num. tries of database poll
+    - poll_freq_ms: time between database poll tries [miliseconds]
     - f_action: action frequency ("how often we send a new action signal)
     - t_episode: episode elapsed time
     - t_begin_control: time to start control
@@ -82,7 +83,8 @@ class RheaEnv(py_environment.PyEnvironment):
         rl_neighbors = 1,
         model_dtype = np.float32,
         rhea_dtype = np.float64,
-        poll_time = 3600, # in seconds, 2 minutes
+        poll_n_tries = 1000,
+        poll_freq_ms = 100,
         f_action = 1.0,
         t_episode = 10.0,
         t_begin_control = 0.0,
@@ -120,7 +122,8 @@ class RheaEnv(py_environment.PyEnvironment):
         self.rl_neighbors = rl_neighbors
         self.model_dtype = model_dtype
         self.rhea_dtype = rhea_dtype
-        self.poll_time = poll_time
+        self.poll_n_tries = poll_n_tries
+        self.poll_freq_ms = poll_freq_ms
         self.action_bounds = action_bounds
         self.reward_norm = reward_norm
         self.reward_beta = reward_beta
@@ -183,7 +186,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # arrays with known shapes
         self._time = np.zeros(self.cfd_n_envs, dtype=self.model_dtype)
-        self._step_type = -np.ones(self.cfd_n_envs, dtype=int) # init status in -1
+        self._step_type = - np.ones(self.cfd_n_envs, dtype=int) # init status in -1
 
         # create and allocate array objects
         self.n_state = n_witness_points(os.path.join(self.cwd, self.witness_file))
@@ -192,10 +195,6 @@ class RheaEnv(py_environment.PyEnvironment):
             self.n_action = 1
         else:   # self.rl_n_envs == 1:
             n_action = n_rectangles(os.path.join(self.cwd, self.rectangle_file))
-            # TODO: remove commented lines of original code,  i think this line (and assert check) is not applicable for my Fpert actions
-            #assert np.mod(n_action, 2) == 0, "Number of actions is not divisible by 2, so zero-net-mass-flux \
-            #    strategy cannot be implemented"
-            #self.n_action = n_action // 2   
         self._state = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
         self._state_rl = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
         self._action = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
@@ -211,246 +210,274 @@ class RheaEnv(py_environment.PyEnvironment):
 
 
 
-    # def stop(self):
-    #     """
-    #     Stops all SOD2D instances inside launched in this environment.
-    #     """
-    #     if self.exp: self._stop_exp()
+    def stop(self):
+        """
+        Stops all RHEA instances inside launched in this environment.
+        """
+        if self.exp: self._stop_exp()
 
 
-    # def start(self, new_ensamble=False, restart_file=0, global_step=0):
-    #     """
-    #     Starts all SOD2D instances with configuration specified in initialization.
-    #     """
-    #     if not self.ensemble or new_ensamble:
-    #         self.ensemble = self._create_mpmd_ensemble(restart_file)
-    #         logger.info(f"New ensamble created")
+    def start(self, new_ensamble=False, restart_file=0, global_step=0):
+        """
+        Starts all RHEA instances with configuration specified in initialization.
+        """
+        # TODO: check method
+        if not self.ensemble or new_ensamble:
+            self.ensemble = self._create_mpmd_ensemble(restart_file)
+            logger.info(f"New ensamble created")
 
-    #     self.exp.start(self.ensemble, block=False) # non-blocking start of Sod2D solver(s)
-    #     self.envs_initialised = False
+        self.exp.start(self.ensemble, block=False) # non-blocking start of RHEA solver(s)
+        self.envs_initialised = False
 
-    #     # Check simulations have started
-    #     status = self.get_status()
-    #     logger.info(f"Initial status: {status}")
-    #     assert np.all(status > 0), "SOD2D environments could not start."
-    #     self._episode_global_step = global_step
+        # Check simulations have started
+        status = self.get_status()
+        logger.info(f"Initial status: {status}")
+        assert np.all(status > 0), "RHEA environments could not start."
+        self._episode_global_step = global_step
 
-    #     # Assert that the same state and action sizes are captured equally in Sod2D and here
-    #     n_state = self._get_n_state()
-    #     n_action = self._get_n_action()
+        # Assert that the same state and action sizes are captured equally in Sod2D and here
+        n_state = self._get_n_state()
+        n_action = self._get_n_action()
 
-    #     if n_state != self.n_state or n_action != self.n_action * 2 * self.marl_n_envs:
-    #         raise ValueError(f"State or action size differs between SOD2D and the Python environment: \n \
-    #             SOD2D n_state: {n_state}\n Python env n_state: {self.n_state}\n \
-    #             SOD2D n_action: {n_action}\n Python env n_action * 2 * MARL_envs: {self.n_action * 2 * self.marl_n_envs}")
+        if n_state != self.n_state or n_action != self.n_action * self.rl_n_envs:
+            raise ValueError(f"State or action size differs between RHEA and the Python environment: \n \
+                RHEA n_state: {n_state}\n Python env n_state: {self.n_state}\n \
+                RHEA n_action: {n_action}\n Python env n_action * RL_envs: {self.n_action * self.marl_n_envs}")
 
-    #     # Get the initial state and reward
-    #     self._get_state() # updates self._state
-    #     self._redistribute_state() # updates self._state_marl
-    #     self._get_reward() # updates self._reward
+        # Get the initial state and reward
+        self._get_state() # updates self._state
+        self._redistribute_state() # updates self._state_marl
+        self._get_reward() # updates self._reward
 
-    #     # Write RL data into disk
-    #     if self.dump_data_flag:
-    #         self._dump_rl_data()
-
-
-    # def _create_mpmd_ensemble(self, restart_file):
-    #     # restart files are copied within SOD2D to the output_* folder
-    #     if restart_file == 3:
-    #         restart_step = [random.choice(["1", "2"]) for _ in range(self.cfd_n_envs)]
-    #     else:
-    #         restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
-
-    #     # set SOD2D exe arguments
-    #     sod_args = {"restart_step": restart_step, "f_action": self.f_action,
-    #         "t_episode": self.t_episode, "t_begin_control": self.t_begin_control}
-
-    #     for i in range(self.cfd_n_envs):
-    #         exe_args = [f"--{k}={v[i]}" for k,v in sod_args.items()]
-    #         run = MpirunSettings(exe=self.sod_exe, exe_args=exe_args)
-    #         run.set_tasks(self.n_tasks_per_env)
-    #         if i == 0:
-    #             f_mpmd = run
-    #         else:
-    #             f_mpmd.make_mpmd(run)
-
-    #     batch_settings = None
-
-    #     # Alvis configuration if requested.
-    #     #  - SOD2D simulations will be launched as external Slurm jobs.
-    #     #  - there are 4xA100 GPUs per node.
-    #     if self.launcher == "alvis":
-    #         gpus_required = self.cfd_n_envs * self.n_tasks_per_env
-    #         n_nodes = int(np.ceil(gpus_required / 4))
-    #         gpus_per_node = '4' if gpus_required >= 4 else gpus_required
-    #         batch_settings = create_batch_settings("slurm", nodes=n_nodes, account=self.cluster_account, time=self.episode_walltime,
-    #                 batch_args={'ntasks':gpus_required, 'gpus-per-node':'A100:' + str(gpus_per_node)})
-    #         batch_settings.add_preamble([". " + self.modules_sh])
-
-    #     return self.exp.create_model("ensemble", f_mpmd, batch_settings=batch_settings)
+        # Write RL data into disk
+        if self.dump_data_flag:
+            self._dump_rl_data()
 
 
-    # def _get_n_state(self):
-    #     try:
-    #         self.client.poll_tensor(self.state_size_key, 100, self.poll_time) # poll every 100ms for 1000 times (100s in total)
-    #         state_size = self.client.get_tensor(self.state_size_key)
-    #     except Exception as exc:
-    #         raise Warning(f"Could not read state size from key: {self.state_size_key}") from exc
-    #     logger.debug(f"Read state_size: {state_size}")
-    #     return state_size[0]
+    def _create_mpmd_ensemble(self, restart_file):
+        # TODO: add method description
+        # TODO: check method
+        # restart files are copied within RHEA to the output_* folder   # TODO: do this action in RHEA, or whatever necessary
+        # TODO: save restart files 1 and 2 to the proper directory
+        if restart_file == 3:   # random choice of restart file
+            restart_step = [random.choice(["1", "2"]) for _ in range(self.cfd_n_envs)]
+        else:
+            restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
+
+        # set RHEA exe arguments
+        # TODO: code RHEA so that it accepts and processes these input arguments when called, or write them in RHEA input file
+        rhea_args = {"restart_step": restart_step, "f_action": self.f_action,
+                     "t_episode": self.t_episode, "t_begin_control": self.t_begin_control}
+
+        # Set model arguments
+        for i in range(self.cfd_n_envs):
+            # TODO: modify MpirunSettings for call of execute.sh files
+            exe_args = [f"--{k}={v[i]}" for k,v in rhea_args.items()]
+            run = MpirunSettings(exe=self.sod_exe, exe_args=exe_args)
+            run.set_tasks(self.n_tasks_per_env)
+            # TODO: check f_mpmd, what is it?
+            if i == 0:
+                f_mpmd = run
+            else:
+                f_mpmd.make_mpmd(run)
+        batch_settings = None
+
+        # Alvis configuration if requested.
+        #  - RHEA simulations will be launched as external Slurm jobs.
+        #  - E.g. there are 4xA100 GPUs per node.
+        if self.launcher == "slurm_launcher":   # TODO: add possible launcher in params.py
+            gpus_required = self.cfd_n_envs * self.n_tasks_per_env
+            n_nodes = int(np.ceil(gpus_required / 4))
+            gpus_per_node = '4' if gpus_required >= 4 else gpus_required
+            batch_settings = create_batch_settings("slurm", nodes=n_nodes, account=self.cluster_account, time=self.episode_walltime,
+                    batch_args={'ntasks':gpus_required, 'gpus-per-node':'A100:' + str(gpus_per_node)})
+            batch_settings.add_preamble([". " + self.modules_sh])
+
+        """ Create model:
+            create_model(name: str, 
+                         run_settings: smartsim.settings.base.RunSettings, 
+                         params: Dict[str, Any] | None = None, 
+                         path: str | None = None, 
+                         enable_key_prefixing: bool = False, 
+                         batch_settings: smartsim.settings.base.BatchSettings | None = None)
+            -> smartsim.entity.model.Model  """
+        return self.exp.create_model("ensemble", f_mpmd, batch_settings=batch_settings)
 
 
-    # def _get_n_action(self):
-    #     try:
-    #         self.client.poll_tensor(self.action_size_key, 100, self.poll_time)
-    #         action_size = self.client.get_tensor(self.action_size_key)
-    #         logger.debug(f"Read action_size: {action_size}")
-    #     except Exception as exc:
-    #         raise Warning(f"Could not read action size from key: {self.action_size_key}") from exc
-    #     return action_size[0]
+    def _get_n_state(self):
+        # TODO: add method description
+        try:
+            # poll_tensor(name: str, poll_frequency_ms: int, num_tries: int) → bool
+            self.client.poll_tensor(self.state_size_key, self.poll_freq_ms, self.poll_n_tries)
+            state_size = self.client.get_tensor(self.state_size_key)
+            logger.debug(f"Read state_size: {state_size}")
+        except Exception as exc:
+            raise Warning(f"Could not read state size from key: {self.state_size_key}") from exc
+        return state_size[0]
 
 
-    # def _get_state(self):
-    #     """
-    #     Get current flow state from the database.
-    #     """
-    #     for i in range(self.cfd_n_envs):
-    #         if self._step_type[i] > 0: # environment still running
-    #             self.client.poll_tensor(self.state_key[i], 100, self.poll_time)
-    #             try:
-    #                 self._state[i, :] = self.client.get_tensor(self.state_key[i])
-    #                 self.client.delete_tensor(self.state_key[i])
-    #                 logger.debug(f"[Env {i}] Got state: {numpy_str(self._state[i, :5])}")
-    #             except Exception as exc:
-    #                 raise Warning(f"Could not read state from key: {self.state_key[i]}") from exc
+    def _get_n_action(self):
+        # TODO: add method description
+        try:
+            # poll_tensor(name: str, poll_frequency_ms: int, num_tries: int) → bool
+            self.client.poll_tensor(self.action_size_key, self.poll_freq_ms, self.poll_n_tries)
+            action_size = self.client.get_tensor(self.action_size_key)
+            logger.debug(f"Read action_size: {action_size}")
+        except Exception as exc:
+            raise Warning(f"Could not read action size from key: {self.action_size_key}") from exc
+        return action_size[0]
 
 
-    # def _redistribute_state(self):
-    #     """
-    #     Redistribute state across MARL pseudo-environments.
-    #     Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z.
-    #     """
-    #     state_extended = np.concatenate((self._state, self._state, self._state), axis=1)
-    #     plane_wit = self.witness_xyz[0] * self.witness_xyz[1]
-    #     block_wit = int(plane_wit * (self.witness_xyz[2] / self.marl_n_envs))
-    #     for i in range(self.cfd_n_envs):
-    #         for j in range(self.marl_n_envs):
-    #             self._state_marl[i * self.marl_n_envs + j,:] = state_extended[i, block_wit * (j - self.marl_neighbors) + \
-    #                 self.n_state:block_wit * (j + self.marl_neighbors + 1) + self.n_state]
+    def _get_state(self):
+        """
+        Get current flow state from the database.
+        """
+        for i in range(self.cfd_n_envs):
+            if self._step_type[i] > 0: # environment still running
+                try:
+                    self.client.poll_tensor(self.state_key[i], self.poll_freq_ms, self.poll_n_tries)
+                    # self._state shape: [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
+                    self._state[i, :] = self.client.get_tensor(self.state_key[i])
+                    self.client.delete_tensor(self.state_key[i])
+                    logger.debug(f"[Env {i}] Got state[:5]: {numpy_str(self._state[i, :5])}")
+                except Exception as exc:
+                    raise Warning(f"Could not read state from key: {self.state_key[i]}") from exc
 
 
-    # def _get_reward(self):
-    #     for i in range(self.cfd_n_envs):
-    #         if self._step_type[i] > 0: # environment still running
-    #             self.client.poll_tensor(self.reward_key[i], 100, self.poll_time)
-    #             try:
-    #                 reward = self.client.get_tensor(self.reward_key[i])
-    #                 self.client.delete_tensor(self.reward_key[i])
-    #                 logger.debug(f"[Env {i}] Got reward: {numpy_str(reward)}")
-
-    #                 local_reward = -reward / self.reward_norm
-    #                 self._local_reward[i, :] = local_reward
-    #                 global_reward = np.mean(local_reward)
-    #                 for j in range(self.marl_n_envs):
-    #                     self._reward[i * self.marl_n_envs + j] = self.reward_beta * global_reward + (1.0 - self.reward_beta) * local_reward[j]
-    #             except Exception as exc:
-    #                 raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
-
-
-    # def _get_time(self):
-    #     for i in range(self.cfd_n_envs):
-    #         self.client.poll_tensor(self.time_key[i], 100, self.poll_time)
-    #         try:
-    #             self._time[i] = self.client.get_tensor(self.time_key[i])[0]
-    #             self.client.delete_tensor(self.time_key[i])
-    #             logger.debug(f"[Env {i}] Got time: {numpy_str(self._time[i])}")
-    #         except Exception as exc:
-    #             raise Warning(f"Could not read time from key: {self.time_key[i]}") from exc
+    def _redistribute_state(self):
+        """
+        Redistribute state across RL pseudo-environments.
+        Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z.
+        # TODO: make sure of this, check!
+        """
+        # concatenate self._state array 3 times along columns, where
+        #   self._state shape:    [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
+        #   state_extended shape: [self.cfd_n_nevs, self.n_state * 3]
+        state_extended = np.concatenate((self._state, self._state, self._state), axis=1)
+        plane_wit = self.witness_xyz[0] * self.witness_xyz[1]
+        block_wit = int(plane_wit * (self.witness_xyz[2] / self.rl_n_envs))     # TODO: rl_n_envs distributed along 3rd coordinate, x or z? why [2] used, i though you have to distribute them along x!
+        for i in range(self.cfd_n_envs):
+            for j in range(self.rl_n_envs):
+                # TODO: check & understand!
+                self._state_rl[i * self.rl_n_envs + j,:] = state_extended[i, block_wit * (j - self.rl_neighbors) + \
+                    self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state]
 
 
-    # def get_status(self):
-    #     """
-    #     Reads the step_type tensors from database (one for each environment).
-    #     Once created, these tensor are never deleted afterwards
-    #     Types of step_type:
-    #         0: Ended
-    #         1: Initialized
-    #         2: Running
-    #     Returns array with step_type from every environment.
-    #     """
-    #     if not self.envs_initialised: # initialising environments - poll and wait for them to get started
-    #         for i in range(self.cfd_n_envs):
-    #             self.client.poll_tensor(self.step_type_key[i], 100, self.poll_time)
-    #             try:
-    #                 self._step_type[i] = self.client.get_tensor(self.step_type_key[i])[0]
-    #             except Exception as exc:
-    #                 raise Warning(f"Could not read step type from key: {self.step_type_key[i]}.") from exc
-    #         if np.any(self._step_type < 0):
-    #             raise ValueError(f"Environments could not be initialized, or initial step_type could not be read from database. \
-    #                 \n step_type = {self._step_type}")
-    #         self.envs_initialised = True
-    #     else:
-    #         for i in range(self.cfd_n_envs):
-    #             try:
-    #                 self._step_type[i] = self.client.get_tensor(self.step_type_key[i])[0]
-    #             except Exception as exc:
-    #                 raise Warning(f"Could not read step type from key: {self.step_type_key[i]}") from exc
-    #     return self._step_type
+    def _get_reward(self):
+        for i in range(self.cfd_n_envs):
+            if self._step_type[i] > 0: # environment still running
+                # poll_tensor(name: str, poll_frequency_ms: int, num_tries: int) → bool
+                try:
+                    self.client.poll_tensor(self.reward_key[i], self.poll_freq_ms, self.poll_n_tries)
+                    reward = self.client.get_tensor(self.reward_key[i])
+                    self.client.delete_tensor(self.reward_key[i])
+                    logger.debug(f"[Env {i}] Got reward: {numpy_str(reward)}")  # shape [self.rl_n_envs], rewards from all rl env for a specific cfd env
+
+                    local_reward = - reward / self.reward_norm
+                    self._local_reward[i, :] = local_reward
+                    global_reward = np.mean(local_reward)
+                    for j in range(self.rl_n_envs):
+                        # TODO: check and understand
+                        self._reward[i * self.rl_n_envs + j] = self.reward_beta * global_reward + (1.0 - self.reward_beta) * local_reward[j]
+                except Exception as exc:
+                    raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
 
 
-    # def _set_action(self, action):
-    #     """
-    #     Write actions for each environment to be polled by the corresponding Sod2D environment.
-    #     Action clipping must be performed within the environment: https://github.com/tensorflow/agents/issues/216
-    #     """
-    #     # scale actions and reshape for SOD2D
-    #     action = action * self.action_bounds[1] if self.mode == "collect" else action
-    #     action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
-    #     for i in range(self.cfd_n_envs):
-    #         for j in range(self.marl_n_envs):
-    #             self._action[i, j] = action[i * self.marl_n_envs + j]
-    #     # apply zero-net-mass-flow strategy
-    #     self._action_znmf = np.repeat(self._action, 2, axis=-1)
-    #     self._action_znmf[..., 1::2] *= -1.0
-    #     # write action into database
-    #     for i in range(self.cfd_n_envs):
-    #         self.client.put_tensor(self.action_key[i], self._action_znmf[i, ...].astype(self.sod_dtype))
-    #             # np.zeros(self.n_action * 2, dtype=self.sod_dtype))
-    #         logger.debug(f"[Env {i}] Writing (half) action: {numpy_str(self._action[i, :])}")
+    def _get_time(self):
+        for i in range(self.cfd_n_envs):
+            try:
+                self.client.poll_tensor(self.time_key[i], self.poll_freq_ms, self.poll_n_tries)
+                self._time[i] = self.client.get_tensor(self.time_key[i])[0]
+                self.client.delete_tensor(self.time_key[i])
+                logger.debug(f"[Env {i}] Got time: {numpy_str(self._time[i])}")
+            except Exception as exc:
+                raise Warning(f"Could not read time from key: {self.time_key[i]}") from exc
 
 
-    # def _dump_rl_data(self):
-    #     """Write RL data into disk."""
-    #     for i in range(self.cfd_n_envs):
-    #         with open(os.path.join(self.dump_data_path , "state", f"state_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
-    #             np.savetxt(f, self._state[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
-    #         f.close()
-    #         with open(os.path.join(self.dump_data_path , "reward", f"local_reward_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
-    #             np.savetxt(f, self._local_reward[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
-    #         f.close()
-    #         with open(os.path.join(self.dump_data_path , "action", f"action_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
-    #             np.savetxt(f, self._action[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
-    #         f.close()
+    def get_status(self):
+        """
+        Reads the step_type tensors from database (one for each environment).
+        Once created, these tensor are never deleted afterwards
+        Types of step_type:
+            0: Ended            (ts.StepType.LAST)
+            1: Initialized      (ts.StepType.FIRST)
+            2: Running          (ts.StepType.MID)
+        Returns array with step_type from every environment.
+        """
+        if not self.envs_initialised: # initialising environments - poll and wait for them to get started
+            for i in range(self.cfd_n_envs):
+                try:
+                    self.client.poll_tensor(self.step_type_key[i], self.poll_freq_ms, self.poll_n_tries)
+                    self._step_type[i] = self.client.get_tensor(self.step_type_key[i])[0]
+                except Exception as exc:
+                    raise Warning(f"Could not read step type from key: {self.step_type_key[i]}.") from exc
+            if np.any(self._step_type < 0):
+                raise ValueError(f"Environments could not be initialized, or initial step_type could not be read from database. \
+                    \n step_type = {self._step_type}")
+            self.envs_initialised = True
+        else:
+            for i in range(self.cfd_n_envs):
+                try:
+                    self.client.poll_tensor(self.step_type_key[i], self.poll_freq_ms, self.poll_n_tries)
+                    self._step_type[i] = self.client.get_tensor(self.step_type_key[i])[0]
+                except Exception as exc:
+                    raise Warning(f"Could not read step type from key: {self.step_type_key[i]}") from exc
+        return self._step_type
 
 
-    # def _stop_exp(self):
-    #     """
-    #     Stop SOD2D experiment (ensemble of models) with SmartSim
-    #     """
-    #     # delete data from database
-    #     self.client.delete_tensor(self.state_size_key)
-    #     self.client.delete_tensor(self.action_size_key)
-    #     for i in range(self.cfd_n_envs):
-    #         self.client.delete_tensor(self.step_type_key[i])
-    #     # stop ensemble run
-    #     self.exp.stop(self.ensemble)
+    def _set_action(self, action):
+        """
+        Write actions for each environment to be polled by the corresponding RHEA environment.
+        Action clipping must be performed within the environment: https://github.com/tensorflow/agents/issues/216
+        """
+        # scale actions and reshape for RHEA
+        # TODO: is this scaling and clipping correct, if action_bounds[0],[1] are not +-k?
+        action = action * self.action_bounds[1] if self.mode == "collect" else action # TODO: check! shouldn't actions be always scaled, ALSO in testing/training?
+        action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
+        for i in range(self.cfd_n_envs):
+            for j in range(self.rl_n_envs):
+                self._action[i, j] = action[i * self.rl_n_envs + j]
+        # write action into database
+        for i in range(self.cfd_n_envs):
+            # self._action shape: np.zeros(self.n_action, dtype=self.rhea_dtype))
+            self.client.put_tensor(self.action_key[i], self._action[i, ...].astype(self.rhea_dtype))
+            logger.debug(f"[Env {i}] Writing action: {numpy_str(self._action[i, :])}")
 
 
-    # def __del__(self):
-    #     """
-    #     Properly finalize all launched SOD2D instances within the SmartSim experiment.
-    #     """
-    #     self.stop()
+    def _dump_rl_data(self):
+        """
+        Write RL data into disk.
+        """
+        for i in range(self.cfd_n_envs):
+            with open(os.path.join(self.dump_data_path , "state", f"state_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+                np.savetxt(f, self._state[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
+            f.close()
+            with open(os.path.join(self.dump_data_path , "reward", f"local_reward_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+                np.savetxt(f, self._local_reward[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
+            f.close()
+            with open(os.path.join(self.dump_data_path , "action", f"action_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+                np.savetxt(f, self._action[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
+            f.close()
+
+
+    def _stop_exp(self):
+        """
+        Stop RHEA experiment (ensemble of models) with SmartSim
+        """
+        # delete data from database
+        self.client.delete_tensor(self.state_size_key)
+        self.client.delete_tensor(self.action_size_key)
+        for i in range(self.cfd_n_envs):
+            self.client.delete_tensor(self.step_type_key[i])
+        # stop ensemble run
+        self.exp.stop(self.ensemble)
+
+
+    def __del__(self):
+        """
+        Properly finalize all launched SOD2D instances within the SmartSim experiment.
+        """
+        self.stop()
 
 
     ### PyEnvironment methods override

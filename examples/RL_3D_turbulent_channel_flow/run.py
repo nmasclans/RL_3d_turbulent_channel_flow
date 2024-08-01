@@ -3,6 +3,8 @@ import os
 import tensorflow as tf
 import time
 
+from tf_agents.environments import tf_py_environment
+
 from smartsim.log import get_logger
 from socket import gethostname
 
@@ -60,9 +62,14 @@ collect_py_env = RheaEnv(
     mode = "collect",
     **env_params,
 )
-"""
-collect_env = tf_py_environment.TFPyEnvironment(collect_py_env)
 
+""" tf_agents.environments.TFPyEnvironment(
+        environment: tf_agents.environments.PyEnvironment,
+        check_dims: bool = False,
+        isolation: bool = False
+    )   """
+collect_env = tf_py_environment.TFPyEnvironment(collect_py_env)
+"""
 global_step = tf.compat.v1.train.get_or_create_global_step()
 observation_tensor_spec, action_tensor_spec, time_step_tensor_spec = (
       spec_utils.get_tensor_specs(collect_env)
