@@ -1,5 +1,8 @@
 import absl.logging
+import contextlib
+import numpy as np
 import os
+import random
 import tensorflow as tf
 import time
 
@@ -18,13 +21,14 @@ from smartsim.log import get_logger
 from socket import gethostname
 
 from params import params, env_params
+from smartrhea.history import History
 from smartrhea.init_smartsim import init_smartsim
-from smartrhea.utils import print_params, deactivate_tf_gpus
+from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, bcolors
 from smartrhea.rhea_env import RheaEnv
 
 #--------------------------- Utils ---------------------------
 
-absl.logging.set_verbosity(absl.logging.DEBUG)
+absl.logging.set_verbosity(os.environ.get("SMARTSIM_LOG_LEVEL"))
 logger = get_logger(__name__)
 cwd = os.path.dirname(os.path.realpath(__file__))
 deactivate_tf_gpus()    # deactivate TF for GPUs
@@ -52,7 +56,7 @@ logger.info(f"Tensorboard event file created: {train_dir}/events.out.tfevents.{i
 print_params(params, "RUN PARAMETERS:")
 
 #--------------------------- RL setup ---------------------------
-# Init SmartSim framework: Experiment and Orchestrator (database)
+#### Init SmartSim framework: Experiment and Orchestrator (database)
 exp, hosts, db, db_is_clustered = init_smartsim(
     port = params["port"],
     network_interface = params["network_interface"],
@@ -60,7 +64,7 @@ exp, hosts, db, db_is_clustered = init_smartsim(
     run_command = params["run_command"],
 )
 
-# Init environment
+### Environment
 collect_py_env = RheaEnv(
     exp,
     db,
@@ -71,7 +75,6 @@ collect_py_env = RheaEnv(
     mode = "collect",
     **env_params,
 )
-
 """ tf_agents.environments.TFPyEnvironment(
         environment: tf_agents.environments.PyEnvironment,
         check_dims: bool = False,
@@ -85,7 +88,13 @@ collect_env = tf_py_environment.TFPyEnvironment(collect_py_env)
     Returns:
       The global step tensor.
 """
-global_step = tf.compat.v1.train.get_or_create_global_step()
+
+### Global step, num. training steps performed
+# Use tf.compat.v1.train.get_or_create_global_step (TensorFlow 1.x API) or tf.Varible (TensorFlow 2.x API)
+# global_step = tf.compat.v1.train.get_or_create_global_step()
+global_step = tf.Variable(0, trainable=False, name='global_step', dtype=tf.int64)
+
+### Tensor specifications
 """ get_tensor_specs(env)
         Returns observation, action and time step TensorSpecs from passed env.        
         Args:
@@ -111,7 +120,7 @@ logger.info(f'Observation Spec:\n{observation_tensor_spec}')
 logger.info(f'Action Spec:\n{action_tensor_spec}')
 logger.info(f'Time Spec:\n{time_step_tensor_spec}')
 
-
+### Action and Value Networks
 """ Actor Network:
     ppo_actor_network.PPOActorNetwork.__init__(self, seed_stream_class=<class 'tensorflow_probability.python.util.seed_stream.SeedStream'>)
     PPOActorNetwork.create_sequential_actor_net(self, fc_layer_units, action_tensor_spec, seed=None)
@@ -131,111 +140,174 @@ value_net = value_network.ValueNetwork(
 )
 logger.debug("Actor & Value networks initialized")
 
+### Optimizer
+# Use tf.compat.v1.train (TensorFlow 1.x API) or tf.kereas.optimizers (TensorFlow 2.x API)
+""" tf.compat.v1.train.AdamOptimizer(
+    learning_rate=0.001, beta1=0.9, beta2=0.999,
+    epsilon=1e-08, use_locking=False, name='Adam'
+)
 """
-# For distribution strategy, networks and agent have to be initialized within strategy.scope
-# optimizer = tf.keras.optimizers.Adam(learning_rate=params["learning_rate"])
-optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=params["learning_rate"])
+#optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=params["learning_rate"])
+optimizer = tf.keras.optimizers.Adam(learning_rate=params["learning_rate"])
+
+### Distribution strategy
+# Networks and agent have to be initialized within strategy.scope
+""" get_strategy(tpu, use_gpu)
+        Utility to create a `tf.DistributionStrategy` for TPU or GPU.
+        If neither is being used a DefaultStrategy is returned which allows executing on CPU only.
+        Args:
+          tpu: BNS address of TPU to use. Note the flag and param are called TPU as that is what the xmanager utilities call.
+          use_gpu: Whether a GPU should be used. This will create a MirroredStrategy.
+        Raises:
+          ValueError if both tpu and use_gpu are set.
+        Returns:
+          An instance of a `tf.DistributionStrategy`.
+"""
 strategy = strategy_utils.get_strategy(tpu=False, use_gpu=False) ## no used gpus for rl tf training
+logger.debug(f"Using distribution strategy {strategy}")
+# Context / Strategy scope: ensures that variables are created on the appropiated devices,
+# and how computations are distributed and synchronized along devices
 if strategy:
+    # If strategy is defined -> Set the context
     context = strategy.scope()
+    logger.debug(f"Set strategy scope {context}")
 else:
-    context = contextlib.nullcontext()  # placeholder that does nothing
+    # If strategy is not defined ('None') -> Set context to placeholder that does nothing
+    context = contextlib.nullcontext()
+    logger.debug("Null strategy scope")
+# Context manager handles setup and teardown of the distributed environment, 
+# ensuring resources are allocated and released properly
 with context:
     # Set TF random seed within strategy to obtain reproducible results
     random.seed(params["seed"])
     np.random.seed(params["seed"])
     tf.random.set_seed(params["seed"])
 
-    # PPO Agent
+    ### PPO Agent, implementing the clipped probability ratios
     agent = ppo_clip_agent.PPOClipAgent(
-        time_step_tensor_spec,
-        action_tensor_spec,
-        optimizer=optimizer,
-        actor_net=actor_net,
-        value_net=value_net,
-        entropy_regularization=0.0,
-        importance_ratio_clipping=0.2,
-        discount_factor=0.99,
-        normalize_observations=False,
-        normalize_rewards=False,
-        use_gae=True,
-        num_epochs=params["num_epochs"],
-        debug_summaries=False,
-        summarize_grads_and_vars=False,
-        train_step_counter=global_step
+        time_step_tensor_spec,              # 'TimeStep' spec of the expected time_steps
+        action_tensor_spec,                 # nest of BoundedTensorSpec representing the actionsq
+        optimizer=optimizer,                # optimizer to use for the agent
+        actor_net=actor_net,                # function action_net(observations, action_spec) that returns a tensor of action distribution parameters for each observation
+                                            #   takes nested observation and returns nested action
+        value_net=value_net,                # function value_net(time_steps) that returns value tensor from neural net predictions of each obesrvation.
+                                            #   takes nested observation and returns batch of value_preds
+        entropy_regularization=0.0,         # coeff of entropy regularization loss term
+        importance_ratio_clipping=0.2,      # epsilon in clipped, surrogate PPO objective
+        discount_factor=0.99,               # discount factor for return computation
+        normalize_observations=False,       # if true, keeps a running estimate of observations mean & variance of observations, and uses these statistics to normalize incoming observations (to have mean=0, std=1)
+                                            # adv (True):  stabilizes training, improves convergence, consistent learning rate
+                                            # cons (True): additional computation, observation spec compatibility (obs. must be tf.float32), sensitivity to distribution change (when non-stationary env)
+                                            # TODO: set normalize_observations = True?
+        normalize_rewards=False,            # if true, keeps moving (mean and) variance of rewards, and normalizes incoming rewards
+        use_gae=True,                       # if true, use generalized advantage estimation for computing per-timestep advantage
+                                            # else, just subtracts value predictions from empirical return.
+        num_epochs=params["num_epochs"],    # num. epochs for computing policy updates
+        debug_summaries=True,               # if true, gather debug summaries
+        summarize_grads_and_vars=False,     # if true, gradient summaries will be written
+        train_step_counter=global_step      # optional counter to increment every time the train operation is run
     )
-
     agent.initialize()
+    logger.debug(f"Agent created & initialized {agent}")
 
-# Get agent policies
-eval_policy = agent.policy
-collect_policy = agent.collect_policy
+### Agent policies
+eval_policy = agent.policy              # returns tf_policy.TFPolicy, which can be used to evaluate agent performance (acts greedily based on best action, no exploration)
+collect_policy = agent.collect_policy   # returns tf_policy.TFPolicy, which can be used to train the agent, to collect data from the environment (includes exploration)
 
-# Instantiate Replay Buffer, which holds the sampled trajectories.
+### Replay Buffer
+# Holds the sampled trajectories (batched adds and uniform sampling)
+# Stores transitions of the form (state, action, reward, next_state, done)
+""" TFUniformReplayBuffer(
+        data_spec, batch_size, max_length=1000, scope='TFUniformReplayBuffer', 
+        device='cpu:*', table_fn=<class 'tf_agents.replay_buffers.table.Table'>, 
+        dataset_drop_remainder=False, dataset_window_shift=None, stateful_dataset=False)
+"""
 replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
     data_spec = agent.collect_data_spec,
     batch_size = collect_env.batch_size,
     max_length = params["replay_buffer_capacity"]
 )
 
-# Instantiate driver for data collection
-environment_steps_metric = tf_metrics.EnvironmentSteps()
-environment_episodes_metric = tf_metrics.NumberOfEpisodes()
-train_avg_return = tf_metrics.AverageReturnMetric(buffer_size=collect_env.n_envs, batch_size=collect_env.n_envs)
+### Driver for data collection
+# Step metrics:
+environment_steps_metric = tf_metrics.EnvironmentSteps()        # counts num. steps
+environment_episodes_metric = tf_metrics.NumberOfEpisodes()     # counts num. episodes
 step_metrics = [
     environment_episodes_metric,
     environment_steps_metric,
 ]
+# Train metrics
+train_avg_return = tf_metrics.AverageReturnMetric(buffer_size=collect_env.n_envs, batch_size=collect_env.n_envs)
 train_metrics = step_metrics + [
     train_avg_return,
     tf_metrics.MinReturnMetric(buffer_size=collect_env.n_envs, batch_size=collect_env.n_envs),
     tf_metrics.MaxReturnMetric(buffer_size=collect_env.n_envs, batch_size=collect_env.n_envs),
     tf_metrics.AverageEpisodeLengthMetric(buffer_size=collect_env.n_envs, batch_size=collect_env.n_envs),
 ]
+# Collect driver
+# Controls how the agent interacts with the environment, collects experience data and updates metrics
+# Used in RL, where you need to collect experiences over several time-steps before updating agent's policy
+""" DynamicEpisodeDriver(
+        env:    environment, class tf_environment.Base, 
+        policy: policy, class tf_policy.TFPolicy, 
+        observers=None: list of observers, updated after every time-step in the environment
+                        each observer is a callable(Trajectory)
+        transition_observers=None: list of observers, updated after every time-step in the environment
+                        each observer is a callable((TimeStep, PolicyStep, NextTimeStep))
+        num_episodes=1: num. episodes to take in the environment. For parallel/batched envs, this is the total num. summed across all envs.
+    )
+"""
 collect_driver = dynamic_episode_driver.DynamicEpisodeDriver(
     collect_env,
     collect_policy,
     observers=[replay_buffer.add_batch] + train_metrics,
-    num_episodes=collect_env.n_envs # the number of episodes to take in the environment before each update. This is the total across all parallel MARL environments.
+    num_episodes=collect_env.n_envs # the number of episodes to take in the environment before each update. This is the total across all parallel RL environments.
 )
 
-# Define checkpointer to save policy
+### Checkpointers to save policy
 ckpt_dir = os.path.join(train_dir, "ckpt")
 saved_model_dir = os.path.join(train_dir, "policy_saved_model")
-
+# Checkpointer to entire training state
 train_checkpointer = common.Checkpointer(
     ckpt_dir=ckpt_dir,
-    max_to_keep=params["ckpt_num"],
-    agent=agent,
+    max_to_keep=params["ckpt_num"],     # if necessary, oldest checkpoints are deleted
+    agent=agent,                        # **kwargs: items to include in the checkpoint
     policy=agent.policy,
     replay_buffer=replay_buffer,
     metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
-    global_step=global_step)
-
+    global_step=global_step,
+)
+# Checkpointer to evaluation policy
 policy_checkpointer = common.Checkpointer(
     ckpt_dir=os.path.join(train_dir, 'policy'),
     policy=eval_policy,
     global_step=global_step,
 )
-
+# Initialize PolicySaver, allows to save a tf_policy.Policy to SavedModel
 saved_model = policy_saver.PolicySaver(eval_policy, train_step=global_step)
-train_checkpointer.initialize_or_restore()
+""" Restore training process if existing saved checkpoints
+    initialize_or_restore(self, session=None)
+        Initialize or restore graph (based on checkpoint if exists).
+"""
+train_checkpointer.initialize_or_restore()  
 
 #--------------------------- Training / Evaluation ---------------------------
 with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
     lambda: tf.math.equal(global_step % params["summary_interval"], 0)
 ):
+    # Define train step 
     def train_step():
-        trajectories = replay_buffer.gather_all()
-        return agent.train(experience=trajectories)
+        trajectories = replay_buffer.gather_all()       # gather all available trajectories stored in buffer
+        return agent.train(experience=trajectories)     # agent updates internal params (policy & value networks) taking the gathered trajectory of experiences as input
+                                                        # returns 'LossInfo' tuple containing loss and info tensors
 
     if params["use_tf_functions"]:
-        collect_driver.run = common.function(
-            collect_driver.run, autograph=False)
-        agent.train = common.function(agent.train, autograph=False)
-        train_step = common.function(train_step)
+        collect_driver.run = common.function(           # wrap collect_driver.run function for optimized execution as TensorFlow graph
+            collect_driver.run, autograph=False)        
+        agent.train = common.function(agent.train, autograph=False)     # wrap agent.train function as TensorFlow graph
+        train_step = common.function(train_step, autograph=True)        # wrap train_step function (autograph=True for converting Python control flow into TensorFlow operations)
 
-    if params["mode"] == "train":
+    if params["mode"] == "train":                       # initialize counters
         collect_time = 0
         train_time = 0
         timed_at_step = agent.train_step_counter.numpy()
@@ -288,8 +360,7 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
                 logger.info(f"Global training steps: {agent.train_step_counter.numpy()}")
                 logger.info(f"Environment steps: {environment_steps_metric.result().numpy()}")
                 logger.info(f"Average reward: {numpy_str(train_avg_return.result().numpy())}")
-
-                history.plot()
+                #history.plot() # TODO: uncomment this when history.plot() is customized to RHEA implementation
                 logger.info("Plotting training metrics done!\n")
 
                 timed_at_step = agent.train_step_counter.numpy()
@@ -352,4 +423,3 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
 # Kill database
 exp.stop(db)
 time.sleep(2.0)
-"""

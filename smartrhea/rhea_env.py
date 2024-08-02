@@ -282,7 +282,7 @@ class RheaEnv(py_environment.PyEnvironment):
         for i in range(self.cfd_n_envs):
             # TODO: modify MpirunSettings for call of execute.sh files
             exe_args = [f"--{k}={v[i]}" for k,v in rhea_args.items()]
-            run = MpirunSettings(exe=self.sod_exe, exe_args=exe_args)
+            run = MpirunSettings(exe=self.rhea_exe, exe_args=exe_args)
             run.set_tasks(self.n_tasks_per_env)
             # TODO: check f_mpmd, what is it?
             if i == 0:

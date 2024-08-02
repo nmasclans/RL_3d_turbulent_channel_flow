@@ -42,9 +42,9 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-###    "mode": mode,                # TODO: rm if not used, mode='collect' used in RheaEnv 
-###    "num_episodes": 2000,
-###    "num_epochs": cfd_n_envs * rl_n_envs, # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
+    "mode": mode,
+    "num_episodes": 2000,
+    "num_epochs": cfd_n_envs * rl_n_envs, # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "f_action": 1.0 / t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
@@ -53,15 +53,15 @@ params = {
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local, # TODO: set custom value
 ###    "restart_file": 3, # 3: random. 1: restart 1. 2: restart 2
     "net": (128, 128),              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-###    "learning_rate": 5e-4,
-###    "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # trajectories buffer
+    "learning_rate": 5e-4,
+    "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # trajectories buffer expand a full train episode
 ###    "log_interval": 1, # save model, policy, metrics, interval
-###    "summary_interval": 1, # write to tensorboard interval
-###    "seed": 16,
-###    "ckpt_num": int(1e6),
+    "summary_interval": 1, # write to tensorboard interval [epochs]
+    "seed": 16,
+    "ckpt_num": int(1e6),
 ###    "ckpt_interval": 1,
 ###    "do_profile": False,
-###    "use_tf_functions": True
+    "use_tf_functions": True
 }
 
 # Default params
