@@ -52,6 +52,7 @@ def write_hosts(hosts, n_slots):
     with open('hostfile', 'w') as f:
         for host in hosts:
             f.write(f"{host} slots={n_slots} max_slots=4\n")
+    logger.debug("Hostfile has been edited")
 
 
 def get_slurm_walltime():

@@ -10,7 +10,7 @@ from tf_agents.environments import py_environment
 from tf_agents.trajectories import time_step as ts
 
 from smartredis import Client
-from smartsim.settings import MpirunSettings
+from smartsim.settings import MpirunSettings, RunSettings
 from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.utils import n_witness_points, n_rectangles, numpy_str, bcolors
@@ -24,7 +24,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - exp: SmartSim experiment class instance
     - db: SmartSim orchestrator class instance
     - hosts: list of host nodes
-    - rhea_exe: RHEA executable (full path)
+    - rhea_exe: RHEA executable filename
     - cwd: working directory
     ### **env_params
     - launcher: "local", other
@@ -108,7 +108,9 @@ class RheaEnv(py_environment.PyEnvironment):
         # Store input parameters
         self.exp = exp
         self.db = db
-        self.rhea_exe = rhea_exe
+        self.rhea_exe_dir   = os.environ["RHEA_EXE_DIR"]
+        self.rhea_exe_fname = rhea_exe
+        self.rhea_exe_path  = os.path.join(self.rhea_exe_dir, self.rhea_exe_fname)
         self.cwd = cwd
         # **env_params:
         self.launcher = launcher
@@ -179,6 +181,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # create RHEA executable arguments
         self.tag = [str(i) for i in range(self.cfd_n_envs)] # environment tags [0, 1, ..., cfd_n_envs - 1]
+        self.configuration_file = ["$RHEA_EXE_DIR/configuration_file.yaml" for _ in range(self.cfd_n_envs)]
         self.f_action = [str(f_action) for _ in range(self.cfd_n_envs)]
         self.t_episode = [str(t_episode) for _ in range(self.cfd_n_envs)]
         self.t_begin_control = [str(t_begin_control) for _ in range(self.cfd_n_envs)]
@@ -276,36 +279,72 @@ class RheaEnv(py_environment.PyEnvironment):
         restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
 
         # set RHEA exe arguments
-        # TODO: code RHEA so that it accepts and processes these input arguments when called, or write them in RHEA input file
-        rhea_args = {"restart_step": restart_step, "f_action": self.f_action,
-                     "t_episode": self.t_episode, "t_begin_control": self.t_begin_control}
+        rhea_args = {"configuration_file": self.configuration_file,  
+                     "restart_step": restart_step, 
+                     "f_action": self.f_action, 
+                     "t_episode": self.t_episode, 
+                     "t_begin_control": self.t_begin_control}
 
-        # Set model arguments
-        f_mpmd = None
-        for i in range(self.cfd_n_envs):
-            exe_args = [f"--{k}={v[i]}" for k,v in rhea_args.items()]
-            run = MpirunSettings(exe=self.rhea_exe, run_args=self.mpirun_args, exe_args=exe_args)   # MpirunSettings add '--' to mpirun_args keys
-            run.set_tasks(self.mpirun_np) # added differently than mpirun_args (--<arg_name>) as np has (-np) single dash
+        if self.run_command == "mpirun": # not working, problems with run_args being interpreted as the executable
+            # Set model arguments
+            f_mpmd = None
+            for i in range(self.cfd_n_envs):
+                exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
+                run_args = self.mpirun_args.copy() 
+                run = MpirunSettings(self.rhea_exe_path, exe_args=exe_args, run_args=run_args)   # MpirunSettings add '--' to mpirun_args keys
+                run.set_tasks(self.mpirun_np) # added differently than mpirun_args (--<arg_name>) as np has (-np) single dash
+                logger.debug(f"CFD ENVIRONMENT {i}:")
+                logger.debug(f"MpirunSettings exe: {self.rhea_exe_path}")
+                logger.debug(f"MpirunSettings run_args: {run_args}")
+                logger.debug(f"MpirunSettings exe_args: {exe_args}")
 
-            if f_mpmd is None:
-                f_mpmd = run
-            else:
-                f_mpmd.make_mpmd(run)
-        logger.debug(f"MPMD main command (1st cfd env): {f_mpmd}")
-        logger.debug(f"MPMD appended commands: {[str(run) for run in f_mpmd.mpmd]}")
-        
-        batch_settings = None
+                if f_mpmd is None:
+                    f_mpmd = run
+                else:
+                    f_mpmd.make_mpmd(run)
+            logger.debug(f"MPMD main command (1st cfd env): {f_mpmd}")
+            logger.debug(f"MPMD appended commands: {[str(run) for run in f_mpmd.mpmd]}")
+            
+            batch_settings = None
+            # Alvis configuration if requested.
+            #  - RHEA simulations will be launched as external Slurm jobs.
+            #  - E.g. there are 4xA100 GPUs per node.
+            if self.launcher == "slurm_launcher":   # TODO: add possible launcher in params.py
+                gpus_required = self.cfd_n_envs * self.n_tasks_per_env
+                n_nodes = int(np.ceil(gpus_required / 4))
+                gpus_per_node = '4' if gpus_required >= 4 else gpus_required
+                batch_settings = create_batch_settings("slurm", nodes=n_nodes, account=self.cluster_account, time=self.episode_walltime,
+                        batch_args={'ntasks':gpus_required, 'gpus-per-node':'A100:' + str(gpus_per_node)})
+                batch_settings.add_preamble([". " + self.modules_sh])
 
-        # Alvis configuration if requested.
-        #  - RHEA simulations will be launched as external Slurm jobs.
-        #  - E.g. there are 4xA100 GPUs per node.
-        if self.launcher == "slurm_launcher":   # TODO: add possible launcher in params.py
-            gpus_required = self.cfd_n_envs * self.n_tasks_per_env
-            n_nodes = int(np.ceil(gpus_required / 4))
-            gpus_per_node = '4' if gpus_required >= 4 else gpus_required
-            batch_settings = create_batch_settings("slurm", nodes=n_nodes, account=self.cluster_account, time=self.episode_walltime,
-                    batch_args={'ntasks':gpus_required, 'gpus-per-node':'A100:' + str(gpus_per_node)})
-            batch_settings.add_preamble([". " + self.modules_sh])
+        elif self.run_command=="bash":
+            # TODO: write somewhere the my-hostfile slots=<cfd_n_envs> * <mpirun_np> using write_hostfile from init_smartsim
+            # Generate the runit.sh script
+            runit_script = 'runit.sh'
+            with open(runit_script, 'w') as f:
+                f.write("#!/bin/bash\n")
+                f.write("echo 'RHEA executable directory: ' $RHEA_EXE_DIR\n")
+                for i in range(self.cfd_n_envs):
+                    exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
+                    if i == 0:
+                        f.write(f"mpirun -np {self.mpirun_np} --hostfile {self.mpirun_args['hostfile']} --mca {self.mpirun_args['mca']} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
+                    else:
+                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile {self.mpirun_args['hostfile']} --mca {self.mpirun_args['mca']} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
+                f.write("\n")
+            # Make the script executable
+            os.chmod(runit_script, 0o755)
+            # Set up RunSettings
+            f_mpmd = RunSettings(exe=runit_script, run_command=self.run_command)
+            # Debug logging
+            logger.debug(f"Generated runit.sh script: {runit_script}")
+            with open(runit_script, 'r') as f:
+                logger.debug(f"runit.sh content:\n{f.read()}")
+            # Batch settings
+            batch_settings = None
+
+        else:
+            raise Warning(f"Could not create Multi-Process Multi-Data run settings, not recognized run_command '{self.run_command}'")
+
 
         """ Create model:
             create_model(name: str, 

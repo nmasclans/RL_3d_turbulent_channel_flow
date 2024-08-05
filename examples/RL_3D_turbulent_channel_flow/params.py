@@ -5,20 +5,20 @@ t_action = 0.01         # action time duration
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = 1.0
 t_episode_eval = 5.0
-cfd_n_envs = 3
+cfd_n_envs = 1          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 3           # num. regions del domini en spanwise direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
 params = {
     # smartsim params
-    "rhea_exe": os.path.join(os.environ["RHEA_EXE_DIR"],"RHEA.exe"),
+    "rhea_exe": "RHEA.exe",
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
     "num_dbs": 1,                       # not used if launcher == 'local'   TODO: rm if not used
     "launcher": "local",
-    "run_command": "mpirun",            # TODO: rm if not used
-    "mpirun_args": {"mca":"btl_base_warn_component_unused 0", "hostfile":"my-hostfile"},   # mpirun arguments
+    "run_command": "bash",              # TODO: rm if not used
+    "mpirun_args": {"mca":"btl_base_warn_component_unused 0", "hostfile":"$RHEA_EXE_DIR/my-hostfile"},   # mpirun arguments
     "mpirun_np": 2,
     "cluster_account": None,
     "modules_sh": None,

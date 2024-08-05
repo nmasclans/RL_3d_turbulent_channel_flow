@@ -820,12 +820,28 @@ int main(int argc, char** argv) {
 #endif
 
     /// Process command line arguments
-    string configuration_file;
-    if( argc >= 2 ) {
-        configuration_file = argv[1];
-    } else {
-        cout << "Proper usage: RHEA.exe configuration_file.yaml" << endl;
+    if (argc < 6 ) {
+        cerr << "Proper usage: RHEA.exe configuration_file.yaml <restart_data_file> <f_action> <t_episode> <t_begin_control>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
+    }
+
+    /// Extract and validate input arguments
+    string configuration_file = argv[1];        
+    string restart_data_file  = argv[2];        // TODO: use param in the code        
+    double f_action           = 0.0;
+    double t_episode          = 0.0;
+    double t_begin_control    = 0.0;
+    try {
+        // Convert arguments to doubles
+        f_action        = stod(argv[3]);        // TODO: use param in the code
+        t_episode       = stod(argv[4]);        // TODO: use param in the code
+        t_begin_control = stod(argv[5]);        // TODO: use param in the code
+    } catch (const invalid_argument& e) {
+        cerr << "Invalid numeric argument: " << e.what() << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    } catch (const out_of_range& e) {
+        cerr << "Numeric argument out of range: " << e.what() << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     /// Construct my RHEA

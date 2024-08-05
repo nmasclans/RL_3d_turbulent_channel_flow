@@ -5,9 +5,11 @@ export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
 export RHEA_EXE_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/ProjectRHEA/examples/RL_3D_turbulent_channel_flow
 
 # add shared dynamic libraries
-export SMARTREDIS_DIR=/apps/smartredis/0.4.0/
+export SMARTREDIS_DIR=/apps/smartredis/0.4.0
 export RAI_PATH=/apps/redisai/1.2.5/redisai.so
 export SMARTSIM_REDISAI=1.2.5
+export LD_LIBRARY_PATH=$SMARTREDIS_DIR/lib:$LD_LIBRARY_PATH
+
 
 # Set RedisAi required environment variables
 #export REDIS_PORT=$(( RANDOM % 1001 + 6000 )) # random int. btw 6000 and 7000
