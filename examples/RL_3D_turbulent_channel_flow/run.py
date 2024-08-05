@@ -47,7 +47,8 @@ if params["use_XLA"]:   # activate XLA (Accelerated Linear Algebra) for performa
         <host_name>: host name of the machine where TensorFlow process runs, e.g. triton
         <pid>: pid of the TensorFlow process that created the event file    """
 train_dir = os.path.join(cwd, "train")
-summary_writer = tf.summary.create_file_writer(train_dir, flush_millis=1000)
+summary_writter_dir = os.path.join(train_dir, "summary")
+summary_writer = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
 summary_writer.set_as_default()
 print("")
 logger.info(f"Tensorboard event file created: {train_dir}/events.out.tfevents.{int(time.time())}.{gethostname()}.{os.getpid()}")
@@ -287,7 +288,9 @@ saved_model = policy_saver.PolicySaver(eval_policy, train_step=global_step)
 """ Restore training process if existing saved checkpoints
     initialize_or_restore(self, session=None)
         Initialize or restore graph (based on checkpoint if exists).
-"""
+    If not checkpoints available, this will return:
+        INFO:absl:No checkpoint available at <train_dir>/ckpt
+        INFO:absl:No checkpoint available at <train_dir>/policy     """
 train_checkpointer.initialize_or_restore()  
 
 #--------------------------- Training / Evaluation ---------------------------
