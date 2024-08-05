@@ -1,6 +1,3 @@
-# Environment paths
-RHEA_PATH    = /home/jofre/Nuria/flowsolverrhea
-
 EXECUTABLE   = RHEA.exe
 MAIN         = myRHEA.cpp
 PROJECT_PATH = $(RHEA_PATH)
