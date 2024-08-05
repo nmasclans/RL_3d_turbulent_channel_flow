@@ -122,6 +122,7 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
     }
 }
 
+// TODO: remove method readState, not necessary, only created for testing
 /// Read state from database -> updates variable 'state_global'
 void SmartRedisManager::readState(const std::string& key) {
     if (mpi_rank == 0) {
