@@ -15,9 +15,6 @@ from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.utils import n_witness_points, n_rectangles, numpy_str, bcolors
 
-import warnings
-warnings.filterwarnings('error')
-
 logger = get_logger(__name__)
 
 class RheaEnv(py_environment.PyEnvironment):
@@ -32,12 +29,13 @@ class RheaEnv(py_environment.PyEnvironment):
     ### **env_params
     - launcher: "local", other
     - run_command: "mpirun" ("srun" still not working)
+    - mpirun_args: mpirun arguments (of flag --)
+    - mpirun_np: mpirun argument of number of processors (of flag -np)
     - cluster_account: project account, if required for specific launcher
     - modules_sh: modules file, if required for specific launcher
     - episode_walltime: environment walltime, if required for specific launcher
     - cfd_n_envs: number of cdf simulations
     - rl_n_envs: number of rl environments inside a cfd simulation
-    - n_tasks_per_env: number of processes (MPI ranks) per environment
     - rectangle_file: actuators surfaces file
     - witness_file: witness points file
     - witness_xyz: number of witness points in the (x, y, x) directions
@@ -74,12 +72,13 @@ class RheaEnv(py_environment.PyEnvironment):
         ### **env_params:
         launcher = "local",
         run_command = "mpirun",
+        mpirun_args = ["--mca", "btl_base_warn_component_unused", "0", "-np", "2", "--hostfile", "my-hostfile"],
+        mpirun_np = 1,
         cluster_account = None,
         modules_sh = None,
         episode_walltime = None,
         cfd_n_envs = 2,
         rl_n_envs = 5,
-        n_tasks_per_env = 1,
         rectangle_file = "rectangleControl.txt",
         witness_file = "witness.txt",
         witness_xyz = (6, 4, 10),
@@ -114,12 +113,13 @@ class RheaEnv(py_environment.PyEnvironment):
         # **env_params:
         self.launcher = launcher
         self.run_command = run_command
+        self.mpirun_args = mpirun_args
+        self.mpirun_np = mpirun_np
         self.cluster_account = cluster_account
         self.modules_sh = modules_sh
         self.episode_walltime = episode_walltime
         self.cfd_n_envs = cfd_n_envs
         self.rl_n_envs = rl_n_envs
-        self.n_tasks_per_env = n_tasks_per_env
         self.rectangle_file = rectangle_file
         self.witness_file = witness_file
         self.witness_xyz = witness_xyz
@@ -234,7 +234,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # TODO: check method
         if not self.ensemble or new_ensamble:
             self.ensemble = self._create_mpmd_ensemble(restart_file)
-            logger.info(f"New ensamble created")
+            logger.debug(f"New ensamble created")
 
         self.exp.start(self.ensemble, block=False) # non-blocking start of RHEA solver(s)
         self.envs_initialised = False
@@ -281,17 +281,18 @@ class RheaEnv(py_environment.PyEnvironment):
                      "t_episode": self.t_episode, "t_begin_control": self.t_begin_control}
 
         # Set model arguments
+        f_mpmd = None
         for i in range(self.cfd_n_envs):
-            # TODO: modify MpirunSettings for call of execute.sh files
             exe_args = [f"--{k}={v[i]}" for k,v in rhea_args.items()]
-            run = MpirunSettings(exe=self.rhea_exe, exe_args=exe_args)
-            run.set_tasks(self.n_tasks_per_env)
-            # TODO: check f_mpmd, what is it?
-            if i == 0:
+            run = MpirunSettings(exe=self.rhea_exe, run_args=self.mpirun_args, exe_args=exe_args)   # MpirunSettings add '--' to mpirun_args keys
+            run.set_tasks(self.mpirun_np) # added differently than mpirun_args (--<arg_name>) as np has (-np) single dash
+
+            if f_mpmd is None:
                 f_mpmd = run
             else:
                 f_mpmd.make_mpmd(run)
-        logger.debug(f"f_mpmd: {f_mpmd}")
+        logger.debug(f"MPMD main command (1st cfd env): {f_mpmd}")
+        logger.debug(f"MPMD appended commands: {[str(run) for run in f_mpmd.mpmd]}")
         
         batch_settings = None
 

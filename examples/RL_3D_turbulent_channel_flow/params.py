@@ -5,7 +5,7 @@ t_action = 0.01         # action time duration
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = 1.0
 t_episode_eval = 5.0
-cfd_n_envs = 8
+cfd_n_envs = 3
 rl_n_envs = 3           # num. regions del domini en spanwise direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -18,12 +18,14 @@ params = {
     "num_dbs": 1,                       # not used if launcher == 'local'   TODO: rm if not used
     "launcher": "local",
     "run_command": "mpirun",            # TODO: rm if not used
+    "mpirun_args": {"mca":"btl_base_warn_component_unused 0", "hostfile":"my-hostfile"},   # mpirun arguments
+    "mpirun_np": 2,
     "cluster_account": None,
     "modules_sh": None,
     "episode_walltime": None,
     "cfd_n_envs": cfd_n_envs,
     "rl_n_envs": rl_n_envs,
-    "n_tasks_per_env": 1,               # TODO: set custom value
+    ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
     "rectangle_file": "rectangleControl.txt",   # only used if rl_n_envs == 1, TODO: set custom file contents
     "witness_file": "witness.txt",      # TODO: set custom file contents
     "witness_xyz": (6, 6, 6),           # TODO: set custom value
@@ -75,12 +77,14 @@ params = {
 env_params = {
     "launcher": params["launcher"],
     "run_command": params["run_command"],
+    "mpirun_args": params["mpirun_args"],
+    "mpirun_np": params["mpirun_np"],
     "cluster_account": params["cluster_account"],
     "modules_sh": params["modules_sh"],
     "episode_walltime": params["episode_walltime"],
     "cfd_n_envs": params["cfd_n_envs"],
     "rl_n_envs": params["rl_n_envs"],
-    "n_tasks_per_env": params["n_tasks_per_env"],
+    ###"n_tasks_per_env": params["n_tasks_per_env"],
     "rectangle_file": params["rectangle_file"],
     "witness_file": params["witness_file"],
     "witness_xyz": params["witness_xyz"],
