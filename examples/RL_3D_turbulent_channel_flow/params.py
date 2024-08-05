@@ -11,6 +11,7 @@ mode = "train"          # "train" or "eval"
 
 params = {
     # smartsim params
+    "rhea_exe": os.path.join(os.environ["RHEA_EXE_DIR"],"RHEA.exe"),
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,

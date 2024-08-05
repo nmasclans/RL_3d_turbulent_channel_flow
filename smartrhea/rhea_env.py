@@ -24,8 +24,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - exp: SmartSim experiment class instance
     - db: SmartSim orchestrator class instance
     - hosts: list of host nodes
-    - rhea_exe: RHEA executable
-    - rhea_dir: directory of RHEA executable
+    - rhea_exe: RHEA executable (full path)
     - cwd: working directory
     ### **env_params
     - launcher: "local", other
@@ -68,7 +67,6 @@ class RheaEnv(py_environment.PyEnvironment):
         db,
         hosts,
         rhea_exe,
-        rhea_dir,
         cwd,
         ### **env_params:
         launcher = "local",
@@ -108,7 +106,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # Store input parameters
         self.exp = exp
         self.db = db
-        self.rhea_exe = os.path.join(rhea_dir, rhea_exe)
+        self.rhea_exe = rhea_exe
         self.cwd = cwd
         # **env_params:
         self.launcher = launcher
