@@ -1,4 +1,8 @@
 import numpy as np
+from smartsim.log import get_logger
+
+logger = get_logger(__name__)
+
 
 class bcolors:
     HEADER = '\033[95m'
@@ -13,11 +17,25 @@ class bcolors:
 
 
 def n_witness_points(fname):
-    return sum([1 for l in open(fname,"r").readlines() if l.strip()])  # num. witness points = num. lines of fname
+    """
+    Return number of witness points
+    Assumption: number of lines in fname is equal to the number of witness points (ignore lines with only whitespaces)
+    """
+    with open(fname, "r") as file:
+        n_witness_points_ = int(sum(1 for l in file if l.strip))
+    logger.debug(f"Number of witness points: {n_witness_points_}")
+    return n_witness_points_
 
 
 def n_rectangles(fname):
-    return int(open(fname,"r").readline())  # first line of fname contains info num. rectangles
+    """
+    Return number of rectangles
+    Assumption: num. rectangles is stored in the first line of fname
+    """
+    with open(fname, "r") as file:
+        n_rectangles_ = int(file.readline().strip())
+    logger.debug(f"Number of rectangles: {n_rectangles_}")
+    return n_rectangles_
 
 
 def print_params(params, title=None):
