@@ -327,8 +327,8 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             start_time = time.time()
             collect_env.start(
                 new_ensamble=True,
-                restart_file=params["restart_file"] if global_step_val > 0 else 1,
-                global_step=global_step_val
+                restart_file=params["restart_file"], # TODO: impl. sth if we want to use several restart files, i.e. if global_step_val > 0 else 1,
+                global_step=global_step_val,
             )
             collect_driver.run()
             collect_env.stop()

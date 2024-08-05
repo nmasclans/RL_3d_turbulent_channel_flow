@@ -15,6 +15,9 @@ from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.utils import n_witness_points, n_rectangles, numpy_str, bcolors
 
+import warnings
+warnings.filterwarnings('error')
+
 logger = get_logger(__name__)
 
 class RheaEnv(py_environment.PyEnvironment):
@@ -263,13 +266,14 @@ class RheaEnv(py_environment.PyEnvironment):
 
     def _create_mpmd_ensemble(self, restart_file):
         # TODO: add method description
-        # TODO: check method
-        # restart files are copied within RHEA to the output_* folder   # TODO: do this action in RHEA, or whatever necessary
-        # TODO: save restart files 1 and 2 to the proper directory
+        """
+        # TODO: custom this implementation if several random restart files are used
         if restart_file == 3:   # random choice of restart file
             restart_step = [random.choice(["1", "2"]) for _ in range(self.cfd_n_envs)]
         else:
             restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
+        """
+        restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
 
         # set RHEA exe arguments
         # TODO: code RHEA so that it accepts and processes these input arguments when called, or write them in RHEA input file
@@ -287,6 +291,8 @@ class RheaEnv(py_environment.PyEnvironment):
                 f_mpmd = run
             else:
                 f_mpmd.make_mpmd(run)
+        logger.debug(f"f_mpmd: {f_mpmd}")
+        
         batch_settings = None
 
         # Alvis configuration if requested.
