@@ -3,3 +3,5 @@
 /rhea_exp
 nohup.out
 ensemble.*
+*.h5
+*.xdmf
