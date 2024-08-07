@@ -1,7 +1,7 @@
 /__pycache__
 /train
 /rhea_exp
-nohup.out
 ensemble.*
 *.h5
 *.xdmf
+*.out
