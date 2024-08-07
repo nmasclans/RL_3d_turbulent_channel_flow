@@ -276,7 +276,7 @@ void SmartRedisManager::writeStepType(const int step_type, const std::string& ke
     if (mpi_rank == 0) {
         std::vector<int64_t> step_type_tensor = {step_type};
         client->put_tensor(key, step_type_tensor.data(), {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
-        std::cout << "Writen tensor with key \"" << key << "\" and value: " <<  step_type_tensor[0] << std::endl;
+        std::cout << "Written tensor '" << key << "': " <<  step_type_tensor[0] << std::endl;
     }
 }
 
