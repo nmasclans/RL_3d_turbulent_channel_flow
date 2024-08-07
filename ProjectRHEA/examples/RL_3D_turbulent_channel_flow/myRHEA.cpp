@@ -147,11 +147,12 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Double arguments
     try {
         // Convert string arguments to doubles
-        this->f_action  = stod(f_action);
-        this->t_episode = stod(t_episode);
-        this->t_begin_control = stod(t_begin_control);
+        this->f_action        = std::stod(f_action);
+        this->t_episode       = std::stod(t_episode);
+        this->t_begin_control = std::stod(t_begin_control);
     } catch (const invalid_argument& e) {
         cerr << "Invalid numeric argument: " << e.what() << endl;
+        cerr << "for f_action = " << f_action << ", t_episode = " << t_episode << ", t_begin_control = " << t_begin_control << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     } catch (const out_of_range& e) {
         cerr << "Numeric argument out of range: " << e.what() << endl;
@@ -882,20 +883,22 @@ int main(int argc, char** argv) {
 #endif
 
     /// Process command line arguments
-#if _FEEDBACK_LOOP_BODY_FORCE_
-    if (argc < 8 ) {
+#if _ACTIVE_CONTROL_BODY_FORCE_
+    string configuration_file, tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered;
+    if (argc >= 8 ) {
+        cout << "num. argc: " << argc << endl;
+        /// Extract and validate input arguments
+        configuration_file  = argv[1];
+        tag                 = argv[2];
+        restart_data_file   = argv[3];
+        f_action            = argv[4];
+        t_episode           = argv[5];
+        t_begin_control     = argv[6];
+        db_clustered        = argv[7];
+    } else {
         cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <f_action> <t_episode> <t_begin_control>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
-    /// Extract and validate input arguments
-    string configuration_file  = argv[1];
-    string tag                 = args[2];
-    string restart_data_file   = argv[3];
-    string f_action            = argv[4];
-    string t_episode           = argv[5];
-    string t_begin_control     = argv[6];
-    string db_clustered        = argv[7];
-    
     /// Construct my RHEA
     myRHEA my_RHEA( configuration_file, tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered );
 
@@ -907,7 +910,6 @@ int main(int argc, char** argv) {
         cout << "Proper usage: RHEA.exe configuration_file.yaml" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
-
     /// Construct my RHEA
     myRHEA my_RHEA( configuration_file );
 
