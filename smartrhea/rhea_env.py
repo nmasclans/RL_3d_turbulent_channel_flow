@@ -351,9 +351,8 @@ class RheaEnv(py_environment.PyEnvironment):
             # Set up RunSettings
             f_mpmd = RunSettings(exe=runit_script, run_command=self.run_command)
             # Debug logging
-            logger.debug(f"Generated runit.sh script: {runit_script}")
             with open(runit_script, 'r') as f:
-                logger.debug(f"runit.sh content:\n{f.read()}")
+                logger.debug(f"Edited {runit_script} as: \n{f.read()}")
             # Batch settings
             batch_settings = None
 
@@ -378,7 +377,7 @@ class RheaEnv(py_environment.PyEnvironment):
             # poll_tensor(name: str, poll_frequency_ms: int, num_tries: int) → bool
             self.client.poll_tensor(self.state_size_key, self.poll_freq_ms, self.poll_n_tries)
             state_size = self.client.get_tensor(self.state_size_key)
-            logger.debug(f"Read state_size: {state_size}")
+            logger.debug(f"Read state_size: {state_size}, type: {state_size.dtype}")
         except Exception as exc:
             raise Warning(f"Could not read state size from key: {self.state_size_key}") from exc
         return state_size[0]
@@ -390,7 +389,7 @@ class RheaEnv(py_environment.PyEnvironment):
             # poll_tensor(name: str, poll_frequency_ms: int, num_tries: int) → bool
             self.client.poll_tensor(self.action_size_key, self.poll_freq_ms, self.poll_n_tries)
             action_size = self.client.get_tensor(self.action_size_key)
-            logger.debug(f"Read action_size: {action_size}")
+            logger.debug(f"Read action_size: {action_size}, type: {action_size.dtype}")
         except Exception as exc:
             raise Warning(f"Could not read action size from key: {self.action_size_key}") from exc
         return action_size[0]

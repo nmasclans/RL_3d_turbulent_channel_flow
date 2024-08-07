@@ -78,10 +78,13 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
                                        const std::vector<size_t>& dims,
                                        const SRTensorType type,
                                        const SRMemoryLayout mem_layout) */
+            ///int64_t temp_state_global_size  = static_cast<int64_t>(state_global_size);
+            ///int64_t temp_action_global_size = static_cast<int64_t>(action_global_size);
+            /// TODO: fix error here, the put tensor in c++ do not correspond to the read tensor by python3, but using temp_* gives exec. error
             client->put_tensor("state_size",  &state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
             client->put_tensor("action_size", &action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
-            std::cout << "Written tensor 'state_size': " << state_global_size << std::endl;
-            std::cout << "Written tensor 'action_size': " << action_global_size << std::endl;
+            std::cout << "Written tensor 'state_size': "  << state_global_size  << ", address: " << &state_global_size  << std::endl;
+            std::cout << "Written tensor 'action_size': " << action_global_size << ", address: " << &action_global_size << std::endl;
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error putting tensor: " << ex.what() << std::endl; 
             return;
