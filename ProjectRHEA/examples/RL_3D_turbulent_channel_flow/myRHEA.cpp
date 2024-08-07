@@ -11,7 +11,7 @@ using namespace std;
 /// TODO: move these env parameters to an .h file for the _ACTIVE_CONTROL_BODY_FORCE_ to be included by SmartRedisManager.cpp & .h files 
 #define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
-#define _FIXED_TIME_STEP_ 0                         /// Activate fixed time step
+#define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 
 /// AUXILIAR PARAMETERS ///
 //const double pi = 2.0*asin( 1.0 );				/// pi number (fixed)
@@ -84,7 +84,7 @@ vector<vector<double>> Deltaij = {
 
 ////////// myRHEA CLASS //////////
 
-myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_configuration_file) {
+myRHEA::myRHEA(const string name_configuration_file, const string restart_data_file, const double f_action, const double t_episode, const double t_begin_control) : FlowSolverRHEA(name_configuration_file) {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
@@ -93,6 +93,12 @@ myRHEA::myRHEA(const string name_configuration_file) : FlowSolverRHEA(name_confi
     DeltaRyy_field.setTopology(topo, "DeltaRyy");
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
+
+    // Store input arguments
+    this->restart_data_file = restart_data_file;          // TODO: use param in the code
+    this->f_action          = f_action;                   // TODO: use param in the code
+    this->t_episode         = t_episode;                  // TODO: use param in the code
+    this->t_begin_control   = t_begin_control;            // TODO: use param in the code
 
     /*
     ////////////////////////////////////////////// Test manager //////////////////////////////////////////////
@@ -820,22 +826,19 @@ int main(int argc, char** argv) {
 #endif
 
     /// Process command line arguments
+#if _FEEDBACK_LOOP_BODY_FORCE_
     if (argc < 6 ) {
         cerr << "Proper usage: RHEA.exe configuration_file.yaml <restart_data_file> <f_action> <t_episode> <t_begin_control>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
-
     /// Extract and validate input arguments
-    string configuration_file = argv[1];        
-    string restart_data_file  = argv[2];        // TODO: use param in the code        
-    double f_action           = 0.0;
-    double t_episode          = 0.0;
-    double t_begin_control    = 0.0;
+    string configuration_file  = argv[1];        
+    string restart_data_file   = argv[2];
     try {
         // Convert arguments to doubles
-        f_action        = stod(argv[3]);        // TODO: use param in the code
-        t_episode       = stod(argv[4]);        // TODO: use param in the code
-        t_begin_control = stod(argv[5]);        // TODO: use param in the code
+        double f_action        = stod(argv[3]);
+        double t_episode       = stod(argv[4]);
+        double t_begin_control = stod(argv[5]);
     } catch (const invalid_argument& e) {
         cerr << "Invalid numeric argument: " << e.what() << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -843,9 +846,23 @@ int main(int argc, char** argv) {
         cerr << "Numeric argument out of range: " << e.what() << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    
+    /// Construct my RHEA
+    myRHEA my_RHEA( configuration_file, restart_data_file, f_action, t_episode, t_begin_control );
+
+#else
+    string configuration_file;
+    if( argc >= 2 ) {
+        configuration_file = argv[1];
+    } else {
+        cout << "Proper usage: RHEA.exe configuration_file.yaml" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1 );
+    }
 
     /// Construct my RHEA
     myRHEA my_RHEA( configuration_file );
+
+#endif
 
     /// Execute my RHEA
     my_RHEA.execute();
