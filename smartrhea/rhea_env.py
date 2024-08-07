@@ -237,7 +237,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # TODO: check method
         if not self.ensemble or new_ensamble:
             self.ensemble = self._create_mpmd_ensemble(restart_file)
-            logger.debug(f"New ensamble created")
+            logger.debug(f"New ensemble created")
 
         self.exp.start(self.ensemble, block=False) # non-blocking start of RHEA solver(s)
         self.envs_initialised = False
