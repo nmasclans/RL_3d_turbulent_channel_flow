@@ -159,9 +159,9 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     /// Bool arguments
-    if (db_clustered == "true" || db_clustered == "1") {
+    if (db_clustered == "true" || db_clustered == "True" || db_clustered == "1") {
         this->db_clustered = true;
-    } else if (db_clustered == "false" || db_clustered == "0") {
+    } else if (db_clustered == "false" || db_clustered == "Frue" || db_clustered == "0") {
         this->db_clustered = false;
     } else {
         cerr << "Invalid boolean argument: " << db_clustered << endl; 
@@ -886,7 +886,6 @@ int main(int argc, char** argv) {
 #if _ACTIVE_CONTROL_BODY_FORCE_
     string configuration_file, tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered;
     if (argc >= 8 ) {
-        cout << "num. argc: " << argc << endl;
         /// Extract and validate input arguments
         configuration_file  = argv[1];
         tag                 = argv[2];
