@@ -48,11 +48,14 @@ def get_slurm_hosts():
     return list(set(hostslist_str.split("\n")[:-1]))  # returns unique name of hosts
 
 
-def write_hosts(hosts, n_slots):
-    with open('hostfile', 'w') as f:
+def write_hosts(hosts, n_slots, hostfile='hostfile'):
+    # TODO: check if this works, of if i should do "localhost slots=.." as before
+    with open(hostfile, 'w') as f:
         for host in hosts:
-            f.write(f"{host} slots={n_slots} max_slots=4\n")
+            f.write(f"{host} slots={n_slots}\n") # max_slots=4\n")
     logger.debug("Hostfile has been edited")
+    with open(hostfile, 'r') as f:
+        logger.debug(f"{hostfile} content:\n{f.read()}")
 
 
 def get_slurm_walltime():

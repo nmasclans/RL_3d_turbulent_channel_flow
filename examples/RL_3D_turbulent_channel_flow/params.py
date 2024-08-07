@@ -19,8 +19,9 @@ params = {
     "num_dbs": 1,                       # not used if launcher == 'local'   TODO: rm if not used
     "launcher": "local",
     "run_command": "bash",              # TODO: rm if not used
-    "mpirun_args": {"mca":"btl_base_warn_component_unused 0", "hostfile":"$RHEA_EXE_DIR/my-hostfile"},   # mpirun arguments
-    "mpirun_np": 2,
+    "mpirun_mca": "btl_base_warn_component_unused 0",   # mpirun argument --mca
+    "mpirun_hostfile": "my-hostfile",   # mpirun argument --hostfile
+    "mpirun_np": 2,                     # mpirun argument -np
     "cluster_account": None,
     "modules_sh": None,
     "episode_walltime": None,
@@ -78,7 +79,8 @@ params = {
 env_params = {
     "launcher": params["launcher"],
     "run_command": params["run_command"],
-    "mpirun_args": params["mpirun_args"],
+    "mpirun_mca": params["mpirun_mca"],
+    "mpirun_hostfile": params["mpirun_hostfile"],
     "mpirun_np": params["mpirun_np"],
     "cluster_account": params["cluster_account"],
     "modules_sh": params["modules_sh"],

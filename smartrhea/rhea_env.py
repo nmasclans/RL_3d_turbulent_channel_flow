@@ -13,6 +13,7 @@ from smartredis import Client
 from smartsim.settings import MpirunSettings, RunSettings
 from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
+from smartrhea.init_smartsim import write_hosts
 from smartrhea.utils import n_witness_points, n_rectangles, numpy_str, bcolors
 
 logger = get_logger(__name__)
@@ -29,8 +30,9 @@ class RheaEnv(py_environment.PyEnvironment):
     ### **env_params
     - launcher: "local", other
     - run_command: "mpirun" ("srun" still not working)
-    - mpirun_args: mpirun arguments (of flag --)
-    - mpirun_np: mpirun argument of number of processors (of flag -np)
+    - mpirun_mca: mpirun argument 'mca' (of flag --)
+    - mpirun_hostfile: mpirun argument 'hostfile' (of flag --)
+    - mpirun_np: mpirun argument 'np', number of processors (of flag -np)
     - cluster_account: project account, if required for specific launcher
     - modules_sh: modules file, if required for specific launcher
     - episode_walltime: environment walltime, if required for specific launcher
@@ -72,7 +74,8 @@ class RheaEnv(py_environment.PyEnvironment):
         ### **env_params:
         launcher = "local",
         run_command = "mpirun",
-        mpirun_args = ["--mca", "btl_base_warn_component_unused", "0", "-np", "2", "--hostfile", "my-hostfile"],
+        mpirun_mca = "btl_base_warn_component_unused",
+        mpirun_hostfile = "my-hostfile",
         mpirun_np = 1,
         cluster_account = None,
         modules_sh = None,
@@ -108,6 +111,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # Store input parameters
         self.exp = exp
         self.db = db
+        self.hosts = hosts
         self.rhea_exe_dir   = os.environ["RHEA_EXE_DIR"]
         self.rhea_exe_fname = rhea_exe
         self.rhea_exe_path  = os.path.join(self.rhea_exe_dir, self.rhea_exe_fname)
@@ -115,7 +119,8 @@ class RheaEnv(py_environment.PyEnvironment):
         # **env_params:
         self.launcher = launcher
         self.run_command = run_command
-        self.mpirun_args = mpirun_args
+        self.mpirun_mca = mpirun_mca
+        self.mpirun_hostfile = mpirun_hostfile
         self.mpirun_np = mpirun_np
         self.cluster_account = cluster_account
         self.modules_sh = modules_sh
@@ -234,7 +239,7 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         Starts all RHEA instances with configuration specified in initialization.
         """
-        # TODO: check method
+        # Create Multi-Process Multi-Data (mpmd) ensemble
         if not self.ensemble or new_ensamble:
             self.ensemble = self._create_mpmd_ensemble(restart_file)
             logger.debug(f"New ensemble created")
@@ -284,15 +289,18 @@ class RheaEnv(py_environment.PyEnvironment):
                      "f_action": self.f_action, 
                      "t_episode": self.t_episode, 
                      "t_begin_control": self.t_begin_control}
+        
+        # Edit my-hostfile
+        write_hosts(self.hosts, self.mpirun_np, os.path.join(self.rhea_exe_dir, self.mpirun_hostfile))
 
         if self.run_command == "mpirun": # not working, problems with run_args being interpreted as the executable
             # Set model arguments
             f_mpmd = None
             for i in range(self.cfd_n_envs):
                 exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
-                run_args = self.mpirun_args.copy() 
-                run = MpirunSettings(self.rhea_exe_path, exe_args=exe_args, run_args=run_args)   # MpirunSettings add '--' to mpirun_args keys
-                run.set_tasks(self.mpirun_np) # added differently than mpirun_args (--<arg_name>) as np has (-np) single dash
+                run_args = {"mca": self.mpirun_mca, "hostfile": "$RHEA_EXE_DIR/"+self.mpirun_hostfile}
+                run = MpirunSettings(self.rhea_exe_path, exe_args=exe_args, run_args=run_args)   # MpirunSettings add '--' to run_args keys
+                run.set_tasks(self.mpirun_np) # added differently than run_args (--<arg_name>) as np has (-np) single dash
                 logger.debug(f"CFD ENVIRONMENT {i}:")
                 logger.debug(f"MpirunSettings exe: {self.rhea_exe_path}")
                 logger.debug(f"MpirunSettings run_args: {run_args}")
@@ -318,8 +326,8 @@ class RheaEnv(py_environment.PyEnvironment):
                 batch_settings.add_preamble([". " + self.modules_sh])
 
         elif self.run_command=="bash":
-            # TODO: write somewhere the my-hostfile slots=<cfd_n_envs> * <mpirun_np> using write_hostfile from init_smartsim
             # Generate the runit.sh script
+            # TODO: currently taking restart_data_file from current directory, but it should be taken the one from $RHEA_EXE_DIR (execution working because restart_data_file input arg is not used in RHEA yet)
             runit_script = 'runit.sh'
             with open(runit_script, 'w') as f:
                 f.write("#!/bin/bash\n")
@@ -327,9 +335,9 @@ class RheaEnv(py_environment.PyEnvironment):
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
                     if i == 0:
-                        f.write(f"mpirun -np {self.mpirun_np} --hostfile {self.mpirun_args['hostfile']} --mca {self.mpirun_args['mca']} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
+                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
                     else:
-                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile {self.mpirun_args['hostfile']} --mca {self.mpirun_args['mca']} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
+                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
                 f.write("\n")
             # Make the script executable
             os.chmod(runit_script, 0o755)
