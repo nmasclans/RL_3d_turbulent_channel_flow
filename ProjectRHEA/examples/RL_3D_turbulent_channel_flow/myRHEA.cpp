@@ -84,7 +84,7 @@ vector<vector<double>> Deltaij = {
 
 ////////// myRHEA CLASS //////////
 
-myRHEA::myRHEA(const string name_configuration_file, const string restart_data_file, const double f_action, const double t_episode, const double t_begin_control) : FlowSolverRHEA(name_configuration_file) {
+myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string f_action, const string t_episode, const string t_begin_control, const string db_clustered) : FlowSolverRHEA(name_configuration_file) {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
@@ -94,11 +94,8 @@ myRHEA::myRHEA(const string name_configuration_file, const string restart_data_f
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
-    // Store input arguments
-    this->restart_data_file = restart_data_file;          // TODO: use param in the code
-    this->f_action          = f_action;                   // TODO: use param in the code
-    this->t_episode         = t_episode;                  // TODO: use param in the code
-    this->t_begin_control   = t_begin_control;            // TODO: use param in the code
+    initRLParams(tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered);
+    initSmartRedis();
 
     /*
     ////////////////////////////////////////////// Test manager //////////////////////////////////////////////
@@ -138,6 +135,65 @@ myRHEA::myRHEA(const string name_configuration_file, const string restart_data_f
     */
 #endif
 
+};
+
+
+void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &f_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
+    
+    /// String arguments
+    this->configuration_file = configuration_file;
+    this->tag                = tag;
+    this->restart_data_file  = restart_data_file;
+    /// Double arguments
+    try {
+        // Convert string arguments to doubles
+        this->f_action  = stod(f_action);
+        this->t_episode = stod(t_episode);
+        this->t_begin_control = stod(t_begin_control);
+    } catch (const invalid_argument& e) {
+        cerr << "Invalid numeric argument: " << e.what() << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    } catch (const out_of_range& e) {
+        cerr << "Numeric argument out of range: " << e.what() << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    /// Bool arguments
+    if (db_clustered == "true" || db_clustered == "1") {
+        this->db_clustered = true;
+    } else if (db_clustered == "false" || db_clustered == "0") {
+        this->db_clustered = false;
+    } else {
+        cerr << "Invalid boolean argument: " << db_clustered << endl; 
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    /// Logging
+    cout << "RL simulation params:" << endl;
+    cout << "--configuration_file: " << this->configuration_file << endl;  
+    cout << "--tag: " << this->tag << endl;
+    cout << "--restart_data_file: " << this->restart_data_file << endl;
+    cout << "--f_action: " << this->f_action << endl;
+    cout << "--t_episode: " << this->t_episode << endl;
+    cout << "--t_begin_control: " << this->t_begin_control << endl; 
+    cout << "--db_clustered: " << db_clustered << endl;
+
+};
+
+
+void myRHEA::initSmartRedis() {
+    /// TODO: transform this Fortran code of BLMARLFlowSolver_Incomp.f90 to current implementation and C++
+    /*
+    class(BLMARLFlowSolverIncomp), intent(inout) :: this
+    open(unit=443,file="./output_"//trim(adjustl(this%tag))//"/"//"control_action.txt",status='replace')
+    open(unit=445,file="./output_"//trim(adjustl(this%tag))//"/"//"control_reward.txt",status='replace')
+    */  
+    int state_local_size = 10; // Example value, replace with actual
+    int action_global_size = 25; // Example value, replace with actual
+    int n_pseudo_envs = 10; // Example value, replace with actual
+    /// TODO: remove this comment:
+    /* equivalent to Fortran line:  
+       call init_smartredis(client, this%nwitPar, this%nRectangleControl, this%n_pseudo_envs, trim(adjustl(this%tag)), this%db_clustered)  */
+    SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
+    manager.writeStepType(1, "ensemble_" + tag + ".step_type");
 };
 
 
@@ -827,28 +883,21 @@ int main(int argc, char** argv) {
 
     /// Process command line arguments
 #if _FEEDBACK_LOOP_BODY_FORCE_
-    if (argc < 6 ) {
-        cerr << "Proper usage: RHEA.exe configuration_file.yaml <restart_data_file> <f_action> <t_episode> <t_begin_control>" << endl;
+    if (argc < 8 ) {
+        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <f_action> <t_episode> <t_begin_control>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
     /// Extract and validate input arguments
-    string configuration_file  = argv[1];        
-    string restart_data_file   = argv[2];
-    try {
-        // Convert arguments to doubles
-        double f_action        = stod(argv[3]);
-        double t_episode       = stod(argv[4]);
-        double t_begin_control = stod(argv[5]);
-    } catch (const invalid_argument& e) {
-        cerr << "Invalid numeric argument: " << e.what() << endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    } catch (const out_of_range& e) {
-        cerr << "Numeric argument out of range: " << e.what() << endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
+    string configuration_file  = argv[1];
+    string tag                 = args[2];
+    string restart_data_file   = argv[3];
+    string f_action            = argv[4];
+    string t_episode           = argv[5];
+    string t_begin_control     = argv[6];
+    string db_clustered        = argv[7];
     
     /// Construct my RHEA
-    myRHEA my_RHEA( configuration_file, restart_data_file, f_action, t_episode, t_begin_control );
+    myRHEA my_RHEA( configuration_file, tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered );
 
 #else
     string configuration_file;

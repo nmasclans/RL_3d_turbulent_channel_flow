@@ -65,6 +65,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         ///     Client(bool cluster, const std::string& logger_name = "default");
         try {
             client = std::make_unique<SmartRedis::Client>(db_clustered, tag);
+            std::cout << "SmartRedis client initialized" << std::endl;
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error initializing SmartRedis client: " << ex.what() << std::endl; 
             return;
@@ -79,6 +80,8 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
                                        const SRMemoryLayout mem_layout) */
             client->put_tensor("state_size",  &state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
             client->put_tensor("action_size", &action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
+            std::cout << "Written tensor 'state_size': " << state_global_size << std::endl;
+            std::cout << "Written tensor 'action_size': " << action_global_size << std::endl;
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error putting tensor: " << ex.what() << std::endl; 
             return;
@@ -268,11 +271,12 @@ void SmartRedisManager::writeReward(const double reward, const std::string& key)
     }
 }
 
-/// TODO: necessary method? delete if not used
+// Indicate environment time step status -> 1: init time step. 2: mid time step. 0: end time step  
 void SmartRedisManager::writeStepType(const int step_type, const std::string& key) {
     if (mpi_rank == 0) {
         std::vector<int64_t> step_type_tensor = {step_type};
         client->put_tensor(key, step_type_tensor.data(), {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
+        std::cout << "Writen tensor with key \"" << key << "\" and value: " <<  step_type_tensor[0] << std::endl;
     }
 }
 

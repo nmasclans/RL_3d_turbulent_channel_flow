@@ -17,10 +17,12 @@ class myRHEA : public FlowSolverRHEA {
 
         ////////// CONSTRUCTORS & DESTRUCTOR //////////
         myRHEA(const std::string name_configuration_file, 
+               const std::string tag="", 
                const std::string restart_data_file="", 
-               const double f_action=0.0, 
-               const double t_episode=0.0, 
-               const double t_begin_control=0.0);               /// Parametrized constructor
+               const std::string f_action="", 
+               const std::string t_episode="", 
+               const std::string t_begin_control="",
+               const std::string db_clustered="");              /// Parametrized constructor
         virtual ~myRHEA() {};									/// Destructor
 
 	////////// SOLVER METHODS //////////
@@ -49,11 +51,17 @@ class myRHEA : public FlowSolverRHEA {
 
     private:
 
+        /// SmartRedis
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
+        std::string tag;
         std::string restart_data_file;
         double f_action;
         double t_episode;
         double t_begin_control;
+        bool db_clustered;
+
+        void initRLParams(const string &tag, const string &restart_data_file, const string &f_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
+        void initSmartRedis();
 
         /// Eigen-decomposition
         void symmetricDiagonalize(const vector<vector<double>> &A, vector<vector<double>> &Q, vector<vector<double>> &D);
