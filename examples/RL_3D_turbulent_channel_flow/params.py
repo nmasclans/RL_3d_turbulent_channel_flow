@@ -1,7 +1,8 @@
 import random, os, numpy as np
 
 # TODO: set custom values
-t_action = 0.01         # action time duration
+# t_phys = delta / u_tau = 1
+t_action = 0.001        # action time duration
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = 1.0
 t_episode_eval = 5.0
