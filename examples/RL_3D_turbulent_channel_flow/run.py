@@ -5,6 +5,8 @@ import os
 import random
 import tensorflow as tf
 import time
+import datetime
+import uuid
 
 from tf_agents.drivers import dynamic_episode_driver
 from tf_agents.environments import tf_py_environment
@@ -46,12 +48,13 @@ if params["use_XLA"]:   # activate XLA (Accelerated Linear Algebra) for performa
         <timestamp>: time when the file is created
         <host_name>: host name of the machine where TensorFlow process runs, e.g. triton
         <pid>: pid of the TensorFlow process that created the event file    """
-train_dir = os.path.join(cwd, "train")
-summary_writter_dir = os.path.join(train_dir, "summary")
+train_dir           = os.path.join(cwd, "train")
+run_id              = datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")+"--"+str(uuid.uuid4())[:4]
+summary_writter_dir = os.path.join(train_dir, "summary", run_id)
 summary_writer = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
 summary_writer.set_as_default()
 print("")
-logger.info(f"Tensorboard event file created: {train_dir}/events.out.tfevents.{int(time.time())}.{gethostname()}.{os.getpid()}")
+logger.info(f"Tensorboard event file created: {summary_writter_dir}/events.out.tfevents.{int(time.time())}.{gethostname()}.{os.getpid()}")
 
 # Print simulation params
 print_params(params, "RUN PARAMETERS:")
@@ -317,7 +320,7 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
         # Write parameter files to Tensorboard and plots in train directory
         tf.summary.text("params", params_html_table(params), step=global_step.numpy())
         logger.debug("Parameters written in Tensorboard")
-        
+
         history = History(train_dir)
 
         # Train loop
