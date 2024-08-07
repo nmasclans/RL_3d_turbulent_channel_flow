@@ -52,6 +52,14 @@ def params_str(params, title=None):
     my_str += "\n"
     return my_str
 
+def params_html_table(params, title=None):
+    my_str = "<table>"
+    if title:
+        my_str += f"<tr><th colspan='2'>{title}</th></tr>"
+    for k, v in params.items():
+        my_str += f"<tr><td>{k}</td><td>{v}</td></tr>"
+    my_str += "</table>"
+    return my_str
 
 def numpy_str(a, precision=2):
     return np.array2string(a, precision=precision, floatmode='fixed')

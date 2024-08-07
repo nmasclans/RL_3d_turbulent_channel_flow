@@ -23,7 +23,7 @@ from socket import gethostname
 from params import params, env_params
 from smartrhea.history import History
 from smartrhea.init_smartsim import init_smartsim
-from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, bcolors
+from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, params_html_table, bcolors
 from smartrhea.rhea_env import RheaEnv
 
 #--------------------------- Utils ---------------------------
@@ -315,7 +315,9 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
         timed_at_step = agent.train_step_counter.numpy()
 
         # Write parameter files to Tensorboard and plots in train directory
-        tf.summary.text("params", params_str(params), step=global_step.numpy())
+        tf.summary.text("params", params_html_table(params), step=global_step.numpy())
+        logger.debug("Parameters written in Tensorboard")
+        
         history = History(train_dir)
 
         # Train loop
