@@ -168,14 +168,18 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     /// Logging
-    cout << "RL simulation params:" << endl;
-    cout << "--configuration_file: " << this->configuration_file << endl;  
-    cout << "--tag: " << this->tag << endl;
-    cout << "--restart_data_file: " << this->restart_data_file << endl;
-    cout << "--f_action: " << this->f_action << endl;
-    cout << "--t_episode: " << this->t_episode << endl;
-    cout << "--t_begin_control: " << this->t_begin_control << endl; 
-    cout << "--db_clustered: " << this->db_clustered << endl;
+    int mpi_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    if( mpi_rank == 0 ) {
+        cout << "RL simulation params:" << endl;
+        cout << "--configuration_file: " << this->configuration_file << endl;  
+        cout << "--tag: " << this->tag << endl;
+        cout << "--restart_data_file: " << this->restart_data_file << endl;
+        cout << "--f_action: " << this->f_action << endl;
+        cout << "--t_episode: " << this->t_episode << endl;
+        cout << "--t_begin_control: " << this->t_begin_control << endl; 
+        cout << "--db_clustered: " << this->db_clustered << endl;
+    }
 
 };
 
