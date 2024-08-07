@@ -257,14 +257,14 @@ class RheaEnv(py_environment.PyEnvironment):
         assert np.all(status > 0), "RHEA environments could not start."
         self._episode_global_step = global_step
 
-        # Assert that the same state and action sizes are captured equally in Sod2D and here
+        # Assert that the same state and action sizes are captured equally in RHEA and here
         n_state = self._get_n_state()
         n_action = self._get_n_action()
 
         if n_state != self.n_state or n_action != self.n_action * self.rl_n_envs:
             raise ValueError(f"State or action size differs between RHEA and the Python environment: \n \
                 RHEA n_state: {n_state}\n Python env n_state: {self.n_state}\n \
-                RHEA n_action: {n_action}\n Python env n_action * RL_envs: {self.n_action * self.marl_n_envs}")
+                RHEA n_action: {n_action}\n Python env n_action * RL_envs: {self.n_action * self.rl_n_envs}")
 
         # Get the initial state and reward
         self._get_state() # updates self._state
