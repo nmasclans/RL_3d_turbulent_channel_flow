@@ -242,9 +242,10 @@ class RheaEnv(py_environment.PyEnvironment):
         # Create Multi-Process Multi-Data (mpmd) ensemble
         if not self.ensemble or new_ensamble:
             self.ensemble = self._create_mpmd_ensemble(restart_file)
-            logger.debug(f"New ensemble created")
+            logger.debug(f"New MPMD ensemble created")
 
         self.exp.start(self.ensemble, block=False) # non-blocking start of RHEA solver(s)
+        logger.debug("Start experiment / RHEA solver (non-blocking)")
         self.envs_initialised = False
 
         # Check simulations have started
