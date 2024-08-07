@@ -10,7 +10,6 @@ export RAI_PATH=/apps/redisai/1.2.5/redisai.so
 export SMARTSIM_REDISAI=1.2.5
 export LD_LIBRARY_PATH=$SMARTREDIS_DIR/lib:$LD_LIBRARY_PATH
 
-
 # Set RedisAi required environment variables
 #export REDIS_PORT=$(( RANDOM % 1001 + 6000 )) # random int. btw 6000 and 7000
 #export SSDB="tcp://127.0.0.1:$REDIS_PORT"
@@ -21,6 +20,9 @@ export SMARTSIM_LOG_LEVEL="DEBUG"
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"
 conda activate smartrhea-env
+
+# Remove nohup.out, if necessary
+rm -f nohup.out
 
 # Run training
 python3 run.py
