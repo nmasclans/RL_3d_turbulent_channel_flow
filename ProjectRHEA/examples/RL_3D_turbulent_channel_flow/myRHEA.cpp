@@ -139,7 +139,7 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 
 
 void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &f_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
-    
+
     /// String arguments
     this->configuration_file = configuration_file;
     this->tag                = tag;
@@ -161,10 +161,10 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Bool arguments
     if (db_clustered == "true" || db_clustered == "True" || db_clustered == "1") {
         this->db_clustered = true;
-    } else if (db_clustered == "false" || db_clustered == "Frue" || db_clustered == "0") {
+    } else if (db_clustered == "false" || db_clustered == "False" || db_clustered == "0") {
         this->db_clustered = false;
     } else {
-        cerr << "Invalid boolean argument: " << db_clustered << endl; 
+        cerr << "Invalid boolean argument for db_clustered = " << db_clustered << endl; 
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     /// Logging
@@ -175,7 +175,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     cout << "--f_action: " << this->f_action << endl;
     cout << "--t_episode: " << this->t_episode << endl;
     cout << "--t_begin_control: " << this->t_begin_control << endl; 
-    cout << "--db_clustered: " << db_clustered << endl;
+    cout << "--db_clustered: " << this->db_clustered << endl;
 
 };
 
