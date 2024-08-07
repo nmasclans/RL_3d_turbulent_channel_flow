@@ -76,6 +76,7 @@ collect_py_env = RheaEnv(
     params["rhea_exe"],
     cwd,
     mode = "collect",
+    db_is_clustered = db_is_clustered,
     **env_params,
 )
 """ tf_agents.environments.TFPyEnvironment(

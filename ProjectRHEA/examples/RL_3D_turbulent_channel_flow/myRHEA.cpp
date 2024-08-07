@@ -896,7 +896,7 @@ int main(int argc, char** argv) {
         t_begin_control     = argv[6];
         db_clustered        = argv[7];
     } else {
-        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <f_action> <t_episode> <t_begin_control>" << endl;
+        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <f_action> <t_episode> <t_begin_control> <db_clustered>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
     /// Construct my RHEA

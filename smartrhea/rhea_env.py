@@ -62,6 +62,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - dump_data_flag:
     ### Not in **env_params:
     - mode:
+    - db_is_clustered
     """
 
     def __init__( # pylint: disable=super-init-not-called
@@ -106,6 +107,7 @@ class RheaEnv(py_environment.PyEnvironment):
         dump_data_flag = True,
         ### Not in **env_params:
         mode = "collect",           # TODO: consider using params['mode'], which is currently train/eval
+        db_is_clustered = False,
     ):
 
         # Store input parameters
@@ -185,11 +187,12 @@ class RheaEnv(py_environment.PyEnvironment):
         logger.info(f"Connected Python Redis client to orchestrator database with address = {self.db_address}, cluster = {self.db.batch}")
 
         # create RHEA executable arguments
-        self.tag = [str(i) for i in range(self.cfd_n_envs)] # environment tags [0, 1, ..., cfd_n_envs - 1]
+        self.tag                = [str(i) for i in range(self.cfd_n_envs)] # environment tags [0, 1, ..., cfd_n_envs - 1]
         self.configuration_file = ["$RHEA_EXE_DIR/configuration_file.yaml" for _ in range(self.cfd_n_envs)]
-        self.f_action = [str(f_action) for _ in range(self.cfd_n_envs)]
-        self.t_episode = [str(t_episode) for _ in range(self.cfd_n_envs)]
-        self.t_begin_control = [str(t_begin_control) for _ in range(self.cfd_n_envs)]
+        self.f_action           = [str(f_action) for _ in range(self.cfd_n_envs)]
+        self.t_episode          = [str(t_episode) for _ in range(self.cfd_n_envs)]
+        self.t_begin_control    = [str(t_begin_control) for _ in range(self.cfd_n_envs)]
+        self.db_clustered       = [str(db_is_clustered) for _ in range(self.cfd_n_envs)]
 
         # create RHEA ensemble models inside experiment
         self.ensemble = None
@@ -285,11 +288,14 @@ class RheaEnv(py_environment.PyEnvironment):
         restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
 
         # set RHEA exe arguments
-        rhea_args = {"configuration_file": self.configuration_file,  
+        rhea_args = {"configuration_file": self.configuration_file, 
+                     "tag": self.tag,
                      "restart_step": restart_step, 
                      "f_action": self.f_action, 
                      "t_episode": self.t_episode, 
-                     "t_begin_control": self.t_begin_control}
+                     "t_begin_control": self.t_begin_control,
+                     "db_clustered": db_clustered,
+        }
         
         # Edit my-hostfile
         write_hosts(self.hosts, self.mpirun_np, os.path.join(self.rhea_exe_dir, self.mpirun_hostfile))
