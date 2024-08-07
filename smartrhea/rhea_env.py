@@ -294,7 +294,7 @@ class RheaEnv(py_environment.PyEnvironment):
                      "f_action": self.f_action, 
                      "t_episode": self.t_episode, 
                      "t_begin_control": self.t_begin_control,
-                     "db_clustered": db_clustered,
+                     "db_clustered": self.db_clustered,
         }
         
         # Edit my-hostfile
