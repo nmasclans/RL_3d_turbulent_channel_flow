@@ -195,6 +195,8 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Witness points
     readWitnessPoints(); 
+    preproceWitnessPoints();
+
 };
 
 
@@ -903,7 +905,7 @@ void myRHEA::readWitnessPoints() {
     
         cout << "Number of witness probes (global_state_size): " << num_witness_probes << endl;
         cout << "Candidate witness probes:" << endl;
-        for (size_t i=0; i<twp_x_positions.size(); i++) {
+        for (int i=0; i<num_witness_probes; i++) {
             cout << twp_x_positions.at(i) << ", " << twp_y_positions.at(i) << ", " << twp_z_positions.at(i) << endl;
         }
     }
@@ -931,170 +933,52 @@ void myRHEA::readWitnessPoints() {
         }
     }
 }
-/*
+
 /// Pre-process witness points
 /// TODO: inspired in subroutine CFDSolverBase_preprocWitnessPoints(this)
 void myRHEA::preproceWitnessPoints() {
     
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    if(mpi_rank == 0) {
-        cout << "Preprocessing witness points..." << endl;
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if(my_rank == 0) {
+        cout << "\nPreprocessing witness points..." << endl;
     }
-
-    /// Read witness file
-
 
     /// Construct (initialize) temporal point probes for witness points
     TemporalPointProbe temporal_witness_probe(mesh, topo);
-    temporal_witness_probes.resize( number_temporal_point_probes );
-    for(int tpp = 0; tpp < number_temporal_point_probes; ++tpp) {
+    temporal_witness_probes.resize( num_witness_probes );
+    for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Set parameters of temporal point probe
-	temporal_point_probe.setPositionX( tpp_x_positions[tpp] );
-	temporal_point_probe.setPositionY( tpp_y_positions[tpp] );
-	temporal_point_probe.setPositionZ( tpp_z_positions[tpp] );
-	temporal_point_probe.setOutputFileName( tpp_output_file_names[tpp] );
+        temporal_witness_probe.setPositionX( twp_x_positions[twp] );
+        temporal_witness_probe.setPositionY( twp_y_positions[twp] );
+        temporal_witness_probe.setPositionZ( twp_z_positions[twp] );
         /// Insert temporal point probe to vector
-        temporal_point_probes[tpp] = temporal_point_probe;
-	/// Locate closest grid point to probe
-	temporal_point_probes[tpp].locateClosestGridPointToProbe();
-    }	   
+        temporal_witness_probes[twp] = temporal_witness_probe;
+        /// Locate closest grid point to probe
+        temporal_witness_probes[twp].locateClosestGridPointToProbe();
+    }
 
-      !$acc parallel loop gang
-      do ielem = 1, numElemsRankPar
-         aux1   = 0.0_rp
-         aux2   = 0.0_rp
-         aux3   = 0.0_rp
-         auxvol = 0.0_rp
-         !$acc loop vector reduction(+:aux1, aux2, aux3, auxvol)
-         do inode = 1, nnode
-            aux1   = aux1 + coordPar(connecParOrig(ielem,inode),1)
-            aux2   = aux2 + coordPar(connecParOrig(ielem,inode),2)
-            aux3   = aux3 + coordPar(connecParOrig(ielem,inode),3)
-            auxvol = auxvol+gpvol(1,inode,ielem) !nnode = ngaus
-         end do
-         center(ielem,1) = aux1/nnode
-         center(ielem,2) = aux2/nnode
-         center(ielem,3) = aux3/nnode
-         helemmax(ielem) = auxvol**(1.0/3.0)
-      end do
-      !$acc end loop
-      maxL = maxval(abs(helemmax))
+    /// Check temporal_witness_probes is well constructed
+    for(int twp = 0; twp < num_witness_probes; ++twp) {
+        /// Owner rank writes to file
+        if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
+            int i_index, j_index, k_index;
+            /// Get local indices i, j, k
+		    i_index = temporal_witness_probes[twp].getLocalIndexI(); 
+		    j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
+		    k_index = temporal_witness_probes[twp].getLocalIndexK();
+            /// Get coordinates of witness probe
+            cout << "Witness probe: " << twp << " , mpi rank: " << my_rank << ", coord: " 
+                 << x_field[I1D(i_index,j_index,k_index)] << " " 
+                 << y_field[I1D(i_index,j_index,k_index)] << " " 
+                 << z_field[I1D(i_index,j_index,k_index)] << endl;
+        }
+    }
 
-      xminloc = minval(coordPar(:,1)) - wittol
-      yminloc = minval(coordPar(:,2)) - wittol
-      zminloc = minval(coordPar(:,3)) - wittol
-      xmaxloc = maxval(coordPar(:,1)) + wittol
-      ymaxloc = maxval(coordPar(:,2)) + wittol
-      zmaxloc = maxval(coordPar(:,3)) + wittol
+    cout.flush();
+    MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, delete if wanted
 
-      call MPI_Allreduce(xminloc, xmin, 1, mpi_datatype_real, MPI_MIN, app_comm, mpi_err)
-      call MPI_Allreduce(yminloc, ymin, 1, mpi_datatype_real, MPI_MIN, app_comm, mpi_err)
-      call MPI_Allreduce(zminloc, zmin, 1, mpi_datatype_real, MPI_MIN, app_comm, mpi_err)
-      call MPI_Allreduce(xmaxloc, xmax, 1, mpi_datatype_real, MPI_MAX, app_comm, mpi_err)
-      call MPI_Allreduce(ymaxloc, ymax, 1, mpi_datatype_real, MPI_MAX, app_comm, mpi_err)
-      call MPI_Allreduce(zmaxloc, zmax, 1, mpi_datatype_real, MPI_MAX, app_comm, mpi_err)
-
-      !$acc kernels
-      witGlobCand(:) = 0
-      witGlob(:) = 0
-      witxyzPar(:,:) = 0.0_rp
-      !$acc end kernels
-      ifound  = 0
-      icand   = 0
-      call read_points(this%witness_inp_file_name, this%nwit, witxyz)
-      do iwit = 1, this%nwit
-	 if (witxyz(iwit,1) < xmin .OR. witxyz(iwit,2) < ymin .OR. witxyz(iwit,3) < zmin .OR. witxyz(iwit,1) > xmax .OR. witxyz(iwit,2) > ymax .OR. witxyz(iwit,3) > zmax) then
-		write(*,*) "FATAL ERROR!! Witness point out of bounds", witxyz(iwit,:)
-         	call MPI_Abort(app_comm,-1,mpi_err)
-	 end if
-	 if (witxyz(iwit,1) > xminloc .AND. witxyz(iwit,2) > yminloc .AND. witxyz(iwit,3) > zminloc .AND. witxyz(iwit,1) < xmaxloc .AND. witxyz(iwit,2) < ymaxloc .AND. witxyz(iwit,3) < zmaxloc) then
-            icand = icand + 1
-            witGlobCand(icand) = iwit
-            witxyzParCand(icand,:) = witxyz(iwit,:)
-         end if
-      end do
-      nwitParCand = icand
-
-      do iwit = 1, nwitParCand
-	 !$acc kernels
-         radwit(:) = ((witxyzParCand(iwit, 1)-center(:,1))*(witxyzParCand(iwit, 1)-center(:,1))+(witxyzParCand(iwit, 2)-center(:,2))*(witxyzParCand(iwit, 2)-center(:,2))+(witxyzParCand(iwit, 3)-center(:,3))*(witxyzParCand(iwit, 3)-center(:,3)))-maxL*maxL
-         !$acc end kernels
-         do ielem = 1, numElemsRankPar
-            if (radwit(ielem) < 0) then
-               call isocoords(coordPar(connecParOrig(ielem,:),:), witxyzParCand(iwit,:), atoIJK, xi, isinside, Niwit)
-               if (isinside .AND. (abs(xi(1)) < 1.0_rp+wittol) .AND. (abs(xi(2)) < 1.0_rp+wittol) .AND. (abs(xi(3)) < 1.0_rp+wittol)) then
-                  ifound = ifound+1
-                  witel(ifound)   = ielem
-                  witxi(ifound,:) = xi(:)
-                  witxyzPar(ifound,:)  = witxyzParCand(iwit, :)
-                  witGlob(ifound) = witGlobCand(iwit)
-                  Nwit(ifound,:) = Niwit(:)
-                  exit
-               end if
-            end if
-         end do
-      end do
-      this%nwitPar = ifound
-      !Check that all witness points have been found
-      call MPI_Allreduce(this%nwitPar, nwitFound, 1, MPI_INTEGER, MPI_SUM, app_comm,mpi_err)
-      if (nwitFound < this%nwit) then
-         nwit2find = this%nwit - nwitFound
-         if (mpi_rank .eq. 0) then
-            write(*,*) "WARNING!!!! The following witness points were not found inside any element, taking the element with the closest centroid as the one they belong to. Make sure they are inside the domain"
-         endif
-         call MPI_Allgather(witGlob, this%nwit, MPI_INTEGER, witGlobFound, this%nwit, MPI_INTEGER, app_comm,mpi_err)
-         allocate(witGlobFound2(nwitFound))
-         allocate(witGlobMiss(nwit2Find))
-         do iwit = 1, this%nwit*mpi_size
-            if (witGlobFound(iwit) > 0) then
-               icount = icount + 1
-		      witGlobFound2(icount) = witGlobFound(iwit)
-	         end if
-	      end do
-	      do iwit = 1, this%nwit
-	 	      found = .false.
-		      do jwit = 1, nwitFound
-	 		      if (witGlobFound2(jwit) == iwit) then
-			      	found = .true.
-			      	exit
-			      end if
-		      end do
-		      if (found .eqv. .false.) then
-		      	imiss = imiss + 1
-		      	witGlobMiss(imiss) = iwit
-		      end if
-	      end do
-         do iwit = 1, nwit2find
-            xyzwit(:)  = witxyz(witGlobMiss(iwit),:)
-            !$acc kernels
-            dist(:)    = (center(:,1)-xyzwit(1))*(center(:,1)-xyzwit(1))+(center(:,2)-xyzwit(2))*(center(:,2)-xyzwit(2))+(center(:,3)-xyzwit(3))*(center(:,3)-xyzwit(3))
-            !$acc end kernels
-            ielem      = minloc(dist(:),1)
-            locdist % realnum = dist(ielem)
-            locdist % intnum  = mpi_rank
-            call MPI_Allreduce(locdist, globdist, 1, mpi_datatype_real_int, MPI_MINLOC, app_comm, mpi_err)
-            if (mpi_rank .eq. globdist % intnum) then
-	       write(*,*) "[NOT FOUND WITNESS] ", xyzwit(:)
-               this%nwitPar              = this%nwitPar+1
-               witGlob(this%nwitPar)     = witGlobMiss(iwit)
-               witel(this%nwitPar)       = ielem
-	       witxyzPar(this%nwitPar,:) = witxyz(witGlobMiss(iwit),:)
-	       call isocoords(coordPar(connecParOrig(ielem,:),:), witxyzPar(this%nwitPar,:), atoIJK, witxi(this%nwitPar,:), isinside, Nwit(this%nwitPar,:))
-            end if
-         end do
-         deallocate(witGlobFound2)
-         deallocate(witGlobMiss)
-      end if
-
-      allocate(buffwit(this%nwitPar,this%leapwitsave,this%nvarwit))
-      allocate(bufftime(this%leapwitsave))
-      allocate(buffstep(this%leapwitsave))
-      if (this%wit_save) call create_witness_hdf5(this%witness_h5_file_name, nnode, witxyzPar, witel, witxi, Nwit, this%nwit, this%nwitPar, witGlob, this%wit_save_u_i, this%wit_save_pr, this%wit_save_rho)
-      if(mpi_rank.eq.0) then
-         write(*,*) "--| End of preprocessing witness points"
-      end if
-   end subroutine CFDSolverBase_preprocWitnessPoints
-*/
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

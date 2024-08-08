@@ -72,6 +72,7 @@ class myRHEA : public FlowSolverRHEA {
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
         void initSmartRedis();
         void readWitnessPoints();
+        void preproceWitnessPoints();
 
 
 
