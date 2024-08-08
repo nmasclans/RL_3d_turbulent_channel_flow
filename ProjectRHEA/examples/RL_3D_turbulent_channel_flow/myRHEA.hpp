@@ -59,6 +59,9 @@ class myRHEA : public FlowSolverRHEA {
         double t_episode;
         double t_begin_control;
         bool db_clustered;
+        int n_rl_envs;
+        int state_local_size;
+        int action_global_size;
 
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
         void initSmartRedis();

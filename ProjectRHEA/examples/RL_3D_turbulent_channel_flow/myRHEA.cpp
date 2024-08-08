@@ -168,6 +168,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         cerr << "Invalid boolean argument for db_clustered = " << db_clustered << endl; 
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+
     /// Logging
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
@@ -182,6 +183,11 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         cout << "--db_clustered: " << this->db_clustered << endl;
     }
 
+    /// Additional arguments, defined here /// TODO: include this in some configuration file
+    this->n_rl_envs = 3;            // n_pseudo_envs in sod2d
+    this->state_local_size = 10;    // nwitPar in sod2d
+    this->action_global_size = 25;  // nRectangleControl ub sod2d 
+
 };
 
 
@@ -192,13 +198,10 @@ void myRHEA::initSmartRedis() {
     open(unit=443,file="./output_"//trim(adjustl(this%tag))//"/"//"control_action.txt",status='replace')
     open(unit=445,file="./output_"//trim(adjustl(this%tag))//"/"//"control_reward.txt",status='replace')
     */  
-    int state_local_size = 10; // Example value, replace with actual
-    int action_global_size = 25; // Example value, replace with actual
-    int n_pseudo_envs = 10; // Example value, replace with actual
     /// TODO: remove this comment:
     /* equivalent to Fortran line:  
        call init_smartredis(client, this%nwitPar, this%nRectangleControl, this%n_pseudo_envs, trim(adjustl(this%tag)), this%db_clustered)  */
-    SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
+    SmartRedisManager manager(state_local_size, action_global_size, n_rl_envs, tag, db_clustered);
     manager.writeStepType(1, "ensemble_" + tag + ".step_type");
 };
 
