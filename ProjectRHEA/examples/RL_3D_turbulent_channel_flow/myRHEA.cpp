@@ -189,13 +189,12 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Additional arguments, defined here /// TODO: include this in some configuration file
     this->n_rl_envs = 3;            // n_pseudo_envs in sod2d
-    this->state_local_size = 10;    // nwitPar in sod2d
     this->action_global_size = 25;  // nRectangleControl ub sod2d 
     this->witness_file = "witness.txt";
 
     /// Witness points
     readWitnessPoints(); 
-    preproceWitnessPoints();
+    preproceWitnessPoints();        // updates attribute 'state_local_size'
 
 };
 
@@ -958,10 +957,12 @@ void myRHEA::preproceWitnessPoints() {
         temporal_witness_probes[twp].locateClosestGridPointToProbe();
     }
 
-    /// Check temporal_witness_probes is well constructed
+    /// Calculate state local size (num witness probes of my_rank) and debugging logs
+    int state_local_size_counter = 0;
     for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Owner rank writes to file
         if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
+            state_local_size_counter += 1;
             int i_index, j_index, k_index;
             /// Get local indices i, j, k
 		    i_index = temporal_witness_probes[twp].getLocalIndexI(); 
@@ -974,6 +975,8 @@ void myRHEA::preproceWitnessPoints() {
                  << z_field[I1D(i_index,j_index,k_index)] << endl;
         }
     }
+    this->state_local_size = state_local_size_counter;
+    cout << "mpi rank " << my_rank << " has " << state_local_size << " local witness points" << endl;
 
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, delete if wanted
