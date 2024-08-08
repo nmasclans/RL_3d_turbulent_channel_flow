@@ -8,8 +8,14 @@ SmartRedisManager::SmartRedisManager() : client(nullptr) {
 SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
     : client(nullptr) 
 {
-    std::cout << "Initializing SmartRedis client/manager..." << std::endl;
-
+    /// Get mpi_size & mpi_rank
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    
+    if (mpi_rank == 0) {
+        std::cout << "Initializing SmartRedis client/manager..." << std::endl;
+    }
+    
     /// Store input arguments (input arguments of each process) to class variables
     n_pseudo_envs      = n_pseudo_envs2;
     state_local_size   = state_local_size2;
@@ -20,10 +26,6 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     /// Set read parameters
     read_interval = 100;    // in miliseconds // TODO: input as params?
     read_tries    = 1000;                     // TODO: input as params?
-
-    /// Get mpi_size & mpi_rank
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
     try {
         state_sizes.resize(mpi_size);                           // vector<int>

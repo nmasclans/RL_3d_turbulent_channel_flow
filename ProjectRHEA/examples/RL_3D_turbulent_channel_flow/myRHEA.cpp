@@ -140,6 +140,12 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 
 void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
 
+    int mpi_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    if (mpi_rank == 0) {
+        cout << "\nInitializing RL parameters..." << endl;
+    }
+
     /// String arguments
     this->configuration_file = configuration_file;
     this->tag                = tag;
@@ -170,8 +176,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// Logging
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     if( mpi_rank == 0 ) {
         cout << "RL simulation params:" << endl;
         cout << "--configuration_file: " << this->configuration_file << endl;  
@@ -187,7 +191,10 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     this->n_rl_envs = 3;            // n_pseudo_envs in sod2d
     this->state_local_size = 10;    // nwitPar in sod2d
     this->action_global_size = 25;  // nRectangleControl ub sod2d 
+    this->witness_file = "witness.txt";
 
+    /// Witness points
+    readWitnessPoints(); 
 };
 
 
@@ -860,6 +867,236 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+/* Read witness file and extract witness points coordinates
+    Reads witness points from 'witness_file', and defines attributes:
+    twp_x_positions, twp_y_positions, twp_z_positions, num_witness_probes
+*/
+void myRHEA::readWitnessPoints() {
+
+    int mpi_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    if (mpi_rank == 0){
+        cout << "\nReading witness points..." << endl;
+
+        std::ifstream file(witness_file);
+        if (!file.is_open()) {
+            std::cerr << "Unable to open file: " << witness_file << std::endl;
+            return;
+        }
+        std::string line;
+        while (std::getline(file, line)) {
+            std::istringstream iss(line);
+            double ix, iy, iz;
+            if (!(iss >> ix >> iy >> iz)) {
+                std::cerr << "Error reading line: " << line << std::endl;
+                continue;
+            }
+            // fill witness points position tensors
+            twp_x_positions.push_back(ix);
+            twp_y_positions.push_back(iy);
+            twp_z_positions.push_back(iz);        
+        }
+        file.close();
+        num_witness_probes = static_cast<int>(twp_x_positions.size());
+    
+        cout << "Number of witness probes (global_state_size): " << num_witness_probes << endl;
+        cout << "Candidate witness probes:" << endl;
+        for (size_t i=0; i<twp_x_positions.size(); i++) {
+            cout << twp_x_positions.at(i) << ", " << twp_y_positions.at(i) << ", " << twp_z_positions.at(i) << endl;
+        }
+    }
+
+    // Broadcast the number of witness probes to all mpi processes
+    MPI_Bcast(&num_witness_probes, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Resize the vectors to hold data in all processes
+    if (mpi_rank != 0) {
+        twp_x_positions.resize(num_witness_probes);
+        twp_y_positions.resize(num_witness_probes);
+        twp_z_positions.resize(num_witness_probes);
+    }
+
+    // Broadcast the witness probes coordinates to all processes
+    MPI_Bcast(twp_x_positions.data(), num_witness_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(twp_y_positions.data(), num_witness_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(twp_z_positions.data(), num_witness_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    // Check successfull broadcast
+    if (mpi_rank != 0) {
+        cout << "Mpi with rank " << mpi_rank << " has received witness probes:" << endl;
+        for (int i=0; i<num_witness_probes; i++) {
+            cout << twp_x_positions.at(i) << ", " << twp_y_positions.at(i) << ", " << twp_z_positions.at(i) << endl;
+        }
+    }
+}
+/*
+/// Pre-process witness points
+/// TODO: inspired in subroutine CFDSolverBase_preprocWitnessPoints(this)
+void myRHEA::preproceWitnessPoints() {
+    
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    if(mpi_rank == 0) {
+        cout << "Preprocessing witness points..." << endl;
+    }
+
+    /// Read witness file
+
+
+    /// Construct (initialize) temporal point probes for witness points
+    TemporalPointProbe temporal_witness_probe(mesh, topo);
+    temporal_witness_probes.resize( number_temporal_point_probes );
+    for(int tpp = 0; tpp < number_temporal_point_probes; ++tpp) {
+        /// Set parameters of temporal point probe
+	temporal_point_probe.setPositionX( tpp_x_positions[tpp] );
+	temporal_point_probe.setPositionY( tpp_y_positions[tpp] );
+	temporal_point_probe.setPositionZ( tpp_z_positions[tpp] );
+	temporal_point_probe.setOutputFileName( tpp_output_file_names[tpp] );
+        /// Insert temporal point probe to vector
+        temporal_point_probes[tpp] = temporal_point_probe;
+	/// Locate closest grid point to probe
+	temporal_point_probes[tpp].locateClosestGridPointToProbe();
+    }	   
+
+      !$acc parallel loop gang
+      do ielem = 1, numElemsRankPar
+         aux1   = 0.0_rp
+         aux2   = 0.0_rp
+         aux3   = 0.0_rp
+         auxvol = 0.0_rp
+         !$acc loop vector reduction(+:aux1, aux2, aux3, auxvol)
+         do inode = 1, nnode
+            aux1   = aux1 + coordPar(connecParOrig(ielem,inode),1)
+            aux2   = aux2 + coordPar(connecParOrig(ielem,inode),2)
+            aux3   = aux3 + coordPar(connecParOrig(ielem,inode),3)
+            auxvol = auxvol+gpvol(1,inode,ielem) !nnode = ngaus
+         end do
+         center(ielem,1) = aux1/nnode
+         center(ielem,2) = aux2/nnode
+         center(ielem,3) = aux3/nnode
+         helemmax(ielem) = auxvol**(1.0/3.0)
+      end do
+      !$acc end loop
+      maxL = maxval(abs(helemmax))
+
+      xminloc = minval(coordPar(:,1)) - wittol
+      yminloc = minval(coordPar(:,2)) - wittol
+      zminloc = minval(coordPar(:,3)) - wittol
+      xmaxloc = maxval(coordPar(:,1)) + wittol
+      ymaxloc = maxval(coordPar(:,2)) + wittol
+      zmaxloc = maxval(coordPar(:,3)) + wittol
+
+      call MPI_Allreduce(xminloc, xmin, 1, mpi_datatype_real, MPI_MIN, app_comm, mpi_err)
+      call MPI_Allreduce(yminloc, ymin, 1, mpi_datatype_real, MPI_MIN, app_comm, mpi_err)
+      call MPI_Allreduce(zminloc, zmin, 1, mpi_datatype_real, MPI_MIN, app_comm, mpi_err)
+      call MPI_Allreduce(xmaxloc, xmax, 1, mpi_datatype_real, MPI_MAX, app_comm, mpi_err)
+      call MPI_Allreduce(ymaxloc, ymax, 1, mpi_datatype_real, MPI_MAX, app_comm, mpi_err)
+      call MPI_Allreduce(zmaxloc, zmax, 1, mpi_datatype_real, MPI_MAX, app_comm, mpi_err)
+
+      !$acc kernels
+      witGlobCand(:) = 0
+      witGlob(:) = 0
+      witxyzPar(:,:) = 0.0_rp
+      !$acc end kernels
+      ifound  = 0
+      icand   = 0
+      call read_points(this%witness_inp_file_name, this%nwit, witxyz)
+      do iwit = 1, this%nwit
+	 if (witxyz(iwit,1) < xmin .OR. witxyz(iwit,2) < ymin .OR. witxyz(iwit,3) < zmin .OR. witxyz(iwit,1) > xmax .OR. witxyz(iwit,2) > ymax .OR. witxyz(iwit,3) > zmax) then
+		write(*,*) "FATAL ERROR!! Witness point out of bounds", witxyz(iwit,:)
+         	call MPI_Abort(app_comm,-1,mpi_err)
+	 end if
+	 if (witxyz(iwit,1) > xminloc .AND. witxyz(iwit,2) > yminloc .AND. witxyz(iwit,3) > zminloc .AND. witxyz(iwit,1) < xmaxloc .AND. witxyz(iwit,2) < ymaxloc .AND. witxyz(iwit,3) < zmaxloc) then
+            icand = icand + 1
+            witGlobCand(icand) = iwit
+            witxyzParCand(icand,:) = witxyz(iwit,:)
+         end if
+      end do
+      nwitParCand = icand
+
+      do iwit = 1, nwitParCand
+	 !$acc kernels
+         radwit(:) = ((witxyzParCand(iwit, 1)-center(:,1))*(witxyzParCand(iwit, 1)-center(:,1))+(witxyzParCand(iwit, 2)-center(:,2))*(witxyzParCand(iwit, 2)-center(:,2))+(witxyzParCand(iwit, 3)-center(:,3))*(witxyzParCand(iwit, 3)-center(:,3)))-maxL*maxL
+         !$acc end kernels
+         do ielem = 1, numElemsRankPar
+            if (radwit(ielem) < 0) then
+               call isocoords(coordPar(connecParOrig(ielem,:),:), witxyzParCand(iwit,:), atoIJK, xi, isinside, Niwit)
+               if (isinside .AND. (abs(xi(1)) < 1.0_rp+wittol) .AND. (abs(xi(2)) < 1.0_rp+wittol) .AND. (abs(xi(3)) < 1.0_rp+wittol)) then
+                  ifound = ifound+1
+                  witel(ifound)   = ielem
+                  witxi(ifound,:) = xi(:)
+                  witxyzPar(ifound,:)  = witxyzParCand(iwit, :)
+                  witGlob(ifound) = witGlobCand(iwit)
+                  Nwit(ifound,:) = Niwit(:)
+                  exit
+               end if
+            end if
+         end do
+      end do
+      this%nwitPar = ifound
+      !Check that all witness points have been found
+      call MPI_Allreduce(this%nwitPar, nwitFound, 1, MPI_INTEGER, MPI_SUM, app_comm,mpi_err)
+      if (nwitFound < this%nwit) then
+         nwit2find = this%nwit - nwitFound
+         if (mpi_rank .eq. 0) then
+            write(*,*) "WARNING!!!! The following witness points were not found inside any element, taking the element with the closest centroid as the one they belong to. Make sure they are inside the domain"
+         endif
+         call MPI_Allgather(witGlob, this%nwit, MPI_INTEGER, witGlobFound, this%nwit, MPI_INTEGER, app_comm,mpi_err)
+         allocate(witGlobFound2(nwitFound))
+         allocate(witGlobMiss(nwit2Find))
+         do iwit = 1, this%nwit*mpi_size
+            if (witGlobFound(iwit) > 0) then
+               icount = icount + 1
+		      witGlobFound2(icount) = witGlobFound(iwit)
+	         end if
+	      end do
+	      do iwit = 1, this%nwit
+	 	      found = .false.
+		      do jwit = 1, nwitFound
+	 		      if (witGlobFound2(jwit) == iwit) then
+			      	found = .true.
+			      	exit
+			      end if
+		      end do
+		      if (found .eqv. .false.) then
+		      	imiss = imiss + 1
+		      	witGlobMiss(imiss) = iwit
+		      end if
+	      end do
+         do iwit = 1, nwit2find
+            xyzwit(:)  = witxyz(witGlobMiss(iwit),:)
+            !$acc kernels
+            dist(:)    = (center(:,1)-xyzwit(1))*(center(:,1)-xyzwit(1))+(center(:,2)-xyzwit(2))*(center(:,2)-xyzwit(2))+(center(:,3)-xyzwit(3))*(center(:,3)-xyzwit(3))
+            !$acc end kernels
+            ielem      = minloc(dist(:),1)
+            locdist % realnum = dist(ielem)
+            locdist % intnum  = mpi_rank
+            call MPI_Allreduce(locdist, globdist, 1, mpi_datatype_real_int, MPI_MINLOC, app_comm, mpi_err)
+            if (mpi_rank .eq. globdist % intnum) then
+	       write(*,*) "[NOT FOUND WITNESS] ", xyzwit(:)
+               this%nwitPar              = this%nwitPar+1
+               witGlob(this%nwitPar)     = witGlobMiss(iwit)
+               witel(this%nwitPar)       = ielem
+	       witxyzPar(this%nwitPar,:) = witxyz(witGlobMiss(iwit),:)
+	       call isocoords(coordPar(connecParOrig(ielem,:),:), witxyzPar(this%nwitPar,:), atoIJK, witxi(this%nwitPar,:), isinside, Nwit(this%nwitPar,:))
+            end if
+         end do
+         deallocate(witGlobFound2)
+         deallocate(witGlobMiss)
+      end if
+
+      allocate(buffwit(this%nwitPar,this%leapwitsave,this%nvarwit))
+      allocate(bufftime(this%leapwitsave))
+      allocate(buffstep(this%leapwitsave))
+      if (this%wit_save) call create_witness_hdf5(this%witness_h5_file_name, nnode, witxyzPar, witel, witxi, Nwit, this%nwit, this%nwitPar, witGlob, this%wit_save_u_i, this%wit_save_pr, this%wit_save_rho)
+      if(mpi_rank.eq.0) then
+         write(*,*) "--| End of preprocessing witness points"
+      end if
+   end subroutine CFDSolverBase_preprocWitnessPoints
+*/
+
+///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
 /// MAIN
