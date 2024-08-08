@@ -50,7 +50,7 @@ params = {
     "mode": mode,
     "num_episodes": 2000,
     "num_epochs": cfd_n_envs * rl_n_envs, # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
-    "f_action": 1.0 / t_action,
+    "t_action": t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-0.3, 0.3),   # TODO: set custom value
@@ -96,7 +96,7 @@ env_params = {
     "rhea_dtype": params["rhea_dtype"],
     "poll_n_tries": params["poll_n_tries"],
     "poll_freq_ms": params["poll_freq_ms"],
-    "f_action": params["f_action"],
+    "t_action": params["t_action"],
     "t_episode": params["t_episode"],
     "t_begin_control": params["t_begin_control"],
     "action_bounds": params["action_bounds"],

@@ -19,7 +19,7 @@ class myRHEA : public FlowSolverRHEA {
         myRHEA(const std::string name_configuration_file, 
                const std::string tag="", 
                const std::string restart_data_file="", 
-               const std::string f_action="", 
+               const std::string t_action="", 
                const std::string t_episode="", 
                const std::string t_begin_control="",
                const std::string db_clustered="");              /// Parametrized constructor
@@ -55,12 +55,12 @@ class myRHEA : public FlowSolverRHEA {
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
         std::string restart_data_file;
-        double f_action;
+        double t_action;
         double t_episode;
         double t_begin_control;
         bool db_clustered;
 
-        void initRLParams(const string &tag, const string &restart_data_file, const string &f_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
+        void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
         void initSmartRedis();
 
         /// Eigen-decomposition

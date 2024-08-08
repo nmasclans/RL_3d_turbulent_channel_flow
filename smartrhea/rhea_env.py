@@ -46,7 +46,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - rhea_dtype: data type for arrays to be sent to RHEA (actions)
     - poll_n_tries: num. tries of database poll
     - poll_freq_ms: time between database poll tries [miliseconds]
-    - f_action: action frequency ("how often we send a new action signal)
+    - t_action: action elapsed time
     - t_episode: episode elapsed time
     - t_begin_control: time to start control
     - action_bounds: bounds for action values
@@ -91,8 +91,8 @@ class RheaEnv(py_environment.PyEnvironment):
         rhea_dtype = np.float64,
         poll_n_tries = 1000,
         poll_freq_ms = 100,
-        f_action = 1.0,
-        t_episode = 10.0,
+        t_action = 0.001,
+        t_episode = 1.0,
         t_begin_control = 0.0,
         action_bounds = (-0.05, 0.05),
         reward_norm = 1.0,
@@ -189,7 +189,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # create RHEA executable arguments
         self.tag                = [str(i) for i in range(self.cfd_n_envs)] # environment tags [0, 1, ..., cfd_n_envs - 1]
         self.configuration_file = ["$RHEA_EXE_DIR/configuration_file.yaml" for _ in range(self.cfd_n_envs)]
-        self.f_action           = [str(f_action) for _ in range(self.cfd_n_envs)]
+        self.t_action           = [str(t_action) for _ in range(self.cfd_n_envs)]
         self.t_episode          = [str(t_episode) for _ in range(self.cfd_n_envs)]
         self.t_begin_control    = [str(t_begin_control) for _ in range(self.cfd_n_envs)]
         self.db_clustered       = [str(db_is_clustered) for _ in range(self.cfd_n_envs)]
@@ -292,7 +292,7 @@ class RheaEnv(py_environment.PyEnvironment):
         rhea_args = {"configuration_file": self.configuration_file, 
                      "tag": self.tag,
                      "restart_step": restart_step, 
-                     "f_action": self.f_action, 
+                     "t_action": self.t_action, 
                      "t_episode": self.t_episode, 
                      "t_begin_control": self.t_begin_control,
                      "db_clustered": self.db_clustered,

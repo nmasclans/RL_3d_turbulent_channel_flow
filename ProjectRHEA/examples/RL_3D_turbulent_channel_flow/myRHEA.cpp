@@ -84,7 +84,7 @@ vector<vector<double>> Deltaij = {
 
 ////////// myRHEA CLASS //////////
 
-myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string f_action, const string t_episode, const string t_begin_control, const string db_clustered) : FlowSolverRHEA(name_configuration_file) {
+myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string t_action, const string t_episode, const string t_begin_control, const string db_clustered) : FlowSolverRHEA(name_configuration_file) {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
@@ -94,7 +94,7 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
 
-    initRLParams(tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered);
+    initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered);
     initSmartRedis();
 
     /*
@@ -138,7 +138,7 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 };
 
 
-void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &f_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
+void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
 
     /// String arguments
     this->configuration_file = configuration_file;
@@ -147,17 +147,18 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Double arguments
     try {
         // Convert string arguments to doubles
-        this->f_action        = std::stod(f_action);
+        this->t_action        = std::stod(t_action);
         this->t_episode       = std::stod(t_episode);
         this->t_begin_control = std::stod(t_begin_control);
     } catch (const invalid_argument& e) {
         cerr << "Invalid numeric argument: " << e.what() << endl;
-        cerr << "for f_action = " << f_action << ", t_episode = " << t_episode << ", t_begin_control = " << t_begin_control << endl;
+        cerr << "for t_action = " << t_action << ", t_episode = " << t_episode << ", t_begin_control = " << t_begin_control << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     } catch (const out_of_range& e) {
         cerr << "Numeric argument out of range: " << e.what() << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    
     /// Bool arguments
     if (db_clustered == "true" || db_clustered == "True" || db_clustered == "1") {
         this->db_clustered = true;
@@ -175,7 +176,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         cout << "--configuration_file: " << this->configuration_file << endl;  
         cout << "--tag: " << this->tag << endl;
         cout << "--restart_data_file: " << this->restart_data_file << endl;
-        cout << "--f_action: " << this->f_action << endl;
+        cout << "--t_action: " << this->t_action << endl;
         cout << "--t_episode: " << this->t_episode << endl;
         cout << "--t_begin_control: " << this->t_begin_control << endl; 
         cout << "--db_clustered: " << this->db_clustered << endl;
@@ -888,22 +889,22 @@ int main(int argc, char** argv) {
 
     /// Process command line arguments
 #if _ACTIVE_CONTROL_BODY_FORCE_
-    string configuration_file, tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered;
+    string configuration_file, tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered;
     if (argc >= 8 ) {
         /// Extract and validate input arguments
         configuration_file  = argv[1];
         tag                 = argv[2];
         restart_data_file   = argv[3];
-        f_action            = argv[4];
+        t_action            = argv[4];
         t_episode           = argv[5];
         t_begin_control     = argv[6];
         db_clustered        = argv[7];
     } else {
-        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <f_action> <t_episode> <t_begin_control> <db_clustered>" << endl;
+        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <t_action> <t_episode> <t_begin_control> <db_clustered>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
     /// Construct my RHEA
-    myRHEA my_RHEA( configuration_file, tag, restart_data_file, f_action, t_episode, t_begin_control, db_clustered );
+    myRHEA my_RHEA( configuration_file, tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered );
 
 #else
     string configuration_file;
