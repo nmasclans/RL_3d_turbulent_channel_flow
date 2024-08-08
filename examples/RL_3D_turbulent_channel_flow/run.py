@@ -120,9 +120,9 @@ observation_tensor_spec, action_tensor_spec, time_step_tensor_spec = (
     'reward': TensorSpec(shape=(), dtype=tf.float32, name='reward'),
     'step_type': TensorSpec(shape=(), dtype=tf.int32, name='step_type')})
 """
-logger.info(f'Observation Spec:\n{observation_tensor_spec}')
-logger.info(f'Action Spec:\n{action_tensor_spec}')
-logger.info(f'Time Spec:\n{time_step_tensor_spec}')
+logger.debug(f'Observation Spec:\n{observation_tensor_spec}')
+logger.debug(f'Action Spec:\n{action_tensor_spec}')
+logger.debug(f'Time Spec:\n{time_step_tensor_spec}')
 
 ### Action and Value Networks
 """ Actor Network:
@@ -168,13 +168,13 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=params["learning_rate"])
           An instance of a `tf.DistributionStrategy`.
 """
 strategy = strategy_utils.get_strategy(tpu=False, use_gpu=False) ## no used gpus for rl tf training
-logger.debug(f"Using distribution strategy {strategy}")
+logger.debug(f"Distribution strategy initialized")
 # Context / Strategy scope: ensures that variables are created on the appropiated devices,
 # and how computations are distributed and synchronized along devices
 if strategy:
     # If strategy is defined -> Set the context
     context = strategy.scope()
-    logger.debug(f"Set strategy scope {context}")
+    logger.debug(f"Strategy scope used")
 else:
     # If strategy is not defined ('None') -> Set context to placeholder that does nothing
     context = contextlib.nullcontext()
@@ -212,7 +212,7 @@ with context:
         train_step_counter=global_step      # optional counter to increment every time the train operation is run
     )
     agent.initialize()
-    logger.debug(f"Agent created & initialized {agent}")
+    logger.debug(f"Agent created & initialized")
 
 ### Agent policies
 eval_policy = agent.policy              # returns tf_policy.TFPolicy, which can be used to evaluate agent performance (acts greedily based on best action, no exploration)
