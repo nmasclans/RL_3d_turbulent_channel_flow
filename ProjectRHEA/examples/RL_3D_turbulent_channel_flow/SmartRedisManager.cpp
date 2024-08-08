@@ -8,6 +8,7 @@ SmartRedisManager::SmartRedisManager() : client(nullptr) {
 SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
     : client(nullptr) 
 {
+    std::cout << "Initializing SmartRedis client/manager..." << std::endl;
 
     /// Store input arguments (input arguments of each process) to class variables
     n_pseudo_envs      = n_pseudo_envs2;
@@ -17,18 +18,23 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     action_global_size_vec = {static_cast<size_t>(action_global_size2)};
 
     /// Set read parameters
-    read_interval = 100;
-    read_tries = 1000;
+    read_interval = 100;    // in miliseconds // TODO: input as params?
+    read_tries    = 1000;                     // TODO: input as params?
 
     /// Get mpi_size & mpi_rank
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
-    state_sizes.resize(mpi_size);                           // vector<int>
-    state_displs.resize(mpi_size);                          // vector<int>
-    action_global.resize(action_global_size, 0.0);          // vector<double>
-    state_global.resize(state_global_size, 0.0);            // vector<double>
+    try {
+        state_sizes.resize(mpi_size);                           // vector<int>
+        state_displs.resize(mpi_size);                          // vector<int>
+        action_global.resize(action_global_size, 0.0);          // vector<double>
+    } catch (const std::length_error& e) {
+        std::cerr << "Length error: " << e.what() << ", with mpi_size: " << mpi_size << ", action_global_size: " << action_global_size << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
+    // Calculate state_sizes (to calculate state_global_size)
     /* Gather the individual sizes to get total size and offsets in root process (0)
         sendbuf(const void*) = state_local_size2 : pointer to the data that each process sends to the root process,
             in this case the size of local state array of each mpi process
@@ -52,12 +58,19 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         }
     }
 
-    /*  Calculate state_global_size: sum the local state_local_size of each process in MPI_COMM_WORLD, and distribute state_global_size result to all processes in MPI_COMM_WORLD
+    // Calculate state_global_size
+    /*  state_global_size: sum the local state_local_size of each process in MPI_COMM_WORLD, and distribute state_global_size result to all processes in MPI_COMM_WORLD
         void MPI::Comm::Allreduce(const void* sendbuf, void* recvbuf,
                                   int count, const MPI::Datatype& datatype, 
                                   const MPI::Op& op) const=0 */
     MPI_Allreduce(&state_local_size, &state_global_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update state_global_size
     state_global_size_vec = {static_cast<size_t>(state_global_size)};
+    try {
+        state_global.resize(state_global_size, 0.0);            // vector<double>
+    } catch (const std::length_error& e) {
+        std::cerr << "Length error: " << e.what() << ", with state_global_size: " << state_global_size << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    } 
 
     /// Init client (only root process!), and write global state and action sizes into DB.
     if (mpi_rank == 0) {
@@ -78,13 +91,13 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
                                        const std::vector<size_t>& dims,
                                        const SRTensorType type,
                                        const SRMemoryLayout mem_layout) */
-            ///int64_t temp_state_global_size  = static_cast<int64_t>(state_global_size);
-            ///int64_t temp_action_global_size = static_cast<int64_t>(action_global_size);
+            int64_t temp_state_global_size  = static_cast<int64_t>(state_global_size);
+            int64_t temp_action_global_size = static_cast<int64_t>(action_global_size);
             /// TODO: fix error here, the put tensor in c++ do not correspond to the read tensor by python3, but using temp_* gives exec. error
-            client->put_tensor("state_size",  &state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
-            client->put_tensor("action_size", &action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
-            std::cout << "Written tensor 'state_size': "  << state_global_size  << ", address: " << &state_global_size  << std::endl;
-            std::cout << "Written tensor 'action_size': " << action_global_size << ", address: " << &action_global_size << std::endl;
+            client->put_tensor("state_size",  &temp_state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
+            client->put_tensor("action_size", &temp_action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
+            std::cout << "Written tensor 'state_size': "  << temp_state_global_size  << ", address: " << &temp_state_global_size  << std::endl;
+            std::cout << "Written tensor 'action_size': " << temp_action_global_size << ", address: " << &temp_action_global_size << std::endl;
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error putting tensor: " << ex.what() << std::endl; 
             return;
@@ -112,7 +125,12 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
                         const int displs[],
                         MPI_Datatype recvtype, 
                         int root, MPI_Comm comm) */
-    state_global.resize(state_global_size);
+    try {
+        state_global.resize(state_global_size);
+    } catch (const std::length_error& e) {
+        std::cerr << "Length error: " << e.what() << ", with state_global_size: " << state_global_size << std::endl;
+        return; 
+    }
     MPI_Gatherv(state_local.data(), state_local_size, MPI_DOUBLE, 
                 state_global.data(), state_sizes.data(), state_displs.data(), 
                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
