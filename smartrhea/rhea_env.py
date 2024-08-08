@@ -262,9 +262,9 @@ class RheaEnv(py_environment.PyEnvironment):
         n_action = self._get_n_action()
 
         if n_state != self.n_state or n_action != self.n_action * self.rl_n_envs:
-            raise ValueError(f"State or action size differs between RHEA and the Python environment: \n \
-                RHEA n_state: {n_state}\n Python env n_state: {self.n_state}\n \
-                RHEA n_action: {n_action}\n Python env n_action * RL_envs: {self.n_action * self.rl_n_envs}")
+            raise ValueError(f"State or action size differs between RHEA and the Python environment: \
+                \nRHEA n_state: {n_state}   \nPython env n_state: {self.n_state} \
+                \nRHEA n_action: {n_action} \nPython env n_action * RL_envs: {self.n_action * self.rl_n_envs}")
 
         # Get the initial state and reward
         self._get_state() # updates self._state
