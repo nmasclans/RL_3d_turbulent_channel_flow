@@ -28,7 +28,7 @@ params = {
     "cfd_n_envs": cfd_n_envs,
     "rl_n_envs": rl_n_envs,
     ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
-    "rectangle_file": "rectangleControl.txt",   # only used if rl_n_envs == 1, TODO: set custom file contents
+    "rectangle_file": "rectangleControl.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
     "witness_file": "witness.txt",      # TODO: set custom file contents
     "witness_xyz": (6, 6, 6),           # TODO: set custom value
     "rl_neighbors": 1,                  # 0 is local state only, # TODO: set custom value

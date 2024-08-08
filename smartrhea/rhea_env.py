@@ -208,8 +208,9 @@ class RheaEnv(py_environment.PyEnvironment):
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
         if self.rl_n_envs > 1:
             self.n_action = 1
+            # TODO: this assert is not done in SOD2D (where marl_n_envs=3 != n_control_rectangles=6), but consider doing assert of n_control_rectangles == rl_n_envs
         else:   # self.rl_n_envs == 1:
-            n_action = n_rectangles(os.path.join(self.cwd, self.rectangle_file))
+            self.n_action = n_rectangles(os.path.join(self.cwd, self.rectangle_file))
         self._state = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
         self._state_rl = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
         self._action = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
