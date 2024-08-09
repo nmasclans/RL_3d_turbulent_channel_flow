@@ -14,7 +14,7 @@ from smartsim.settings import MpirunSettings, RunSettings
 from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.init_smartsim import write_hosts
-from smartrhea.utils import n_witness_points, n_rectangles, numpy_str, bcolors
+from smartrhea.utils import n_witness_points, n_cubes, numpy_str, bcolors
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - episode_walltime: environment walltime, if required for specific launcher
     - cfd_n_envs: number of cdf simulations
     - rl_n_envs: number of rl environments inside a cfd simulation
-    - rectangle_file: actuators surfaces file
+    - control_cubes_file: actuators cubes file
     - witness_file: witness points file
     - witness_xyz: number of witness points in the (x, y, x) directions
     - rl_neighbors: number of witness blocks selected to compose the state
@@ -83,7 +83,7 @@ class RheaEnv(py_environment.PyEnvironment):
         episode_walltime = None,
         cfd_n_envs = 2,
         rl_n_envs = 5,
-        rectangle_file = "rectangleControl.txt",
+        control_cubes_file = "cubeControl.txt",
         witness_file = "witness.txt",
         witness_xyz = (6, 4, 10),
         rl_neighbors = 1,
@@ -129,7 +129,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self.episode_walltime = episode_walltime
         self.cfd_n_envs = cfd_n_envs
         self.rl_n_envs = rl_n_envs
-        self.rectangle_file = rectangle_file
+        self.control_cubes_file = control_cubes_file
         self.witness_file = witness_file
         self.witness_xyz = witness_xyz
         self.rl_neighbors = rl_neighbors
@@ -208,9 +208,11 @@ class RheaEnv(py_environment.PyEnvironment):
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
         if self.rl_n_envs > 1:
             self.n_action = 1
+            num_cubes = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
+            assert self.rl_n_envs == num_cubes, f"(num. rl environments = {self.rl_n_envs}) != (num. control cubes = {num_cubes})"
             # TODO: this assert is not done in SOD2D (where marl_n_envs=3 != n_control_rectangles=6), but consider doing assert of n_control_rectangles == rl_n_envs
         else:   # self.rl_n_envs == 1:
-            self.n_action = n_rectangles(os.path.join(self.cwd, self.rectangle_file))
+            self.n_action = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
         self._state = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
         self._state_rl = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
         self._action = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)

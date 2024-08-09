@@ -13,7 +13,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     
     if (mpi_rank == 0) {
-        std::cout << "Initializing SmartRedis client/manager..." << std::endl;
+        std::cout << "\nInitializing SmartRedis client/manager..." << std::endl;
     }
     
     /// Store input arguments (input arguments of each process) to class variables

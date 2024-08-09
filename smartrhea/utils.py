@@ -27,15 +27,15 @@ def n_witness_points(fname):
     return n_witness_points_
 
 
-def n_rectangles(fname):
+def n_cubes(fname):
     """
-    Return number of rectangles
-    Assumption: num. rectangles is stored in the first line of fname
+    Return number of control cubes
+    Assumption: num. cubes is stored in the first line of fname
     """
     with open(fname, "r") as file:
-        n_rectangles_ = int(file.readline().strip())
-    logger.debug(f"Number of rectangles: {n_rectangles_}")
-    return n_rectangles_
+        n_cubes_ = int(file.readline().strip())
+    logger.debug(f"Number of rectangles: {n_cubes_}")
+    return n_cubes_
 
 
 def print_params(params, title=None):

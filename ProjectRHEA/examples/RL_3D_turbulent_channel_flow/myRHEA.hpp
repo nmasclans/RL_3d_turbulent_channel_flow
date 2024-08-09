@@ -57,6 +57,13 @@ class myRHEA : public FlowSolverRHEA {
         std::vector<double> twp_z_positions;
         int num_witness_probes;
 
+        /// Cubic control regions
+        std::string control_cubes_file; 
+        int num_control_cubes;
+        int num_control_probes;
+        std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
+        std::vector<TemporalPointProbe> temporal_control_probes;
+
         /// SmartRedis
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
@@ -73,8 +80,7 @@ class myRHEA : public FlowSolverRHEA {
         void initSmartRedis();
         void readWitnessPoints();
         void preproceWitnessPoints();
-
-
+        void readControlCubes();
 
     private:
 

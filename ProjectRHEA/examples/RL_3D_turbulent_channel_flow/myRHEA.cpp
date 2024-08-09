@@ -191,10 +191,14 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     this->n_rl_envs = 3;            // n_pseudo_envs in sod2d
     this->action_global_size = 25;  // nRectangleControl ub sod2d 
     this->witness_file = "witness.txt";
+    this->control_cubes_file = "cubeControl.txt";
 
     /// Witness points
     readWitnessPoints(); 
     preproceWitnessPoints();        // updates attribute 'state_local_size'
+
+    /// Control cubic regions
+    readControlCubes();
 
 };
 
@@ -876,11 +880,12 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
 */
 void myRHEA::readWitnessPoints() {
 
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    if (mpi_rank == 0){
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0){
         cout << "\nReading witness points..." << endl;
 
+        /// Read file (only with 1 mpi process to avoid file accessing errors)
         std::ifstream file(witness_file);
         if (!file.is_open()) {
             std::cerr << "Unable to open file: " << witness_file << std::endl;
@@ -892,7 +897,7 @@ void myRHEA::readWitnessPoints() {
             double ix, iy, iz;
             if (!(iss >> ix >> iy >> iz)) {
                 std::cerr << "Error reading line: " << line << std::endl;
-                continue;
+                return;
             }
             // fill witness points position tensors
             twp_x_positions.push_back(ix);
@@ -913,7 +918,7 @@ void myRHEA::readWitnessPoints() {
     MPI_Bcast(&num_witness_probes, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     // Resize the vectors to hold data in all processes
-    if (mpi_rank != 0) {
+    if (my_rank != 0) {
         twp_x_positions.resize(num_witness_probes);
         twp_y_positions.resize(num_witness_probes);
         twp_z_positions.resize(num_witness_probes);
@@ -925,8 +930,8 @@ void myRHEA::readWitnessPoints() {
     MPI_Bcast(twp_z_positions.data(), num_witness_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // Check successfull broadcast
-    if (mpi_rank != 0) {
-        cout << "Mpi with rank " << mpi_rank << " has received witness probes:" << endl;
+    if (my_rank != 0) {
+        cout << "Mpi with rank " << my_rank << " has received witness probes:" << endl;
         for (int i=0; i<num_witness_probes; i++) {
             cout << twp_x_positions.at(i) << ", " << twp_y_positions.at(i) << ", " << twp_z_positions.at(i) << endl;
         }
@@ -934,7 +939,7 @@ void myRHEA::readWitnessPoints() {
 }
 
 /// Pre-process witness points
-/// TODO: inspired in subroutine CFDSolverBase_preprocWitnessPoints(this)
+/// Inspired in SOD2D subroutine: CFDSolverBase_preprocWitnessPoints
 void myRHEA::preproceWitnessPoints() {
     
     int my_rank;
@@ -975,13 +980,117 @@ void myRHEA::preproceWitnessPoints() {
                  << z_field[I1D(i_index,j_index,k_index)] << endl;
         }
     }
-    this->state_local_size = state_local_size_counter;
+    this->state_local_size = state_local_size_counter;  // each mpi process updates attribute 'state_local_size'
     cout << "mpi rank " << my_rank << " has " << state_local_size << " local witness points" << endl;
-
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, delete if wanted
 
 }
+
+
+/*  Read control cubes
+    Control cubes are the 3d regions where RL control actions will be applied
+    This method reads the file containing the 3 points defining the control cube
+    Several cubes can be introduced
+
+    Defines attributes 'num_control_vertices' and 'control_cubes_vertices' in all mpi processes
+*/
+/// Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_readControlRectangles
+void myRHEA::readControlCubes(){
+
+    /// Get attrib. 'num_control_cubes' and 'control_cubes_vertices' (in rank=0)
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if(my_rank == 0) {
+        cout << "\nReading control cubes..." << endl;
+
+        /// Read file (only with 1 mpi process to avoid file accessing errors)
+        std::ifstream file(control_cubes_file);
+        if (!file.is_open()) {
+            cerr << "Unable to open file: " << control_cubes_file << endl;
+            return;
+        }
+        
+        /// Read first line, contains the number of control cubes
+        file >> this->num_control_cubes;
+        file.ignore();                                          // Ignore the newline character after 'num_control_cubes' integer
+        
+        /// Read all following lines, contains control cube vertices
+        int cube_count   = 0;
+        std::string empty_line;
+        while (!file.eof()) { // finishes when end-of-file is reached
+            std::array<std::array<double, 3>, 4> cube_vertices;
+            for (int i = 0; i < 4; i++) {                       /// loop along the 4 vertices
+                if (!(file >> cube_vertices[i][0] >> cube_vertices[i][1] >> cube_vertices[i][2])) {
+                    cerr << "Error reading cube vertices" << endl;
+                    return;
+                }
+            }
+            control_cubes_vertices.push_back(cube_vertices);    // store single cube vertices in 'control_cubes_vertices' tensor
+            cube_count++;                                       // update cube count
+            std::getline(file, empty_line);                     // read the empty line separating cubes
+        }
+
+        /// Check num. cubes read & stored corresponds to expected 'num_control_cubes'
+        if (cube_count != num_control_cubes) {
+            cerr << "Mismatch between expected and actual number of cubes" << endl;
+            cerr << "Additional info: cube_count = " << cube_count << ", num_control_cubes: " << num_control_cubes << endl;
+            return;
+        } 
+        cout << "Number of control cubes: " << num_control_cubes << endl;
+
+        file.close();
+
+    }
+
+    /// Broadcast the number of control cubes 'num_control_cubes' to all mpi processes
+    MPI_Bcast(&num_control_cubes, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    /// Resize 'control_cubes_vertices' tensor in all processes with rank != 0
+    if (my_rank != 0) {
+        control_cubes_vertices.resize(num_control_cubes);       /// shape [num_control_cubes, 4, 3]
+    }
+
+    /// Broadcast the control cubes vertices coordinates from rank=0 to all processes
+    MPI_Bcast(control_cubes_vertices.data(), num_control_cubes * 4 * 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    /// Check successfull data reading and broadcast
+    cout << "Mpi proc. with rank " << my_rank << " has received control cubes vertices:" << endl;
+    for (int i = 0; i < num_control_cubes; ++i) {
+        cout << "   Cube " << i + 1 << " vertices:" << endl;
+        for (int j = 0; j < 4; ++j) {                       /// loop along the 4 vertices
+            cout << "      Vertex " << j + 1 << ": "
+                    << control_cubes_vertices[i][j][0] << ", "
+                    << control_cubes_vertices[i][j][1] << ", "
+                    << control_cubes_vertices[i][j][2] << endl;
+        }
+    }
+    cout.flush();
+    MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, delete if wanted
+
+}
+
+/*
+/// TODO: Add description
+/// Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
+void myRHEA::preproceControlCubes() {
+    
+    /// Construct (initialize) temporal control probes for points inside control cubes 
+    TemporalPointProbe temporal_control_probe(mesh, topo);
+    // temporal_control_probes.resize( num_control_probes ); not possible, as num_control_probes is unknown
+    for(int icube = 0; icube < num_control_cubes; ++icube) {
+        .....
+        /// Set parameters of temporal point probe
+        temporal_witness_probe.setPositionX( twp_x_positions[twp] );
+        temporal_witness_probe.setPositionY( twp_y_positions[twp] );
+        temporal_witness_probe.setPositionZ( twp_z_positions[twp] );
+        /// Insert temporal point probe to vector
+        temporal_witness_probes[twp] = temporal_witness_probe;
+        /// Locate closest grid point to probe
+        temporal_witness_probes[twp].locateClosestGridPointToProbe();
+    }
+}
+*/
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
