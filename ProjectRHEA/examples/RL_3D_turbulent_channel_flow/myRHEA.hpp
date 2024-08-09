@@ -58,11 +58,11 @@ class myRHEA : public FlowSolverRHEA {
         int num_witness_probes;
 
         /// Cubic control regions
+        DistributedArray action_mask;
+        std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
         std::string control_cubes_file; 
         int num_control_cubes;
-        int num_control_probes;
-        std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
-        std::vector<TemporalPointProbe> temporal_control_probes;
+        int num_control_points;
 
         /// SmartRedis
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
@@ -81,6 +81,7 @@ class myRHEA : public FlowSolverRHEA {
         void readWitnessPoints();
         void preproceWitnessPoints();
         void readControlCubes();
+        void getControlCubes();
 
     private:
 
@@ -100,6 +101,10 @@ class myRHEA : public FlowSolverRHEA {
         void barycentricCoord2eigVal(const double &xmap1, const double &xmap2, vector<double> &lambda);
         void barycentricCoord2eigValMatrix(const double &xmap1, const double &xmap2, vector<vector<double>> &D);
         void Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &R);
+
+        /// Helper functions
+        double myDotProduct(const array<double,3> &v1, const array<double,3> &v2) {return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];}
+        double myNorm(const array<double,3> &v){return std::sqrt(myDotProduct(v,v));}
 
 };
 

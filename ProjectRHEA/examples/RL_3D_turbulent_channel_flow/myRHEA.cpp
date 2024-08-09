@@ -93,6 +93,7 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     DeltaRyy_field.setTopology(topo, "DeltaRyy");
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
+    action_mask.setTopology(topo, "action_mask");
 
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered);
     initSmartRedis();
@@ -199,6 +200,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Control cubic regions
     readControlCubes();
+    getControlCubes();
 
 };
 
@@ -1070,27 +1072,116 @@ void myRHEA::readControlCubes(){
 
 }
 
-/*
-/// TODO: Add description
-/// Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
-void myRHEA::preproceControlCubes() {
-    
-    /// Construct (initialize) temporal control probes for points inside control cubes 
-    TemporalPointProbe temporal_control_probe(mesh, topo);
-    // temporal_control_probes.resize( num_control_probes ); not possible, as num_control_probes is unknown
-    for(int icube = 0; icube < num_control_cubes; ++icube) {
-        .....
-        /// Set parameters of temporal point probe
-        temporal_witness_probe.setPositionX( twp_x_positions[twp] );
-        temporal_witness_probe.setPositionY( twp_y_positions[twp] );
-        temporal_witness_probe.setPositionZ( twp_z_positions[twp] );
-        /// Insert temporal point probe to vector
-        temporal_witness_probes[twp] = temporal_witness_probe;
-        /// Locate closest grid point to probe
-        temporal_witness_probes[twp].locateClosestGridPointToProbe();
-    }
-}
+/*  Locate grid points within mesh partition which are located inside each cube defined by 4 vertices of 3 coordinates
+    Updates 'action_mask' field: 0.0 for no action, 1.0 for 1st control cube, etc.
+    Updates 'num_control_points' and 'action_global_size'
+    Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
 */
+void myRHEA::getControlCubes() {
+
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+      
+    /// Initialize local variables
+    std::array<std::array<double,3>,4> cube_vertices; 
+    std::array<double,3> dir1, dir2, dir3, cube_origin, vec_candidate;
+    double size1, size2, size3, x, y, z, proj1, proj2, proj3;
+    bool isInside;
+    int num_control_points_local, num_control_points_per_cube_global, num_control_points_per_cube_local;
+    
+    /// Set counters to 0
+    action_global_size = 0;                 // global attribute
+    num_control_points = 0;                 // global attribute
+    num_control_points_local = 0;           // local var
+    num_control_points_per_cube_global = 0; // global var
+    num_control_points_per_cube_local = 0;  // local var
+
+    for (int icube = 0; icube < num_control_cubes; icube++) {
+
+        num_control_points_per_cube_local  = 0;
+        num_control_points_per_cube_global = 0;    
+        
+        /// Define cube vertices and direction vectors of cube -> cube defined by 3 direction vectors
+        cube_vertices = control_cubes_vertices[icube];  // take cube data of cube #icube
+        for (int icoord = 0; icoord < 3; icoord++) {
+            cube_origin[icoord] = cube_vertices[0][icoord];
+            dir1[icoord] = cube_vertices[1][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 1
+            dir2[icoord] = cube_vertices[2][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 2
+            dir3[icoord] = cube_vertices[3][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 3
+        }
+        /// Transform director vectors to unitary vectors for further calculations of dot product
+        size1 = myNorm(dir1);
+        size2 = myNorm(dir2);
+        size3 = myNorm(dir3);
+        for (int icoord = 0; icoord < 3; icoord++) {
+            dir1[icoord] = dir1[icoord] / size1;
+            dir2[icoord] = dir2[icoord] / size2;
+            dir3[icoord] = dir3[icoord] / size3;
+        }
+        /// Inner points: locate grid points located inside the cube 
+        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+            for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                    
+                    /// Reset action_mask to 0 (no action)
+                    action_mask[I1D(i,j,k)] = 0.0;
+
+                    /// Geometric stuff
+                    x = mesh->x[i];
+                    y = mesh->y[j];
+                    z = mesh->z[k];
+                    
+                    /// Define vector from cube origin to point
+                    vec_candidate = {x - cube_origin[0], y - cube_origin[1], z - cube_origin[2]}; 
+                    
+                    /// Define vector projection to cube unitary vectors 
+                    proj1 = myDotProduct(vec_candidate, dir1);
+                    proj2 = myDotProduct(vec_candidate, dir2);
+                    proj3 = myDotProduct(vec_candidate, dir3);
+                    
+                    /// Check condition: point is inside cube
+                    isInside =    (0 <= proj1) && (proj1 <= size1)\
+                               && (0 <= proj2) && (proj2 <= size2)\
+                               && (0 <= proj3) && (proj3 <= size3);
+
+                    /// Store point if inside the cube
+                    if (isInside) {
+                        action_mask[I1D(i,j,k)] = icube + 1.0;
+                        num_control_points_local++;
+                        num_control_points_per_cube_local++;
+                        /// log point information
+                        cout << "rank: " << my_rank << ", cube: " << icube << ", found control point: " 
+                             << x_field[I1D(i,j,k)] << ", " << y_field[I1D(i,j,k)] << ", " << z_field[I1D(i,j,k)] << endl;
+                    }
+                }
+            }
+        }
+        /// Check if cube contains any control point
+        MPI_Allreduce(&num_control_points_per_cube_local, &num_control_points_per_cube_global, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update num_control_points_per_cube_global
+        if (num_control_points_per_cube_global == 0){
+            cerr << "Not found control points for cube #" << icube << endl;
+            return;
+        } else {
+            action_global_size++;
+        }
+        /// Logging
+        if (my_rank == 0) {
+            cout << "Cube " << icube << " has " << num_control_points_per_cube_global << " control points" << endl;
+        }
+    }
+
+    /// Calculate total num_control_points from local values
+    MPI_Allreduce(&num_control_points_local, &num_control_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'num_control_points'
+
+    /// Logging
+    if (my_rank == 0) {
+        cout << "Total number of control points: " << num_control_points << endl;
+        cout << "Action global size (num. cubes with at least 1 control point): " << action_global_size << endl;
+    }
+    cout.flush();
+    MPI_Barrier(MPI_COMM_WORLD);
+
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
