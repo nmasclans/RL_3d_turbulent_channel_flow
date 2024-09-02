@@ -504,6 +504,7 @@ void myRHEA::calculateTimeStep() {
 #if _FIXED_TIME_STEP_
     /// Set new time step
     delta_t = fixed_time_step;
+    cout << "Fixed time step: " << delta_t << endl;
 #else
     FlowSolverRHEA::calculateTimeStep();
 #endif

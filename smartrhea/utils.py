@@ -39,6 +39,7 @@ def n_cubes(fname):
 
 
 def print_params(params, title=None):
+    print("")
     if title: print(f"{bcolors.OKGREEN}{title}{bcolors.ENDC}")
     print(params_str(params))
     
