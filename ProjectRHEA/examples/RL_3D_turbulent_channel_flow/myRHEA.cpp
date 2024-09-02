@@ -148,7 +148,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// String arguments
-    this->configuration_file = configuration_file;
     this->tag                = tag;
     this->restart_data_file  = restart_data_file;
     /// Double arguments
@@ -179,7 +178,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Logging
     if( mpi_rank == 0 ) {
         cout << "RL simulation params:" << endl;
-        cout << "--configuration_file: " << this->configuration_file << endl;  
         cout << "--tag: " << this->tag << endl;
         cout << "--restart_data_file: " << this->restart_data_file << endl;
         cout << "--t_action: " << this->t_action << endl;
