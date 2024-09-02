@@ -44,6 +44,7 @@ const double alpha_u    = 1.0;                      /// Magnitude of velocity pe
 const double alpha_P    = 0.1;                      /// Magnitude of pressure perturbations
 
 const double fixed_time_step = 1.0e-5;				/// Fixed time step
+const int cout_precision = 10;		                /// Output precision (fixed) 
 
 #if _FEEDBACK_LOOP_BODY_FORCE_
 /// Estimated uniform body force to drive the flow
@@ -101,9 +102,9 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     /*
     ////////////////////////////////////////////// Test manager //////////////////////////////////////////////
     int mpi_size;
-    int mpi_rank;
+    int my_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     /// Construct SmartRedis client to communicate with Redis database
     /// TODO: replace example arguments for actual arg
@@ -119,9 +120,9 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     vector<double> original_state_local(state_local_size,0.0);
     // Fill the vector with sequential values starting from 0.0
     std::iota(original_state_local.begin(), original_state_local.end(), 0.0);   // 0.0, 1.0, 2.0, etc
-    // Sum 50.0 * mpi_rank to all elements
+    // Sum 50.0 * my_rank to all elements
     transform(original_state_local.begin(), original_state_local.end(), original_state_local.begin(),
-                [mpi_rank](double val) { return val + 50.0 * static_cast<double>(mpi_rank); });
+                [my_rank](double val) { return val + 50.0 * static_cast<double>(my_rank); });
     manager.writeState(original_state_local, "state_key");
     manager.printDatabaseContent();
     manager.readState("state_key");
@@ -142,9 +143,9 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
 
     /// Logging
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    if (mpi_rank == 0) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
         cout << "\nInitializing RL parameters..." << endl;
         cout << "RL simulation params:" << endl;
         cout << "--tag: " << tag << endl;
@@ -165,10 +166,10 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         this->t_update_action = this->t_action;
         this->final_time      = std::stod(t_episode);        // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
         this->t_begin_control = std::stod(t_begin_control);
-        if (mpi_rank == 0) {
+        if (my_rank == 0) {
             cout << "[myRHEA::initRLParams] t_update_action = " << scientific << this->t_update_action
-                << ", final_time = " << scientific << this->final_time
-                << ", t_begin_control = " << scientific << this->t_begin_control << endl;
+                 << ", final_time = " << scientific << this->final_time
+                 << ", t_begin_control = " << scientific << this->t_begin_control << endl;
         }
     } catch (const invalid_argument& e) {
         cerr << "Invalid numeric argument: " << e.what() << endl;
@@ -260,6 +261,10 @@ void myRHEA::setInitialConditions() {
 void myRHEA::calculateSourceTerms() {
 
     /// IMPORTANT: This method needs to be modified/overwritten according to the problem under consideration
+
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    cout << fixed << setprecision(cout_precision);
 
 #if _FEEDBACK_LOOP_BODY_FORCE_
     /// Evaluate numerical shear stress at walls
@@ -356,19 +361,39 @@ void myRHEA::calculateSourceTerms() {
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
     /// Update action if necessary
-    cout << "[myRHEA::calculateSourceTerms] current_time = " << scientific << current_time 
-         << ", t_update_action = " << scientific << t_update_action << endl;
-    // if (current_time < t_update_action) {
-    //     cout << "Action is not updated yet" << endl;
-    //     return;
-    // } else {
-    //     cout << "Action needs to be updated" << endl;
-    //     // TODO: update action
-    //     // Set update time of next action
-    //     t_update_action += t_action;
-    //     cout << "New action to be updated at time instant " << t_update_action << endl;
-    //     return;
-    // }
+    if (current_time > t_begin_control) {
+        
+        if (my_rank == 0) {
+            cout << "[myRHEA::calculateSourceTerms] RL Control is applied, as current time (" << scientific << current_time << ") "
+                << "> time begin control (" << scientific << t_begin_control << ")" << endl;
+        }
+        
+        if (current_time > t_update_action) {
+            
+            // Logging
+            if (my_rank == 0) {
+                cout << "[myRHEA::calculateSourceTerms] New action to be updated at time instant " << scientific << current_time << endl;
+            }
+
+            // Update t_update_action
+            t_update_action += t_action;
+            if (current_time > t_update_action) {
+                throw runtime_error("Error: current_time is still greater than t_update_action after t_update_action is updated.");
+            }
+
+            // Update action value
+            /// TODO: manager.readAction("action_key");
+
+        }
+
+    } else {
+        
+        if (my_rank == 0) {
+            cout << "[myRHEA::calculateSourceTerms] RL Control is NOT applied yet, as current time (" << scientific << current_time << ") "
+                << "< time begin control (" << scientific << t_begin_control << ")" << endl;
+        }
+
+    }
 
     /// Initialize variables
     double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
@@ -1208,12 +1233,13 @@ void myRHEA::initializeFromRestart() {
     // Add additional functionality
 #if _ACTIVE_CONTROL_BODY_FORCE_
     t_update_action += current_time;
-    final_time      += current_time;
     t_begin_control += current_time;
+    final_time      += current_time;
     // Logging
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    if (mpi_rank == 0) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
+        cout << fixed << setprecision(cout_precision);
         cout << "[myRHEA::initializeFromRestart] From restart current_time = " << scientific << current_time 
             << ", updated t_update_action = " << scientific << t_update_action
             << ", final_time = " << scientific << final_time
