@@ -17,12 +17,23 @@ export SR_LOG_FILE="nohup.out"
 export SR_LOG_LEVEL="INFO"
 export SMARTSIM_LOG_LEVEL="DEBUG"
 
+# Compile ProjectRHEA code
+echo ">>> Compiling ProjectRHEA..."
+CURRENT_DIR=$(pwd)
+cd "$RHEA_EXE_DIR"
+make clean
+make
+cd "$CURRENT_DIR"
+echo ">>> ProjectRHEA compiled!"
+
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"
 conda activate smartrhea-env
+echo ">>> Conda environment 'smartrhea-env' activated"
 
 # Remove nohup.out, if necessary
 rm -f nohup.out
 
 # Run training
+echo ">>> Running training 'run.py'..."
 python3 run.py
