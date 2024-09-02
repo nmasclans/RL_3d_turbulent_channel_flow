@@ -288,7 +288,7 @@ class RheaEnv(py_environment.PyEnvironment):
         else:
             restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
         """
-        restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
+        restart_step = ["$RHEA_EXE_DIR/" + str(restart_file) for _ in range(self.cfd_n_envs)]
 
         # set RHEA exe arguments
         rhea_args = {"configuration_file": self.configuration_file, 
@@ -409,7 +409,7 @@ class RheaEnv(py_environment.PyEnvironment):
                     # self._state shape: [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
                     self._state[i, :] = self.client.get_tensor(self.state_key[i])
                     self.client.delete_tensor(self.state_key[i])
-                    logger.debug(f"[Env {i}] Got state[:5]: {numpy_str(self._state[i, :5])}")
+                    logger.debug(f"[Env {i}] has state[:5]: {numpy_str(self._state[i, :5])}")
                 except Exception as exc:
                     raise Warning(f"Could not read state from key: {self.state_key[i]}") from exc
 
