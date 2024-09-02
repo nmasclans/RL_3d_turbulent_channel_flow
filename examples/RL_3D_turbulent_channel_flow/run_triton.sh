@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Function to handle cleanup on script termination
+cleanup() {
+    echo ">>> Terminating all child processes..."
+    # Kill all child processes of the current shell
+    pkill -P $$
+    wait
+    echo ">>> All child processes terminated."
+}
+# Trap SIGINT (Ctrl+C) and SIGTSTP (Ctrl+Z) to execute the cleanup function
+trap cleanup SIGINT SIGTERM
+
 # RHEA variables
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
 export RHEA_EXE_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/ProjectRHEA/examples/RL_3D_turbulent_channel_flow
@@ -37,3 +48,7 @@ rm -f nohup.out
 # Run training
 echo ">>> Running training 'run.py'..."
 python3 run.py
+
+# Wait for the command to finish
+wait $pid
+echo ">>> Background process finished"
