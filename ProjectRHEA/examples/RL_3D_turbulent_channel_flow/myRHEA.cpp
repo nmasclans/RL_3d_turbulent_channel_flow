@@ -502,7 +502,6 @@ void myRHEA::calculateTimeStep() {
 #if _FIXED_TIME_STEP_
     /// Set new time step
     delta_t = fixed_time_step;
-    cout << "Fixed time step: " << delta_t << endl;
 #else
     FlowSolverRHEA::calculateTimeStep();
 #endif
@@ -939,8 +938,10 @@ void myRHEA::readWitnessPoints() {
     }
 }
 
-/// Pre-process witness points
-/// Inspired in SOD2D subroutine: CFDSolverBase_preprocWitnessPoints
+/* Pre-process witness points
+   Builds 'temporal_witness_probes', vector of TemporalPointProbe elements 
+   Inspired in SOD2D subroutine: CFDSolverBase_preprocWitnessPoints
+*/
 void myRHEA::preproceWitnessPoints() {
     
     int my_rank;
