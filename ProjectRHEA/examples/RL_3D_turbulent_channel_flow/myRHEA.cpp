@@ -381,8 +381,11 @@ void myRHEA::calculateSourceTerms() {
                 throw runtime_error("Error: current_time is still greater than t_update_action after t_update_action is updated.");
             }
 
-            // Update action value
-            /// TODO: manager.readAction("action_key");
+            // Write state (from environment to RL) 
+            manager.writeState() /// TODO: fix this, i have to input some state value
+
+            // Read action value (from RL to environment)
+            manager.readAction("action_key");   // TODO: fix this, giving error currently because RL has not sent action
 
         }
 
