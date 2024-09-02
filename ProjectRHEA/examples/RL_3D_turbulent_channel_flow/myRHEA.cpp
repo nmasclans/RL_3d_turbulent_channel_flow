@@ -141,21 +141,35 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 
 void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
 
+    /// Logging
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     if (mpi_rank == 0) {
         cout << "\nInitializing RL parameters..." << endl;
+        cout << "RL simulation params:" << endl;
+        cout << "--tag: " << tag << endl;
+        cout << "--restart_data_file: " << restart_data_file << endl;
+        cout << "--t_action: " << t_action << endl;
+        cout << "--t_episode: " << t_episode << endl;
+        cout << "--t_begin_control: " << t_begin_control << endl; 
+        cout << "--db_clustered: " << db_clustered << endl;
     }
 
     /// String arguments
     this->tag                = tag;
-    this->restart_data_file  = restart_data_file;
+    this->restart_data_file  = restart_data_file;            // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
     /// Double arguments
     try {
         // Convert string arguments to doubles
         this->t_action        = std::stod(t_action);
-        this->t_episode       = std::stod(t_episode);
+        this->t_update_action = this->t_action;
+        this->final_time      = std::stod(t_episode);        // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
         this->t_begin_control = std::stod(t_begin_control);
+        if (mpi_rank == 0) {
+            cout << "[myRHEA::initRLParams] t_update_action = " << scientific << this->t_update_action
+                << ", final_time = " << scientific << this->final_time
+                << ", t_begin_control = " << scientific << this->t_begin_control << endl;
+        }
     } catch (const invalid_argument& e) {
         cerr << "Invalid numeric argument: " << e.what() << endl;
         cerr << "for t_action = " << t_action << ", t_episode = " << t_episode << ", t_begin_control = " << t_begin_control << endl;
@@ -175,20 +189,8 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    /// Logging
-    if( mpi_rank == 0 ) {
-        cout << "RL simulation params:" << endl;
-        cout << "--tag: " << this->tag << endl;
-        cout << "--restart_data_file: " << this->restart_data_file << endl;
-        cout << "--t_action: " << this->t_action << endl;
-        cout << "--t_episode: " << this->t_episode << endl;
-        cout << "--t_begin_control: " << this->t_begin_control << endl; 
-        cout << "--db_clustered: " << this->db_clustered << endl;
-    }
-
     /// Additional arguments, defined here /// TODO: include this in some configuration file
-    this->n_rl_envs = 3;            // n_pseudo_envs in sod2d
-    this->action_global_size = 25;  // nRectangleControl ub sod2d 
+    this->n_rl_envs = 3;                            // n_pseudo_envs in sod2d
     this->witness_file = "witness.txt";
     this->control_cubes_file = "cubeControl.txt";
 
@@ -353,6 +355,21 @@ void myRHEA::calculateSourceTerms() {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
+    /// Update action if necessary
+    cout << "[myRHEA::calculateSourceTerms] current_time = " << scientific << current_time 
+         << ", t_update_action = " << scientific << t_update_action << endl;
+    // if (current_time < t_update_action) {
+    //     cout << "Action is not updated yet" << endl;
+    //     return;
+    // } else {
+    //     cout << "Action needs to be updated" << endl;
+    //     // TODO: update action
+    //     // Set update time of next action
+    //     t_update_action += t_action;
+    //     cout << "New action to be updated at time instant " << t_update_action << endl;
+    //     return;
+    // }
+
     /// Initialize variables
     double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
     double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
@@ -486,8 +503,6 @@ void myRHEA::calculateSourceTerms() {
     //f_rhov_field.update();
     //f_rhow_field.update();
     //f_rhoE_field.update();
-
-
 
 };
 
@@ -1184,6 +1199,30 @@ void myRHEA::getControlCubes() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+void myRHEA::initializeFromRestart() {
+    
+    // Call the parent class method
+    FlowSolverRHEA::initializeFromRestart();
+
+    // Add additional functionality
+#if _ACTIVE_CONTROL_BODY_FORCE_
+    t_update_action += current_time;
+    final_time      += current_time;
+    t_begin_control += current_time;
+    // Logging
+    int mpi_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    if (mpi_rank == 0) {
+        cout << "[myRHEA::initializeFromRestart] From restart current_time = " << scientific << current_time 
+            << ", updated t_update_action = " << scientific << t_update_action
+            << ", final_time = " << scientific << final_time
+            << ", t_begin_control = " << scientific << t_begin_control << endl;
+    }
+#endif
+
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /// MAIN
@@ -1222,10 +1261,10 @@ int main(int argc, char** argv) {
         configuration_file  = argv[1];
         tag                 = argv[2];
         restart_data_file   = argv[3];
-        t_action            = argv[4];
-        t_episode           = argv[5];
-        t_begin_control     = argv[6];
-        db_clustered        = argv[7];
+        t_action            = argv[4];  // 0.0001 
+        t_episode           = argv[5];  // 1.0
+        t_begin_control     = argv[6];  // 0.0
+        db_clustered        = argv[7];  // False
     } else {
         cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <t_action> <t_episode> <t_begin_control> <db_clustered>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );

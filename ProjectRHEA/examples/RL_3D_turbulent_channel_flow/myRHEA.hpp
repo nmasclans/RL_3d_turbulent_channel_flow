@@ -68,7 +68,7 @@ class myRHEA : public FlowSolverRHEA {
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
         double t_action;
-        double t_episode;
+        double t_update_action;
         double t_begin_control;
         bool db_clustered;
         int n_rl_envs;
@@ -81,6 +81,7 @@ class myRHEA : public FlowSolverRHEA {
         void preproceWitnessPoints();
         void readControlCubes();
         void getControlCubes();
+        void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
 
     private:
 
