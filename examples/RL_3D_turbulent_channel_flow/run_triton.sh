@@ -43,7 +43,7 @@ conda activate smartrhea-env
 echo ">>> Conda environment 'smartrhea-env' activated"
 
 # Remove nohup.out, if necessary
-rm -f nohup.out
+rm -f nohup.out ensemble.out ensemble.err 
 
 # Run training
 echo ">>> Running training 'run.py'..."
