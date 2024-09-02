@@ -67,7 +67,6 @@ class myRHEA : public FlowSolverRHEA {
         /// SmartRedis
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
-        std::string restart_data_file;
         double t_action;
         double t_episode;
         double t_begin_control;
