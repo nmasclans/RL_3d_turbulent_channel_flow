@@ -2,6 +2,7 @@
 /train
 /rhea_exp
 ensemble.*
+timers_information_file.txt
 *.h5
 *.xdmf
 *.out
