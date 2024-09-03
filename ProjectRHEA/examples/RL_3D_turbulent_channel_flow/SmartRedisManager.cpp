@@ -127,22 +127,25 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
                         const int displs[],
                         MPI_Datatype recvtype, 
                         int root, MPI_Comm comm) */
+    if (mpi_rank == 0) {std::cout << "Writing state..." << std::endl;};
     try {
         state_global.resize(state_global_size);
     } catch (const std::length_error& e) {
         std::cerr << "Length error: " << e.what() << ", with state_global_size: " << state_global_size << std::endl;
         return; 
     }
+    if (mpi_rank == 0) {std::cout << "Gathering local state data..." << std::endl;};
     MPI_Gatherv(state_local.data(), state_local_size, MPI_DOUBLE, 
                 state_global.data(), state_sizes.data(), state_displs.data(), 
                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    // /// Write global state into database
+    /// Write global state into database
     if (mpi_rank == 0) {
         /* void Client::put_tensor(const std::string& name,
                                    void* data,
                                    const std::vector<size_t>& dims,
                                    const SRTensorType type,
                                    const SRMemoryLayout mem_layout) */
+        std::cout << "Writing state..." << std::endl;
         client->put_tensor(key, state_global.data(), state_global_size_vec, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
         std::cout << "State written" << std::endl;
     }
@@ -220,6 +223,7 @@ void SmartRedisManager::readState(const std::string& key) {
 
 /// Read action from database -> updates variable 'action_global'
 void SmartRedisManager::readAction(const std::string& key) {
+    if (mpi_rank == 0) {std::cout << "Reading action..." << std::endl;};
     if (mpi_rank == 0) {
         /* bool Client::poll_tensor(const std::string& name, 
                                     int poll_frequency_ms, 

@@ -161,15 +161,17 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     this->restart_data_file  = restart_data_file;            // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
     /// Double arguments
     try {
-        // Convert string arguments to doubles
-        this->t_action        = std::stod(t_action);
-        this->t_update_action = this->t_action;
-        this->final_time      = std::stod(t_episode);        // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
-        this->t_begin_control = std::stod(t_begin_control);
+        // Set actuation attributes 
+        this->actuation_period        = std::stod(t_action);
+        this->begin_actuation_time    = std::stod(t_begin_control);
+        this->previous_actuation_time = 0.0;
+        this->final_time              = std::stod(t_episode);        // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
         if (my_rank == 0) {
-            cout << "[myRHEA::initRLParams] t_update_action = " << scientific << this->t_update_action
-                 << ", final_time = " << scientific << this->final_time
-                 << ", t_begin_control = " << scientific << this->t_begin_control << endl;
+            cout << "[myRHEA::initRLParams] " 
+                 << "actuation_period = " << scientific << this->actuation_period
+                 << ", begin_actuation_time = " << scientific << this->begin_actuation_time
+                 << ", previous_actuation_time = " << scientific << this->previous_actuation_time
+                 << ", final_time = " << scientific << this->final_time << endl;
         }
     } catch (const invalid_argument& e) {
         cerr << "Invalid numeric argument: " << e.what() << endl;
@@ -194,6 +196,11 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     this->n_rl_envs = 3;                            // n_pseudo_envs in sod2d
     this->witness_file = "witness.txt";
     this->control_cubes_file = "cubeControl.txt";
+    this->time_key      = "ensemble_" + tag + ".time";
+    this->step_type_key = "ensemble_" + tag + ".step_type";
+    this->state_key     = "ensemble_" + tag + ".state";
+    this->action_key    = "ensemble_" + tag + ".action";
+    this->reward_key    = "ensemble_" + tag + ".reward";
 
     /// Witness points
     readWitnessPoints(); 
@@ -206,6 +213,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 };
 
 
+/// Based on subroutine mod_smartredis::init_smartredis
 void myRHEA::initSmartRedis() {
     /// TODO: transform this Fortran code of BLMARLFlowSolver_Incomp.f90 to current implementation and C++
     /*
@@ -213,11 +221,19 @@ void myRHEA::initSmartRedis() {
     open(unit=443,file="./output_"//trim(adjustl(this%tag))//"/"//"control_action.txt",status='replace')
     open(unit=445,file="./output_"//trim(adjustl(this%tag))//"/"//"control_reward.txt",status='replace')
     */  
-    /// TODO: remove this comment:
-    /* equivalent to Fortran line:  
-       call init_smartredis(client, this%nwitPar, this%nRectangleControl, this%n_pseudo_envs, trim(adjustl(this%tag)), this%db_clustered)  */
     SmartRedisManager manager(state_local_size, action_global_size, n_rl_envs, tag, db_clustered);
     manager.writeStepType(1, "ensemble_" + tag + ".step_type");
+
+    /// Allocate action data
+    /// Annotation: State is stored in arrays of different sizes on each MPI rank.
+    ///             Actions is a global array living in all processes.
+    action_global.resize(action_global_size);
+    action_global_previous.resize(action_global_size);
+    state_local.resize(state_local_size);
+    std::fill(action_global.begin(), action_global.end(), 0.0);
+    std::fill(action_global_previous.begin(), action_global_previous.end(), 0.0);
+    std::fill(state_local.begin(), state_local.end(), 0.0);
+    reward = 0.0;
 };
 
 
@@ -360,169 +376,200 @@ void myRHEA::calculateSourceTerms() {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
-    /// Update action if necessary
-    if (current_time > t_begin_control) {
+    /// Check if new action is needed
+    if (current_time > begin_actuation_time) {
         
+        /// TODO: it seems to me with the couts that this loop is made 3 times per time instant (i get x3 couts than expected)... why?
         if (my_rank == 0) {
-            cout << "[myRHEA::calculateSourceTerms] RL Control is applied, as current time (" << scientific << current_time << ") "
-                << "> time begin control (" << scientific << t_begin_control << ")" << endl;
+            cout << "[myRHEA::calculateSourceTerms] RL Control is applied, as current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
         }
         
-        if (current_time > t_update_action) {
+        /// Check if new action is needed
+        if (current_time - previous_actuation_time > actuation_period) {
             
-            // Logging
+            /// Logging
             if (my_rank == 0) {
-                cout << "[myRHEA::calculateSourceTerms] New action to be updated at time instant " << scientific << current_time << endl;
+                cout << "[myRHEA::calculateSourceTerms] Performing SmartRedis communications (state, action, reward) at time instant " << current_time << endl;
             }
 
-            // Update t_update_action
-            t_update_action += t_action;
-            if (current_time > t_update_action) {
-                throw runtime_error("Error: current_time is still greater than t_update_action after t_update_action is updated.");
+            /// Save old action values and time - useful for interpolating to new action
+            action_global_previous  = action_global;     // a copy is made
+            previous_actuation_time = current_time;      // TODO: SmartSOD2D use instead "this%previousActuationTime = this%previousActuationTime + this%periodActuation"
+
+            // Update & Write state (from environment to RL) 
+            if (my_rank == 0) {cout << "Updating local state..." << endl;};
+            int i_index, j_index, k_index;
+            int state_local_size_counter = 0;
+            state_local.resize(state_local_size);
+            for(int twp = 0; twp < num_witness_probes; ++twp) {
+                /// Owner rank writes to file
+                if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
+                    /// Get local indices i, j, k
+                    i_index = temporal_witness_probes[twp].getLocalIndexI(); 
+                    j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
+                    k_index = temporal_witness_probes[twp].getLocalIndexK();
+                    /// Get state data: u-velocity
+                    state_local[state_local_size_counter] = u_field[I1D(i_index,j_index,k_index)];
+                    state_local_size_counter += 1;
+                }
             }
+            if (my_rank == 0) {cout << "Calling manager to write state..." << endl;};
+            manager.writeState(state_local, state_key);
 
-            // Write state (from environment to RL) 
-            manager.writeState() /// TODO: fix this, i have to input some state value
+            /// TODO: Update and write reward
+            if (my_rank == 0) {cout << "Calling manager to write reward..." << endl;};
+            reward = 0.0; /// TODO: update reward, choose which reward to use!
+            manager.writeReward(reward, reward_key);
 
-            // Read action value (from RL to environment)
-            manager.readAction("action_key");   // TODO: fix this, giving error currently because RL has not sent action
+            // Read action value (from RL to environment) 
+            if (my_rank == 0) {cout << "Calling manager to read action..." << endl;};
+            manager.readAction(action_key);
+            action_global = manager.getActionGlobal();
 
+            /// Update time
+            if (my_rank == 0) {cout << "Calling manager to write time..." << endl;};
+            manager.writeTime(current_time, time_key);
+
+            /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
+            if (current_time + 2.0 * actuation_period > final_time) {
+                if (my_rank == 0) {cout << "Calling manager to write step type..." << endl;};
+                manager.writeStepType(0, step_type_key);
+            }
         }
 
-    } else {
-        
-        if (my_rank == 0) {
-            cout << "[myRHEA::calculateSourceTerms] RL Control is NOT applied yet, as current time (" << scientific << current_time << ") "
-                << "< time begin control (" << scientific << t_begin_control << ")" << endl;
-        }
+        /// Initialize variables
+        double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
+        double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
+        double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
+        double delta_x, delta_y, delta_z;
+        double Rkk_inv, Akk;
+        bool   isNegligibleAction, isNegligibleRkk;
+        vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+        vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+        vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+        vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
 
-    }
+        /// Calculate DeltaRij = Rij_perturbated - Rij_original
+        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+            for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                    
+                    /// Get perturbation values from RL agent
+                    /// TODO: implement RL action here!
+                    // TODO: readAction()
+                    DeltaRkk    = 0.0;
+                    DeltaThetaZ = 0.0;
+                    DeltaThetaY = 0.0;
+                    DeltaThetaX = 0.0;
+                    DeltaXmap1  = 0.0;
+                    DeltaXmap2  = 0.0;
 
-    /// Initialize variables
-    double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
-    double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
-    double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
-    double delta_x, delta_y, delta_z;
-    double Rkk_inv, Akk;
-    bool   isNegligibleAction, isNegligibleRkk;
-    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
-    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
-    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
-    vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
+                    isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                    Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                    isNegligibleRkk    = (abs(Rkk) < EPS);
+                    if (isNegligibleAction || isNegligibleRkk) {
+                        DeltaRxx_field[I1D(i,j,k)] = 0.0;
+                        DeltaRyy_field[I1D(i,j,k)] = 0.0;
+                        DeltaRzz_field[I1D(i,j,k)] = 0.0;
+                        DeltaRxy_field[I1D(i,j,k)] = 0.0;
+                        DeltaRxz_field[I1D(i,j,k)] = 0.0;
+                        DeltaRyz_field[I1D(i,j,k)] = 0.0;
+                    } else {
+                        /// Rkk is Rij trace (dof #1)
+                        Rkk_inv = 1.0 / Rkk;
 
-    /// Calculate DeltaRij = Rij_perturbated - Rij_original
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                
-                /// Get perturbation values from RL agent
-                /// TODO: implement RL action here!
-                // TODO: readAction()
-                DeltaRkk    = 0.0;
-                DeltaThetaZ = 0.0;
-                DeltaThetaY = 0.0;
-                DeltaThetaX = 0.0;
-                DeltaXmap1  = 0.0;
-                DeltaXmap2  = 0.0;
+                        /// Build anisotropy tensor (symmetric, trace-free)
+                        Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                        Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                        Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                        Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                        Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                        Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                        Aij[1][0]  = Aij[0][1];
+                        Aij[2][0]  = Aij[0][2];
+                        Aij[2][1]  = Aij[1][2];
 
-                isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
-                Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                isNegligibleRkk    = (abs(Rkk) < EPS);
-                if (isNegligibleAction || isNegligibleRkk) {
-                    DeltaRxx_field[I1D(i,j,k)] = 0.0;
-                    DeltaRyy_field[I1D(i,j,k)] = 0.0;
-                    DeltaRzz_field[I1D(i,j,k)] = 0.0;
-                    DeltaRxy_field[I1D(i,j,k)] = 0.0;
-                    DeltaRxz_field[I1D(i,j,k)] = 0.0;
-                    DeltaRyz_field[I1D(i,j,k)] = 0.0;
-                } else {
-                    /// Rkk is Rij trace (dof #1)
-                    Rkk_inv = 1.0 / Rkk;
+                        /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                        Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                        Aij[0][0] -= Akk / 3.0;
+                        Aij[1][1] -= Akk / 3.0;
+                        Aij[2][2] -= Akk / 3.0;
 
-                    /// Build anisotropy tensor (symmetric, trace-free)
-                    Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                    Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                    Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                    Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                    Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                    Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                    Aij[1][0]  = Aij[0][1];
-                    Aij[2][0]  = Aij[0][2];
-                    Aij[2][1]  = Aij[1][2];
+                        /// Aij eigen-decomposition
+                        symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
+                        sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
-                    /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                    Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                    Aij[0][0] -= Akk / 3.0;
-                    Aij[1][1] -= Akk / 3.0;
-                    Aij[2][2] -= Akk / 3.0;
+                        /// Eigen-vectors Euler Rotation angles (dof #2-4)
+                        eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
 
-                    /// Aij eigen-decomposition
-                    symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
-                    sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
+                        /// Eigen-values Barycentric coordinates (dof #5-6)
+                        eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
 
-                    /// Eigen-vectors Euler Rotation angles (dof #2-4)
-                    eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+                        /// Build perturbed Rij d.o.f.
+                        Rkk    += DeltaRkk;
+                        thetaZ += DeltaThetaZ;
+                        thetaY += DeltaThetaY;
+                        thetaX += DeltaThetaX;
+                        xmap1  += DeltaXmap1;
+                        xmap2  += DeltaXmap2;
 
-                    /// Eigen-values Barycentric coordinates (dof #5-6)
-                    eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
+                        /// Enforce realizability to perturbed Rij d.o.f
+                        enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
 
-                    /// Build perturbed Rij d.o.f.
-                    Rkk    += DeltaRkk;
-                    thetaZ += DeltaThetaZ;
-                    thetaY += DeltaThetaY;
-                    thetaX += DeltaThetaX;
-                    xmap1  += DeltaXmap1;
-                    xmap2  += DeltaXmap2;
+                        /// Calculate perturbed & realizable Rij
+                        eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                        barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
+                        sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
+                        Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
 
-                    /// Enforce realizability to perturbed Rij d.o.f
-                    enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
-
-                    /// Calculate perturbed & realizable Rij
-                    eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
-                    barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
-                    sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
-                    Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
-
-                    /// Calculate perturbed & realizable DeltaRij
-                    DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
-                    DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                    DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
-                    DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
-                    DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
-                    DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+                        /// Calculate perturbed & realizable DeltaRij
+                        DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
+                        DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                        DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                        DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                        DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                        DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+                    }
                 }
             }
         }
-    }
 
-    /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                
-                /// Geometric stuff
-                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
-                
-                /// Calculate DeltaRij derivatives
-                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+        /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
+        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+            for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                    
+                    /// Geometric stuff
+                    delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                    delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                    delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                    
+                    /// Calculate DeltaRij derivatives
+                    d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                    d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                    d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                    d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                    d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                    d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                    d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                    d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                    d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
 
-                /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                f_rhou_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                f_rhov_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                f_rhow_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
-                f_rhoE_field[I1D(i,j,k)] += 0.0;
+                    /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+                    f_rhou_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                    f_rhov_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                    f_rhow_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                    f_rhoE_field[I1D(i,j,k)] += 0.0;
+                }
             }
         }
+
+    } else {
+
+        if (my_rank == 0) {
+            cout << "[myRHEA::calculateSourceTerms] RL Control is NOT applied yet, as current time (" << scientific << current_time << ") " << "< time begin control (" << scientific << begin_actuation_time << ")" << endl;
+        }
+
     }
 #endif
 
@@ -942,10 +989,11 @@ void myRHEA::readWitnessPoints() {
                 std::cerr << "Error reading line: " << line << std::endl;
                 return;
             }
-            // fill witness points position tensors
+            
+            /// Fill witness points position tensors
             twp_x_positions.push_back(ix);
             twp_y_positions.push_back(iy);
-            twp_z_positions.push_back(iz);        
+            twp_z_positions.push_back(iz);
         }
         file.close();
         num_witness_probes = static_cast<int>(twp_x_positions.size());
@@ -1235,18 +1283,19 @@ void myRHEA::initializeFromRestart() {
 
     // Add additional functionality
 #if _ACTIVE_CONTROL_BODY_FORCE_
-    t_update_action += current_time;
-    t_begin_control += current_time;
-    final_time      += current_time;
+    begin_actuation_time    += current_time;
+    previous_actuation_time += current_time;
+    final_time              += current_time;
+
     // Logging
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     if (my_rank == 0) {
         cout << fixed << setprecision(cout_precision);
         cout << "[myRHEA::initializeFromRestart] From restart current_time = " << scientific << current_time 
-            << ", updated t_update_action = " << scientific << t_update_action
-            << ", final_time = " << scientific << final_time
-            << ", t_begin_control = " << scientific << t_begin_control << endl;
+            << ", updated begin_actuation_time = " << scientific << begin_actuation_time
+            << ", previous_actuation_time = " << scientific << previous_actuation_time
+            << ", final_time = " << scientific << final_time << endl;
     }
 #endif
 

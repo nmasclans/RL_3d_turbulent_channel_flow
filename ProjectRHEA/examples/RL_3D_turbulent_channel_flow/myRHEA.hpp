@@ -67,13 +67,22 @@ class myRHEA : public FlowSolverRHEA {
         /// SmartRedis
         SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
-        double t_action;
-        double t_update_action;
-        double t_begin_control;
+        std::string time_key;
+        std::string step_type_key;
+        std::string state_key;
+        std::string action_key;
+        std::string reward_key;
+        double actuation_period;
+        double begin_actuation_time;
+        double previous_actuation_time;
+        double reward;
         bool db_clustered;
         int n_rl_envs;
         int state_local_size;                   /// or nwitPar
         int action_global_size;                 /// or nRectangleControl
+        std::vector<double> action_global;
+        std::vector<double> action_global_previous;
+        std::vector<double> state_local;
 
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
         void initSmartRedis();
