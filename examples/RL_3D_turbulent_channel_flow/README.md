@@ -32,3 +32,16 @@ If the process does not terminate with the standard kill command, you can use th
 ```sh
 sudo kill -9 <PID>
 ```
+
+## Check content smartredis database from file
+
+To check the content of smartredis database from the database file `smartsim_db.dat`, do:
+```bash
+conda activate smartrhea-env; python3
+```
+```python3
+import pickle
+with open("smartsim_db.dat","rb") as file:
+    data = pickle.load(file)
+print(data)
+```
