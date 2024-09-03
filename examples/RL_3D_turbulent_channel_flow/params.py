@@ -34,7 +34,7 @@ params = {
     "rl_neighbors": 1,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
-    "poll_n_tries": 1000,               # num. tries of database poll
+    "poll_n_tries": 5000,               # num. tries of database poll
     "poll_freq_ms": 100,                # time between database poll tries [miliseconds]
     "time_key": "time",
     "step_type_key": "step_type",
