@@ -26,10 +26,12 @@ public:
 
     std::vector<double> getStateGlobal();
     std::vector<double> getActionGlobal();
+    void coutStateLocalSize();
+    void coutStateGlobalSize();
 
     void printDatabaseContent();
 
-private:
+protected:
                  
     std::unique_ptr<SmartRedis::Client> client; // Use a unique pointer for conditional initialization
     std::vector<int> state_sizes;
@@ -44,8 +46,6 @@ private:
     std::vector<size_t> action_global_size_vec;
     int step_type_mod;
     int n_pseudo_envs;
-    int mpi_size;
-    int mpi_rank;
     int read_interval;
     int read_tries;
 };

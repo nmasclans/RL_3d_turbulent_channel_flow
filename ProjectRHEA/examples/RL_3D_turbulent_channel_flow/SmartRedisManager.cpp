@@ -8,11 +8,12 @@ SmartRedisManager::SmartRedisManager() : client(nullptr) {
 SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
     : client(nullptr) 
 {
-    /// Get mpi_size & mpi_rank
+    /// Get mpi size and rank
+    int mpi_size, my_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
-    if (mpi_rank == 0) {
+    if (my_rank == 0) {
         std::cout << "\nInitializing SmartRedis client/manager..." << std::endl;
     }
     
@@ -20,8 +21,13 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     n_pseudo_envs      = n_pseudo_envs2;
     state_local_size   = state_local_size2;
     action_global_size = action_global_size2;
+    state_global_size  = 0; // further modified in constructor 
     state_local_size_vec   = {static_cast<size_t>(state_local_size2)};
     action_global_size_vec = {static_cast<size_t>(action_global_size2)};
+    if (my_rank == 0) {std::cout << "mpi size: " << mpi_size
+                                 << ", n_pseudo_envs: " << n_pseudo_envs 
+                                 << ", state_local_size: " << state_local_size
+                                 << ", action_global_size: " << action_global_size << std::endl;};
 
     /// Set read parameters
     read_interval = 100;    // in miliseconds // TODO: input as params?
@@ -52,7 +58,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     MPI_Gather(&state_local_size, 1, MPI_INT, state_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD); // update state_sizes
 
     // Compute displacements - global state idxs corresponding to the local state of each MPI process
-    if (mpi_rank == 0) {
+    if (my_rank == 0) {
         int state_counter = 0;
         for (int i = 0; i < mpi_size; ++i) {
             state_displs[i] = state_counter;
@@ -75,7 +81,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     } 
 
     /// Init client (only root process!), and write global state and action sizes into DB.
-    if (mpi_rank == 0) {
+    if (my_rank == 0) {
         /// Initialize client, the client is initialized to utilize a SmartRedis Orchestrator in cluster configuration if db_clustered
         ///     Client(bool cluster, const std::string& logger_name = "default");
         try {
@@ -95,7 +101,6 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
                                        const SRMemoryLayout mem_layout) */
             int64_t temp_state_global_size  = static_cast<int64_t>(state_global_size);
             int64_t temp_action_global_size = static_cast<int64_t>(action_global_size);
-            /// TODO: fix error here, the put tensor in c++ do not correspond to the read tensor by python3, but using temp_* gives exec. error
             client->put_tensor("state_size",  &temp_state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
             client->put_tensor("action_size", &temp_action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
             std::cout << "Written tensor 'state_size': "  << temp_state_global_size  << ", address: " << &temp_state_global_size  << std::endl;
@@ -107,8 +112,9 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     }
 
     // Debugging
-    if (mpi_rank==0)
-        std::cout << "SmartRedis manager constructed" << std::endl << std::endl;
+    if (my_rank==0){std::cout << "SmartRedis manager constructed" << std::endl;};
+    MPI_Barrier(MPI_COMM_WORLD);
+
 }
 
 /// Destructor
@@ -126,49 +132,75 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
                         const int recvcounts[], 
                         const int displs[],
                         MPI_Datatype recvtype, 
-                        int root, MPI_Comm comm) */
-    if (mpi_rank == 0) {std::cout << "Writing state..." << std::endl;};
+                        int root, 
+                        MPI_Comm comm) */
+
+    int my_rank, mpi_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
     try {
+        std::cout << "[writeState] Rank " << my_rank << " resizing state_global with size " << state_global_size << std::endl;
         state_global.resize(state_global_size);
     } catch (const std::length_error& e) {
-        std::cerr << "Length error: " << e.what() << ", with state_global_size: " << state_global_size << std::endl;
+        std::cerr << "[writeState] Length error: " << e.what() << ", with state_global_size: " << state_global_size << std::endl;
         return; 
     }
-    if (mpi_rank == 0) {std::cout << "Gathering local state data..." << std::endl;};
+
+    // Checks
+    if (my_rank == 0) {
+        std::cout << "[writeState] State sizes: ";
+        for (int i = 0; i < mpi_size; ++i) {
+            std::cout << state_sizes[i] << " ";
+        }
+        std::cout << std::endl;
+
+        std::cout << "[writeState] State displacements: ";
+        for (int i = 0; i < mpi_size; ++i) {
+            std::cout << state_displs[i] << " ";
+        }
+        std::cout << std::endl;
+    }
+    
+    if (my_rank == 0) {std::cout << "[writeState] Gathering local state data..." << std::endl;};
     MPI_Gatherv(state_local.data(), state_local_size, MPI_DOUBLE, 
                 state_global.data(), state_sizes.data(), state_displs.data(), 
                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
     /// Write global state into database
-    if (mpi_rank == 0) {
+    if (my_rank == 0) {
         /* void Client::put_tensor(const std::string& name,
                                    void* data,
                                    const std::vector<size_t>& dims,
                                    const SRTensorType type,
                                    const SRMemoryLayout mem_layout) */
-        std::cout << "Writing state..." << std::endl;
+        std::cout << "[writeState] Writing state..." << std::endl;
         client->put_tensor(key, state_global.data(), state_global_size_vec, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
-        std::cout << "State written" << std::endl;
-    }
+        std::cout << "[writeState] State written" << std::endl;
+    } 
+
 }
 
 // TODO: remove method readState, not necessary, only created for testing
+/*
 /// Read state from database -> updates variable 'state_global'
 void SmartRedisManager::readState(const std::string& key) {
-    if (mpi_rank == 0) {
-        /* bool Client::poll_tensor(const std::string& name, 
-                                    int poll_frequency_ms, 
-                                    int num_tries) */
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
+        /// bool Client::poll_tensor(const std::string& name, 
+        ///                  int poll_frequency_ms, 
+        ///                  int num_tries)
         bool found = client->poll_tensor(key, read_interval, read_tries);
         if (!found) {
             std::cerr << "ERROR in readState, state array not found." << std::endl;
                 MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        /* void Client::get_tensor(const std::string& name,
-                                   void*& data,
-                                   std::vector<size_t>& dims,
-                                   SRTensorType& type,
-                                   const SRMemoryLayout mem_layout) */
+        /// void Client::get_tensor(const std::string& name,
+        ///                            void*& data,
+        ///                            std::vector<size_t>& dims,
+        ///                            SRTensorType& type,
+        ///                            const SRMemoryLayout mem_layout)
         void* get_data_ptr;
         std::vector<size_t> get_dims;
         SRTensorType get_SRTensorType;
@@ -209,22 +241,25 @@ void SmartRedisManager::readState(const std::string& key) {
         client->delete_tensor(key);
     }
 
-    /* Broadcast rank 0 global state array to all processes
-        void MPI::Comm::Bcast(void* buffer, 
-                              int count,
-	                          const MPI::Datatype& datatype, 
-                              int root) const = 0 */
+    /// Broadcast rank 0 global state array to all processes
+    ///  void MPI::Comm::Bcast(void* buffer, 
+    ///                        int count,
+    ///                        const MPI::Datatype& datatype, 
+    ///                        int root) const = 0
     MPI_Bcast(state_global.data(), state_global_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    if (mpi_rank == 0) {
+    if (my_rank == 0) {
         std::cout << "State read (and deleted)" << std::endl;
     }
 }
+*/
 
 /// Read action from database -> updates variable 'action_global'
 void SmartRedisManager::readAction(const std::string& key) {
-    if (mpi_rank == 0) {std::cout << "Reading action..." << std::endl;};
-    if (mpi_rank == 0) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {std::cout << "Reading action..." << std::endl;};
+    if (my_rank == 0) {
         /* bool Client::poll_tensor(const std::string& name, 
                                     int poll_frequency_ms, 
                                     int num_tries) */
@@ -286,13 +321,15 @@ void SmartRedisManager::readAction(const std::string& key) {
                               int root) const = 0 */
     MPI_Bcast(action_global.data(), action_global_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    if (mpi_rank == 0) {
+    if (my_rank == 0) {
         std::cout << "Action read (and deleted)" << std::endl;
     }
 }
 
 void SmartRedisManager::writeReward(const double reward, const std::string& key) {
-    if (mpi_rank == 0) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
         std::vector<double> reward_tensor = {reward};
         client->put_tensor(key, reward_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
     }
@@ -300,15 +337,19 @@ void SmartRedisManager::writeReward(const double reward, const std::string& key)
 
 // Indicate environment time step status -> 1: init time step. 2: mid time step. 0: end time step  
 void SmartRedisManager::writeStepType(const int step_type, const std::string& key) {
-    if (mpi_rank == 0) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
         std::vector<int64_t> step_type_tensor = {step_type};
         client->put_tensor(key, step_type_tensor.data(), {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
-        std::cout << "Written tensor '" << key << "': " <<  step_type_tensor[0] << std::endl;
+        std::cout << "[writeStepType] Written tensor '" << key << "': " <<  step_type_tensor[0] << std::endl;
     }
 }
 
 void SmartRedisManager::writeTime(const double time, const std::string& key) {
-    if (mpi_rank == 0) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
         std::vector<double> time_tensor = {time};
         client->put_tensor(key, time_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
     }
@@ -321,6 +362,20 @@ std::vector<double> SmartRedisManager::getStateGlobal(){
 
 std::vector<double> SmartRedisManager::getActionGlobal(){
     return action_global;
+}
+
+/// TODO: remove method
+void SmartRedisManager::coutStateLocalSize(){
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    std::cout << "[coutStateLocalSize] Rank " << my_rank << " has state local size: " << state_local_size << std::endl;
+}
+
+/// TODO: remove method
+void SmartRedisManager::coutStateGlobalSize(){
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    std::cout << "[coutStateGlobalSize] Rank " << my_rank << " has state global size: " << state_global_size << std::endl;
 }
 
 /// Check I: test SmartRedis, RedisAI and Redis installation and compilation
@@ -342,7 +397,9 @@ void testSmartRedisClient() {
 
 /// Check II: Print database contents
 void SmartRedisManager::printDatabaseContent() {
-    if (mpi_rank==0){
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank==0){
         try{
             std::vector<std::string> tensor_keys = {"state_size", "action_size", "state_key", "action_key",
                                                     "reward_key", "step_type_key", "time_key"};
