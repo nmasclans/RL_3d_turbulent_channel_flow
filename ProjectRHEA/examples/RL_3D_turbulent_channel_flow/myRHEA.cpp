@@ -424,6 +424,12 @@ void myRHEA::calculateSourceTerms() {
                     /// Get state data: u-velocity
                     state_local[state_local_size2_counter] = u_field[I1D(i_index,j_index,k_index)];
                     state_local_size2_counter += 1;
+                    /// Logging
+                    cout << "Rank " << my_rank << " has witness point #" << twp << " at coord: [" 
+                         << x_field[I1D(i_index,j_index,k_index)] << ", " 
+                         << y_field[I1D(i_index,j_index,k_index)] << ", " 
+                         << z_field[I1D(i_index,j_index,k_index)] << "], "
+                         << "and u_field value: " << u_field[I1D(i_index,j_index,k_index)] << endl;
                 }
             }
             

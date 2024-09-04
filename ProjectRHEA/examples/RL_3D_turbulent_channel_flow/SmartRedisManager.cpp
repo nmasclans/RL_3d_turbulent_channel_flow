@@ -334,6 +334,7 @@ void SmartRedisManager::writeReward(const double reward, const std::string& key)
     if (my_rank == 0) {
         std::vector<double> reward_tensor = {reward};
         client->put_tensor(key, reward_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
+        std::cout << "[writeReward] Written reward '" << key << "': " << reward_tensor[0] << std::endl;
     }
 }
 
