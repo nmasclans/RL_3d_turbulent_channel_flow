@@ -14,7 +14,7 @@ from smartsim.settings import MpirunSettings, RunSettings
 from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.init_smartsim import write_hosts
-from smartrhea.utils import n_witness_points, n_cubes, numpy_str, bcolors
+from smartrhea.utils import n_witness_points, n_cubes, get_witness_xyz, numpy_str, bcolors
 
 logger = get_logger(__name__)
 
@@ -40,7 +40,6 @@ class RheaEnv(py_environment.PyEnvironment):
     - rl_n_envs: number of rl environments inside a cfd simulation
     - control_cubes_file: actuators cubes file
     - witness_file: witness points file
-    - witness_xyz: number of witness points in the (x, y, x) directions
     - rl_neighbors: number of witness blocks selected to compose the state
     - model_dtype: data type for the model
     - rhea_dtype: data type for arrays to be sent to RHEA (actions)
@@ -85,7 +84,6 @@ class RheaEnv(py_environment.PyEnvironment):
         rl_n_envs = 5,
         control_cubes_file = "cubeControl.txt",
         witness_file = "witness.txt",
-        witness_xyz = (6, 4, 10),
         rl_neighbors = 1,
         model_dtype = np.float32,
         rhea_dtype = np.float64,
@@ -131,7 +129,6 @@ class RheaEnv(py_environment.PyEnvironment):
         self.rl_n_envs = rl_n_envs
         self.control_cubes_file = control_cubes_file
         self.witness_file = witness_file
-        self.witness_xyz = witness_xyz
         self.rl_neighbors = rl_neighbors
         self.model_dtype = model_dtype
         self.rhea_dtype = rhea_dtype
@@ -146,13 +143,14 @@ class RheaEnv(py_environment.PyEnvironment):
         # calculated parameters
         self.n_envs = cfd_n_envs * rl_n_envs
         self.dump_data_path = os.path.join(self.cwd, "train") if mode == "collect" else os.path.join(self.cwd, "eval")
+        self.witness_xyz = get_witness_xyz(self.witness_file)
         
         # preliminary checks
         if (2 * rl_neighbors + 1 > rl_n_envs):
             raise ValueError(f"Number of witness blocks selected to compose the state exceed the number total witness blocks:\n \
                 Witness blocks selected: {2 * rl_neighbors + 1}\n \
                 Total witness blocks: {rl_n_envs}\n")
-
+        
         # manage directories
         if self.mode == "eval" and os.path.exists(self.dump_data_path):
             counter = 0
@@ -204,7 +202,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self._step_type = - np.ones(self.cfd_n_envs, dtype=int) # init status in -1
 
         # create and allocate array objects
-        self.n_state = n_witness_points(os.path.join(self.cwd, self.witness_file))
+        self.n_state = n_witness_points(os.path.join(self.cwd, self.witness_file))    
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
         if self.rl_n_envs > 1:
             self.n_action = 1
@@ -216,10 +214,13 @@ class RheaEnv(py_environment.PyEnvironment):
         self._state = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
         self._state_rl = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
         self._action = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
-        self._action_znmf = np.zeros((self.cfd_n_envs, 2 * self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)  # TODO: what is this?
+        self._action_znmf = np.zeros((self.cfd_n_envs, 2 * self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
         self._local_reward = np.zeros((self.cfd_n_envs, self.rl_n_envs))
         self._reward = np.zeros(self.n_envs)
         self._episode_global_step= -1
+        logger.debug(f"n_state: {self.n_state}, n_state_rl: {self.n_state_rl}, rl_n_envs: {rl_n_envs}, n_action: {self.n_action}")
+        logger.debug(f"Shape of _state: {self._state.shape}, _state_rl: {self._state_rl.shape}, _action: {self._action.shape}, _action_znmf: {self._action_znmf.shape}, " +
+                     f"_local_reward: {self._local_reward.shape}, _reward: {self._reward.shape}")
 
         # define initial state and action array properties. Omit batch dimension (shape is per (rl) environment)
         self._observation_spec = array_spec.ArraySpec(shape=(self.n_state_rl,), dtype=self.model_dtype, name="observation")
@@ -409,7 +410,7 @@ class RheaEnv(py_environment.PyEnvironment):
                     # self._state shape: [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
                     self._state[i, :] = self.client.get_tensor(self.state_key[i])
                     self.client.delete_tensor(self.state_key[i])
-                    logger.debug(f"[Env {i}] has state[:5]: {numpy_str(self._state[i, :5])}")
+                    logger.debug(f"[Env {i}] has state: {numpy_str(self._state[i,:])}")
                 except Exception as exc:
                     raise Warning(f"Could not read state from key: {self.state_key[i]}") from exc
 
@@ -418,17 +419,24 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         Redistribute state across RL pseudo-environments.
         Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z.
-        # TODO: make sure of this, check!
+        -> check done in rhea_env.__init__ -> utils.get_witness_xyz -> utils.check_witness_xyz
+
+        Additional info:
+        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
+                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
+        self._state shape:    [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
+        state_extended shape: [self.cfd_n_nevs, self.n_state * 3]
         """
-        # concatenate self._state array 3 times along columns, where
-        #   self._state shape:    [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
-        #   state_extended shape: [self.cfd_n_nevs, self.n_state * 3]
+        # concatenate self._state array 3 times along columns
         state_extended = np.concatenate((self._state, self._state, self._state), axis=1)
         plane_wit = self.witness_xyz[0] * self.witness_xyz[1]
         block_wit = int(plane_wit * (self.witness_xyz[2] / self.rl_n_envs))     # TODO: rl_n_envs distributed along 3rd coordinate, x or z? why [2] used, i though you have to distribute them along x!
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 # TODO: check & understand!
+                print("shape _state_rl:", self._state_rl.shape)
+                print("shape state_extended:", state_extended.shape)
+                print("shape selected state_extended:", state_extended[i, block_wit * (j - self.rl_neighbors) + self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state].shape)
                 self._state_rl[i * self.rl_n_envs + j,:] = state_extended[i, block_wit * (j - self.rl_neighbors) + \
                     self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state]
 

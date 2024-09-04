@@ -34,8 +34,49 @@ def n_cubes(fname):
     """
     with open(fname, "r") as file:
         n_cubes_ = int(file.readline().strip())
-    logger.debug(f"Number of rectangles: {n_cubes_}")
+    logger.debug(f"Number of cubes: {n_cubes_}")
     return n_cubes_
+
+
+def check_witness_xyz(fname):
+    """
+    Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z.
+    Arguments:
+        fname (str): witness points filename
+    """
+    witness_points = np.loadtxt(fname)
+    # Check if x changes first, then y, then z
+    prev_point = witness_points[0]
+    for point in witness_points[1:]:
+        logger.debug(f"prev_point: {prev_point}, point: {point}")
+        # Ensure x changes first (y,z fixed)
+        if point[2] == prev_point[2] and point[1] == prev_point[1]:
+            assert point[0] >= prev_point[0], "Error: x should increase first, then y, then z"
+        # If x is reset (with different combination (y,z)), y should change next (z fixed)
+        elif point[2] == prev_point[2]:
+            assert point[1] >= prev_point[1], "Error: y should increase after x, then z"
+        # If both x and y are reset, z should change last
+        else:
+            assert point[2] >= prev_point[2], "Error: z should increase after x and y."
+        # Update previous point
+        prev_point = point
+    logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is x, then y, and last z.")
+
+
+def get_witness_xyz(fname):
+    """
+    Gets the number of witness points in the (x, y, x) directions
+    Arguments:
+        fname (str): witness points filename
+    """
+    check_witness_xyz(fname)
+    witness_points = np.loadtxt(fname)
+    unique_x = np.unique(witness_points[:,0])
+    unique_y = np.unique(witness_points[:,1])
+    unique_z = np.unique(witness_points[:,2])
+    witness_xyz = [len(unique_x), len(unique_y), len(unique_z)]
+    logger.debug(f"Number of witness points in the (x, y, z) directions: {witness_xyz}")
+    return witness_xyz
 
 
 def print_params(params, title=None):
