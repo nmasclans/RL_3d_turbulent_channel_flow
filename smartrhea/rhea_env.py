@@ -143,7 +143,6 @@ class RheaEnv(py_environment.PyEnvironment):
         # calculated parameters
         self.n_envs = cfd_n_envs * rl_n_envs
         self.dump_data_path = os.path.join(self.cwd, "train") if mode == "collect" else os.path.join(self.cwd, "eval")
-        self.witness_xyz = get_witness_xyz(self.witness_file)
         
         # preliminary checks
         if (2 * rl_neighbors + 1 > rl_n_envs):
@@ -197,13 +196,13 @@ class RheaEnv(py_environment.PyEnvironment):
         self._episode_ended = False
         self.envs_initialised = False
 
-        # arrays with known shapes
-        self._time = np.zeros(self.cfd_n_envs, dtype=self.model_dtype)
-        self._step_type = - np.ones(self.cfd_n_envs, dtype=int) # init status in -1
-
-        # create and allocate array objects
-        self.n_state = n_witness_points(os.path.join(self.cwd, self.witness_file))    
+        # witness points information (to obtain dimensions of state arrays)
+        self.witness_xyz = get_witness_xyz(self.witness_file)
+        num_witness_points = n_witness_points(self.witness_file)
+        assert np.prod(self.witness_xyz) == num_witness_points
+        self.n_state = num_witness_points
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
+        assert self.n_state % self.rl_n_envs == 0, f"ERROR: number of witness points ({self.n_state}) must be multiple of number of rl environments ({self.rl_n_envs}), so that each environment has the same number of witness points"
         if self.rl_n_envs > 1:
             self.n_action = 1
             num_cubes = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
@@ -211,12 +210,16 @@ class RheaEnv(py_environment.PyEnvironment):
             # TODO: this assert is not done in SOD2D (where marl_n_envs=3 != n_control_rectangles=6), but consider doing assert of n_control_rectangles == rl_n_envs
         else:   # self.rl_n_envs == 1:
             self.n_action = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
+
+        # create and allocate array objects
         self._state = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
         self._state_rl = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
         self._action = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
         self._action_znmf = np.zeros((self.cfd_n_envs, 2 * self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
         self._local_reward = np.zeros((self.cfd_n_envs, self.rl_n_envs))
         self._reward = np.zeros(self.n_envs)
+        self._time = np.zeros(self.cfd_n_envs, dtype=self.model_dtype)
+        self._step_type = - np.ones(self.cfd_n_envs, dtype=int) # init status in -1
         self._episode_global_step= -1
         logger.debug(f"n_state: {self.n_state}, n_state_rl: {self.n_state_rl}, rl_n_envs: {rl_n_envs}, n_action: {self.n_action}")
         logger.debug(f"Shape of _state: {self._state.shape}, _state_rl: {self._state_rl.shape}, _action: {self._action.shape}, _action_znmf: {self._action_znmf.shape}, " +
@@ -418,27 +421,34 @@ class RheaEnv(py_environment.PyEnvironment):
     def _redistribute_state(self):
         """
         Redistribute state across RL pseudo-environments.
-        Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z.
+        Make sure the witness points are written in such that the first moving coordinate is z, then y, and last x.
+        TODO: in SmartSOD2d they had: Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z. I thing i want it different than SOD2d,
+              because i want my actuators to be distributed first along x-directions, then y, then z -> witness points first along z, then y, then x 
         -> check done in rhea_env.__init__ -> utils.get_witness_xyz -> utils.check_witness_xyz
 
         Additional info:
+        state_extended array is used for accessing neighbouring blocks of witness points; each rl env has self.rl_neighbors neighboring envs 
         self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
                                                                     self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
         self._state shape:    [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
         state_extended shape: [self.cfd_n_nevs, self.n_state * 3]
         """
-        # concatenate self._state array 3 times along columns
+        logger.debug("Distributing state along rl environments...")
+        # concatenate self._state array 3 times along columns, used for building self._state_rl which include the state of neighbouring rl environments
         state_extended = np.concatenate((self._state, self._state, self._state), axis=1)
-        plane_wit = self.witness_xyz[0] * self.witness_xyz[1]
-        block_wit = int(plane_wit * (self.witness_xyz[2] / self.rl_n_envs))     # TODO: rl_n_envs distributed along 3rd coordinate, x or z? why [2] used, i though you have to distribute them along x!
+        plane_wit = self.witness_xyz[0] * self.witness_xyz[1]                   # num. witness points in x-y plane
+        block_wit = int(plane_wit * (self.witness_xyz[2] / self.rl_n_envs))     # TODO: rl_n_envs distributed along 3rd coordinate z, shouldn't it be x?
+        assert self.witness_xyz[2] % self.rl_n_envs == 0, f"Number of witness points in the z-direction is not multiple to the number of rl environments, with self.witness_xyz[2] = {self.witness_xyz[2]} and self.rl_n_envs = {self.rl_n_envs}"
+        logger.debug(f"number of witness points in x-y plane: {plane_wit}")
+        logger.debug(f"number of witness points in x-y-z block along z-direction: {block_wit}")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
-                # TODO: check & understand!
-                print("shape _state_rl:", self._state_rl.shape)
-                print("shape state_extended:", state_extended.shape)
-                print("shape selected state_extended:", state_extended[i, block_wit * (j - self.rl_neighbors) + self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state].shape)
                 self._state_rl[i * self.rl_n_envs + j,:] = state_extended[i, block_wit * (j - self.rl_neighbors) + \
                     self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state]
+                logger.debug(f"rl_n_envs: {j}")
+                logger.debug(f"Shape of selected state values: {self._state_rl[i * self.rl_n_envs + j,:].shape}")
+                logger.debug(f"Selected values: {self._state_rl[i * self.rl_n_envs + j,:]}")
+        # -> _redistribute_state has been CHECKED, the state information is distributed successfully along rl env., including the neighboring rl env.  
 
 
     def _get_reward(self):

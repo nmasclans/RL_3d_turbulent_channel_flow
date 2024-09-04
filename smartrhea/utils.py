@@ -40,27 +40,40 @@ def n_cubes(fname):
 
 def check_witness_xyz(fname):
     """
-    Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z.
+    Make sure the witness points are written in such that the first moving coordinate is z, then y, and last x.
     Arguments:
         fname (str): witness points filename
     """
     witness_points = np.loadtxt(fname)
-    # Check if x changes first, then y, then z
     prev_point = witness_points[0]
+    # ### Check if x changes first, then y, then z
+    # for point in witness_points[1:]:
+    #     # Ensure x changes first (y,z fixed)
+    #     if point[2] == prev_point[2] and point[1] == prev_point[1]:
+    #         assert point[0] >= prev_point[0], "Error: x should increase first, then y, then z"
+    #     # If x is reset (with different combination (y,z)), y should change next (z fixed)
+    #     elif point[2] == prev_point[2]:
+    #         assert point[1] >= prev_point[1], "Error: y should increase after x, then z"
+    #     # If both x and y are reset, z should change last
+    #     else:
+    #         assert point[2] >= prev_point[2], "Error: z should increase after x and y."
+    #     # Update previous point
+    #     prev_point = point
+    # logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is x, then y, and last z.")
+    ### Check if z changes first, then y, then x
     for point in witness_points[1:]:
-        logger.debug(f"prev_point: {prev_point}, point: {point}")
-        # Ensure x changes first (y,z fixed)
-        if point[2] == prev_point[2] and point[1] == prev_point[1]:
-            assert point[0] >= prev_point[0], "Error: x should increase first, then y, then z"
-        # If x is reset (with different combination (y,z)), y should change next (z fixed)
-        elif point[2] == prev_point[2]:
-            assert point[1] >= prev_point[1], "Error: y should increase after x, then z"
-        # If both x and y are reset, z should change last
+        # Ensure z changes first (x,y fixed)
+        if point[0] == prev_point[0] and point[1] == prev_point[1]:
+            assert point[2] >= prev_point[2], "Error: z should increase first, then y, then x"
+        # If z is reset (with different combination (x,y)), y should change next (x fixed)
+        elif point[0] == prev_point[0]:
+            assert point[1] >= prev_point[1], "Error: y should increase after z, then x"
+        # If both y and z are reset, x should change last
         else:
-            assert point[2] >= prev_point[2], "Error: z should increase after x and y."
+            assert point[0] >= prev_point[0], "Error: x should increase after y and z."
         # Update previous point
         prev_point = point
-    logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is x, then y, and last z.")
+    logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is z, then y, and last x.")
 
 
 def get_witness_xyz(fname):
