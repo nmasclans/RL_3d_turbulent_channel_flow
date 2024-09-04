@@ -112,7 +112,10 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     }
 
     // Debugging
-    if (my_rank==0){std::cout << "SmartRedis manager constructed" << std::endl;};
+    std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has action global size: " << action_global_size << std::endl;
+    std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has state global size: " << state_global_size << std::endl;
+    std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has state local size: " << state_local_size << std::endl;
+    if (my_rank==0){std::cout << "[SmartRedisManager::SmartRedisManager] SmartRedis manager constructed" << std::endl;};
     MPI_Barrier(MPI_COMM_WORLD);
 
 }
@@ -258,7 +261,6 @@ void SmartRedisManager::readState(const std::string& key) {
 void SmartRedisManager::readAction(const std::string& key) {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    if (my_rank == 0) {std::cout << "Reading action..." << std::endl;};
     if (my_rank == 0) {
         /* bool Client::poll_tensor(const std::string& name, 
                                     int poll_frequency_ms, 
