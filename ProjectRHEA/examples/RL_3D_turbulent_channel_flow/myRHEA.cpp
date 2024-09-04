@@ -109,15 +109,15 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     /// Construct SmartRedis client to communicate with Redis database
     /// TODO: replace example arguments for actual arg
     /// TODO: include SmartRedisManager input arguments into the configuration_file as case parameters
-    int state_local_size = 10; // Example value, replace with actual
-    int action_global_size = 25; // Example value, replace with actual
+    int state_local_size2 = 10; // Example value, replace with actual
+    int action_global_size2 = 25; // Example value, replace with actual
     int n_pseudo_envs = 10; // Example value, replace with actual
     std::string tag = "client_name"; // Example value, replace with actual
     bool db_clustered = false; // if true, execution ERROR: Unable to connect to backend database: ERR This instance has cluster support disabled
-    SmartRedisManager manager(state_local_size, action_global_size, n_pseudo_envs, tag, db_clustered);
+    SmartRedisManager manager(state_local_size2, action_global_size2, n_pseudo_envs, tag, db_clustered);
 
     // write and read local states, and compare to original local states
-    vector<double> original_state_local(state_local_size,0.0);
+    vector<double> original_state_local(state_local_size2,0.0);
     // Fill the vector with sequential values starting from 0.0
     std::iota(original_state_local.begin(), original_state_local.end(), 0.0);   // 0.0, 1.0, 2.0, etc
     // Sum 50.0 * my_rank to all elements
@@ -204,7 +204,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Witness points
     readWitnessPoints(); 
-    preproceWitnessPoints();        // updates attribute 'state_local_size'
+    preproceWitnessPoints();        // updates attribute 'state_local_size2'
 
     /// Control cubic regions
     readControlCubes();
@@ -221,19 +221,32 @@ void myRHEA::initSmartRedis() {
     open(unit=443,file="./output_"//trim(adjustl(this%tag))//"/"//"control_action.txt",status='replace')
     open(unit=445,file="./output_"//trim(adjustl(this%tag))//"/"//"control_reward.txt",status='replace')
     */  
-    SmartRedisManager manager(state_local_size, action_global_size, n_rl_envs, tag, db_clustered);
-    manager.writeStepType(1, "ensemble_" + tag + ".step_type");
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+    /// Create new smart redis manager
+    manager = new SmartRedisManager(state_local_size2, action_global_size2, n_rl_envs, tag, db_clustered);
+
+    /// Write step type = 1
+    manager->writeStepType(1, "ensemble_" + tag + ".step_type");
 
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
     ///             Actions is a global array living in all processes.
-    action_global.resize(action_global_size);
-    action_global_previous.resize(action_global_size);
-    state_local.resize(state_local_size);
+    action_global.resize(action_global_size2);
+    action_global_previous.resize(action_global_size2);
+    state_local.resize(state_local_size2);
     std::fill(action_global.begin(), action_global.end(), 0.0);
     std::fill(action_global_previous.begin(), action_global_previous.end(), 0.0);
     std::fill(state_local.begin(), state_local.end(), 0.0);
     reward = 0.0;
+
+    /// Logging
+    if (my_rank == 0) {
+        cout << "[initSmartRedis] Rank " << my_rank << " has action global size: " << action_global_size2 << endl;
+        cout << "[initSmartRedis] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
+    }
+
 };
 
 
@@ -397,10 +410,10 @@ void myRHEA::calculateSourceTerms() {
             previous_actuation_time = current_time;      // TODO: SmartSOD2D use instead "this%previousActuationTime = this%previousActuationTime + this%periodActuation"
 
             // Update & Write state (from environment to RL) 
-            if (my_rank == 0) {cout << "Updating local state..." << endl;};
+            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Updating local state..." << endl;};
             int i_index, j_index, k_index;
-            int state_local_size_counter = 0;
-            state_local.resize(state_local_size);
+            int state_local_size2_counter = 0;
+            state_local.resize(state_local_size2);
             for(int twp = 0; twp < num_witness_probes; ++twp) {
                 /// Owner rank writes to file
                 if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
@@ -409,31 +422,40 @@ void myRHEA::calculateSourceTerms() {
                     j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
                     k_index = temporal_witness_probes[twp].getLocalIndexK();
                     /// Get state data: u-velocity
-                    state_local[state_local_size_counter] = u_field[I1D(i_index,j_index,k_index)];
-                    state_local_size_counter += 1;
+                    state_local[state_local_size2_counter] = u_field[I1D(i_index,j_index,k_index)];
+                    state_local_size2_counter += 1;
                 }
             }
-            if (my_rank == 0) {cout << "Calling manager to write state..." << endl;};
-            manager.writeState(state_local, state_key);
+            
+            /// Logging
+            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
+            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has state local: ";
+            for (int ii = 0; ii<state_local_size2; ii++) {  
+                cout << state_local[ii] << " ";
+            }
+            cout << endl << flush;
+
+            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write state..." << endl;};
+            manager->writeState(state_local, state_key);
 
             /// TODO: Update and write reward
-            if (my_rank == 0) {cout << "Calling manager to write reward..." << endl;};
+            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write reward..." << endl;};
             reward = 0.0; /// TODO: update reward, choose which reward to use!
-            manager.writeReward(reward, reward_key);
+            manager->writeReward(reward, reward_key);
 
             // Read action value (from RL to environment) 
-            if (my_rank == 0) {cout << "Calling manager to read action..." << endl;};
-            manager.readAction(action_key);
-            action_global = manager.getActionGlobal();
+            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to read action..." << endl;};
+            manager->readAction(action_key);
+            action_global = manager->getActionGlobal();
 
             /// Update time
-            if (my_rank == 0) {cout << "Calling manager to write time..." << endl;};
-            manager.writeTime(current_time, time_key);
+            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write time..." << endl;};
+            manager->writeTime(current_time, time_key);
 
             /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
             if (current_time + 2.0 * actuation_period > final_time) {
-                if (my_rank == 0) {cout << "Calling manager to write step type..." << endl;};
-                manager.writeStepType(0, step_type_key);
+                if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write step type..." << endl;};
+                manager->writeStepType(0, step_type_key);
             }
         }
 
@@ -1056,11 +1078,11 @@ void myRHEA::preproceWitnessPoints() {
     }
 
     /// Calculate state local size (num witness probes of my_rank) and debugging logs
-    int state_local_size_counter = 0;
+    int state_local_size2_counter = 0;
     for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Owner rank writes to file
         if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
-            state_local_size_counter += 1;
+            state_local_size2_counter += 1;
             int i_index, j_index, k_index;
             /// Get local indices i, j, k
 		    i_index = temporal_witness_probes[twp].getLocalIndexI(); 
@@ -1073,8 +1095,8 @@ void myRHEA::preproceWitnessPoints() {
                  << z_field[I1D(i_index,j_index,k_index)] << endl;
         }
     }
-    this->state_local_size = state_local_size_counter;  // each mpi process updates attribute 'state_local_size'
-    cout << "mpi rank " << my_rank << " has " << state_local_size << " local witness points" << endl;
+    this->state_local_size2 = state_local_size2_counter;  // each mpi process updates attribute 'state_local_size2'
+    cout << "mpi rank " << my_rank << " has " << state_local_size2 << " local witness points" << endl;
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, delete if wanted
 
@@ -1165,7 +1187,7 @@ void myRHEA::readControlCubes(){
 
 /*  Locate grid points within mesh partition which are located inside each cube defined by 4 vertices of 3 coordinates
     Updates 'action_mask' field: 0.0 for no action, 1.0 for 1st control cube, etc.
-    Updates 'num_control_points' and 'action_global_size'
+    Updates 'num_control_points' and 'action_global_size2'
     Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
 */
 void myRHEA::getControlCubes() {
@@ -1181,7 +1203,7 @@ void myRHEA::getControlCubes() {
     int num_control_points_local, num_control_points_per_cube_global, num_control_points_per_cube_local;
     
     /// Set counters to 0
-    action_global_size = 0;                 // global attribute
+    action_global_size2 = 0;                 // global attribute
     num_control_points = 0;                 // global attribute
     num_control_points_local = 0;           // local var
     num_control_points_per_cube_global = 0; // global var
@@ -1253,7 +1275,7 @@ void myRHEA::getControlCubes() {
             cerr << "Not found control points for cube #" << icube << endl;
             return;
         } else {
-            action_global_size++;
+            action_global_size2++;
         }
         /// Logging
         if (my_rank == 0) {
@@ -1267,7 +1289,7 @@ void myRHEA::getControlCubes() {
     /// Logging
     if (my_rank == 0) {
         cout << "Total number of control points: " << num_control_points << endl;
-        cout << "Action global size (num. cubes with at least 1 control point): " << action_global_size << endl;
+        cout << "Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
     }
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);

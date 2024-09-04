@@ -65,7 +65,7 @@ class myRHEA : public FlowSolverRHEA {
         int num_control_points;
 
         /// SmartRedis
-        SmartRedisManager manager;              /// TODO: should these vars be 'protected' or 'private'?
+        SmartRedisManager *manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
         std::string time_key;
         std::string step_type_key;
@@ -78,8 +78,8 @@ class myRHEA : public FlowSolverRHEA {
         double reward;
         bool db_clustered;
         int n_rl_envs;
-        int state_local_size;                   /// or nwitPar
-        int action_global_size;                 /// or nRectangleControl
+        int state_local_size2;                   /// or nwitPar
+        int action_global_size2;                 /// or nRectangleControl
         std::vector<double> action_global;
         std::vector<double> action_global_previous;
         std::vector<double> state_local;
