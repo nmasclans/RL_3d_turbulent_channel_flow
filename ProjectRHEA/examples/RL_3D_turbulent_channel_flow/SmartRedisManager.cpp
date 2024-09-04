@@ -364,20 +364,6 @@ std::vector<double> SmartRedisManager::getActionGlobal(){
     return action_global;
 }
 
-/// TODO: remove method
-void SmartRedisManager::coutStateLocalSize(){
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    std::cout << "[coutStateLocalSize] Rank " << my_rank << " has state local size: " << state_local_size << std::endl;
-}
-
-/// TODO: remove method
-void SmartRedisManager::coutStateGlobalSize(){
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    std::cout << "[coutStateGlobalSize] Rank " << my_rank << " has state global size: " << state_global_size << std::endl;
-}
-
 /// Check I: test SmartRedis, RedisAI and Redis installation and compilation
 void testSmartRedisClient() {
     std::cout << "Testing SmartRedis..." << std::endl;

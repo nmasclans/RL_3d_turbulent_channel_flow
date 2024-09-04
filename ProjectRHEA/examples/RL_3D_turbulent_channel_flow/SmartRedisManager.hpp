@@ -26,8 +26,6 @@ public:
 
     std::vector<double> getStateGlobal();
     std::vector<double> getActionGlobal();
-    void coutStateLocalSize();
-    void coutStateGlobalSize();
 
     void printDatabaseContent();
 
