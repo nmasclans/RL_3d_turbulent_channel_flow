@@ -22,8 +22,10 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     state_local_size   = state_local_size2;
     action_global_size = action_global_size2;
     state_global_size  = 0; // further modified in constructor 
-    state_local_size_vec   = {static_cast<size_t>(state_local_size2)};
+    reward_global_size = n_pseudo_envs2;
+    state_local_size_vec   = {static_cast<size_t>(state_local_size2)}; // TODO: not used?, delete?
     action_global_size_vec = {static_cast<size_t>(action_global_size2)};
+    reward_global_size_vec = {static_cast<size_t>(reward_global_size)};
     if (my_rank == 0) {std::cout << "mpi size: " << mpi_size
                                  << ", n_pseudo_envs: " << n_pseudo_envs 
                                  << ", state_local_size: " << state_local_size
@@ -37,6 +39,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         state_sizes.resize(mpi_size);                           // vector<int>
         state_displs.resize(mpi_size);                          // vector<int>
         action_global.resize(action_global_size, 0.0);          // vector<double>
+        reward_global.resize(reward_global_size, 0.0);
     } catch (const std::length_error& e) {
         std::cerr << "Length error: " << e.what() << ", with mpi_size: " << mpi_size << ", action_global_size: " << action_global_size << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -103,8 +106,8 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
             int64_t temp_action_global_size = static_cast<int64_t>(action_global_size);
             client->put_tensor("state_size",  &temp_state_global_size,  {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
             client->put_tensor("action_size", &temp_action_global_size, {1}, SRTensorType::SRTensorTypeInt64, SRMemoryLayout::SRMemLayoutContiguous);
-            std::cout << "Written tensor 'state_size': "  << temp_state_global_size  << ", address: " << &temp_state_global_size  << std::endl;
-            std::cout << "Written tensor 'action_size': " << temp_action_global_size << ", address: " << &temp_action_global_size << std::endl;
+            std::cout << "[SmartRedisManager::SmartRedisManager] Written tensor 'state_size': "  << temp_state_global_size  << std::endl;
+            std::cout << "[SmartRedisManager::SmartRedisManager] Written tensor 'action_size': " << temp_action_global_size << std::endl;
         } catch (const SmartRedis::Exception& ex) {
             std::cerr << "Error putting tensor: " << ex.what() << std::endl; 
             return;
@@ -143,29 +146,12 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
     try {
-        std::cout << "[writeState] Rank " << my_rank << " resizing state_global with size " << state_global_size << std::endl;
         state_global.resize(state_global_size);
     } catch (const std::length_error& e) {
         std::cerr << "[writeState] Length error: " << e.what() << ", with state_global_size: " << state_global_size << std::endl;
         return; 
     }
 
-    // Checks
-    if (my_rank == 0) {
-        std::cout << "[writeState] State sizes: ";
-        for (int i = 0; i < mpi_size; ++i) {
-            std::cout << state_sizes[i] << " ";
-        }
-        std::cout << std::endl;
-
-        std::cout << "[writeState] State displacements: ";
-        for (int i = 0; i < mpi_size; ++i) {
-            std::cout << state_displs[i] << " ";
-        }
-        std::cout << std::endl;
-    }
-    
-    if (my_rank == 0) {std::cout << "[writeState] Gathering local state data..." << std::endl;};
     MPI_Gatherv(state_local.data(), state_local_size, MPI_DOUBLE, 
                 state_global.data(), state_sizes.data(), state_displs.data(), 
                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -176,10 +162,27 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
                                    const std::vector<size_t>& dims,
                                    const SRTensorType type,
                                    const SRMemoryLayout mem_layout) */
-        std::cout << "[writeState] Writing state..." << std::endl;
         client->put_tensor(key, state_global.data(), state_global_size_vec, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
-        std::cout << "[writeState] State written" << std::endl;
+        std::cout << "[writeState] State written: ";
+        for (int i=0; i<state_global_size; i++)
+            std::cout << state_global[i] << " ";
+        std::cout << std::endl;
     } 
+
+    // Checks   // TODO: remove cout lines if not used in the future
+    // if (my_rank == 0) {
+    //     std::cout << "[writeState] State sizes: ";
+    //     for (int i = 0; i < mpi_size; ++i) {
+    //         std::cout << state_sizes[i] << " ";
+    //     }
+    //     std::cout << std::endl;
+
+    //     std::cout << "[writeState] State displacements: ";
+    //     for (int i = 0; i < mpi_size; ++i) {
+    //         std::cout << state_displs[i] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
 
 }
 
@@ -324,17 +327,29 @@ void SmartRedisManager::readAction(const std::string& key) {
     MPI_Bcast(action_global.data(), action_global_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     if (my_rank == 0) {
-        std::cout << "Action read (and deleted)" << std::endl;
+        std::cout << "[readAction] Action read (and deleted): ";
+        for (int i=0; i<action_global_size; i++) 
+            std::cout << action_global[i] << " ";
+        std::cout << std::endl;
     }
 }
 
-void SmartRedisManager::writeReward(const double reward, const std::string& key) {
+void SmartRedisManager::writeReward(const std::vector<double>& reward, const std::string& key) {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     if (my_rank == 0) {
-        std::vector<double> reward_tensor = {reward};
-        client->put_tensor(key, reward_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
-        std::cout << "[writeReward] Written reward '" << key << "': " << reward_tensor[0] << std::endl;
+        /// if reward is a double:
+        /// > std::vector<double> reward_tensor = {reward};
+        /// > client->put_tensor(key, reward_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
+        /// if reward is a vector<double> 
+        reward_global.resize(reward_global_size, 0.0);
+        reward_global = reward;
+        client->put_tensor(key, reward_global.data(), reward_global_size_vec, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
+        /// Logging
+        std::cout << "[writeReward] Reward written: ";
+        for (int i=0; i<reward_global_size; i++)
+            std::cout << reward_global[i] << " ";
+        std::cout << std::endl;
     }
 }
 
@@ -355,6 +370,7 @@ void SmartRedisManager::writeTime(const double time, const std::string& key) {
     if (my_rank == 0) {
         std::vector<double> time_tensor = {time};
         client->put_tensor(key, time_tensor.data(), {1}, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
+        std::cout << "[writeTime] Written time '" << key << "': " << time_tensor[0] << std::endl;
     }
 }
 

@@ -20,7 +20,7 @@ public:
     void writeState(const std::vector<double>& state_local, const std::string& key);
     void readState(const std::string& key);
     void readAction(const std::string& key);
-    void writeReward(const double reward, const std::string& key);
+    void writeReward(const std::vector<double>& reward, const std::string& key);
     void writeStepType(const int step_type, const std::string& key);
     void writeTime(const double time, const std::string& key);
 
@@ -36,12 +36,15 @@ protected:
     std::vector<int> state_displs;
     std::vector<double> state_global;
     std::vector<double> action_global;
+    std::vector<double> reward_global;
     int state_local_size;
     int state_global_size;
     int action_global_size;
+    int reward_global_size;
     std::vector<size_t> state_local_size_vec;
     std::vector<size_t> state_global_size_vec;
     std::vector<size_t> action_global_size_vec;
+    std::vector<size_t> reward_global_size_vec;
     int step_type_mod;
     int n_pseudo_envs;
     int read_interval;

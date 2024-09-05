@@ -193,7 +193,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// Additional arguments, defined here /// TODO: include this in some configuration file
-    this->n_rl_envs = 3;                            // n_pseudo_envs in sod2d
     this->witness_file = "witness.txt";
     this->control_cubes_file = "cubeControl.txt";
     this->time_key      = "ensemble_" + tag + ".time";
@@ -208,7 +207,78 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Control cubic regions
     readControlCubes();
-    getControlCubes();
+    getControlCubes();              // updates action_global_size2, n_rl_envs
+
+    /// Allocate action data
+    /// Annotation: State is stored in arrays of different sizes on each MPI rank.
+    ///             Actions is a global array living in all processes.
+    action_global.resize(action_global_size2);
+    action_global_previous.resize(action_global_size2);
+    state_local.resize(state_local_size2);
+    reward.resize(n_rl_envs);                                       /// n_rl_envs == n_pseudo_envs
+    avg_u_field_rl_envs.resize(n_rl_envs);
+    avg_u_field_rl_envs_previous.resize(n_rl_envs);
+    std::fill(action_global.begin(), action_global.end(), 0.0);
+    std::fill(action_global_previous.begin(), action_global_previous.end(), 0.0);
+    std::fill(state_local.begin(), state_local.end(), 0.0);
+    std::fill(reward.begin(), reward.end(), 0.0);
+    std::fill(avg_u_field_rl_envs.begin(), avg_u_field_rl_envs.end(), 0.0);
+    std::fill(avg_u_field_rl_envs_previous.begin(), avg_u_field_rl_envs_previous.end(), 0.0);
+    /// Define iterator 'iter_rl_envs' to move on the ComputationalDomain inside each rl environment
+    /// ALERT: the rl_envs are distributed along x-direction only
+    /* iter_rl_envs shape: [n_rl_envs, 6]
+       dim 0: identifies rl envionment
+       dim 1: identifies limits in each direction, where it is used as indices (defined in MacroParameters.h):
+            #define _INIX_ 0
+            #define _ENDX_ 1
+            #define _INIY_ 2
+            #define _ENDY_ 3
+            #define _INIZ_ 4
+            #define _ENDZ_ 5
+    */ 
+    /// Get local number of cells in each direction (including inner + outer)
+    int lNx = topo->getlNx();
+    int lNy = topo->getlNy();
+    int lNz = topo->getlNz();
+    int lNx_inner = lNx-2;      /// Number of inner cells in the x-direction 
+    int lNx_rl_envs;
+    lNx_rl_envs = int(lNx_inner / n_rl_envs); /// Number of cells in the x-direction per each rl environment, except the last env if necessary
+    /// Resize iter_rl_envs
+    iter_rl_envs.resize(n_rl_envs);
+    for (int i = 0; i<n_rl_envs; i++){iter_rl_envs[i].resize(6);};
+    /// Fill iter_rl_envs
+    for (int i = 0; i<n_rl_envs; i++) {
+        iter_rl_envs[i][_INIX_] = 1 + i * lNx_rl_envs;
+        iter_rl_envs[i][_ENDX_] = (i + 1) * lNx_rl_envs;
+        iter_rl_envs[i][_INIY_] = 1;
+        iter_rl_envs[i][_ENDY_] = lNy-2;
+        iter_rl_envs[i][_INIZ_] = 1;
+        iter_rl_envs[i][_ENDZ_] = lNz-2;
+    }
+    /// The case when RL env cannot be evently distributed (lNx_inner % n_rl_envs!= 0),
+    /// will cause some last x-coord to not be taken by any RL environment
+    /// Ensure all x-coord are taken by a RL environment, by enlarging the last environment
+    /// Note that if (lNx_inner % n_rl_envs == 0) this will not have any effect, as iter_rl_envs[-1][_ENDX_] will already have lNx-2 value
+    if (lNx_inner % n_rl_envs!= 0) {
+        cout << "Warning: lNx_inner (" << lNx_inner << ") is not evenly divisible by n_rl_envs (" << n_rl_envs << ")." << endl;
+        cout << "Warning: consequently, the last RL environment will have " << lNx_inner % n_rl_envs << " additional yz-planes" << endl;
+    }
+    iter_rl_envs[n_rl_envs-1][_ENDX_] = lNx-2;
+    /// Logging
+    cout << "[initRLParams] Rank " << my_rank << " has action global size: " << action_global_size2 << endl;
+    cout << "[initRLParams] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
+    cout << flush;
+    if (my_rank == 0) {
+        cout << "[initRLParams] ALERT: the rl_envs are distributed along x-direction only" << endl;
+        cout << "[initRLParams] Local number of cells lNx, lNy, lNz: " << lNx << ", " << lNy << ", " << lNz << endl;
+        cout << "[initRLParams] Each of the " << n_rl_envs << " RL environments has " << lNx_rl_envs << " cells in the x-direction" << endl;
+        for (int i = 0; i<n_rl_envs; i++) {
+            cout << "[initRLParams] RL env " << i << " has bounds indexes:" << endl 
+                 << "_INIX_: " << iter_rl_envs[i][_INIX_] << ", _ENDX_: " << iter_rl_envs[i][_ENDX_] << endl
+                 << "_INIY_: " << iter_rl_envs[i][_INIY_] << ", _ENDY_: " << iter_rl_envs[i][_ENDY_] << endl
+                 << "_INIZ_: " << iter_rl_envs[i][_INIZ_] << ", _ENDZ_: " << iter_rl_envs[i][_ENDZ_] << endl;
+        }
+    }
 
 };
 
@@ -230,22 +300,6 @@ void myRHEA::initSmartRedis() {
     /// Write step type = 1
     manager->writeStepType(1, "ensemble_" + tag + ".step_type");
 
-    /// Allocate action data
-    /// Annotation: State is stored in arrays of different sizes on each MPI rank.
-    ///             Actions is a global array living in all processes.
-    action_global.resize(action_global_size2);
-    action_global_previous.resize(action_global_size2);
-    state_local.resize(state_local_size2);
-    std::fill(action_global.begin(), action_global.end(), 0.0);
-    std::fill(action_global_previous.begin(), action_global_previous.end(), 0.0);
-    std::fill(state_local.begin(), state_local.end(), 0.0);
-    reward = 0.0;
-
-    /// Logging
-    if (my_rank == 0) {
-        cout << "[initSmartRedis] Rank " << my_rank << " has action global size: " << action_global_size2 << endl;
-        cout << "[initSmartRedis] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
-    }
 
 };
 
@@ -414,6 +468,7 @@ void myRHEA::calculateSourceTerms() {
             int i_index, j_index, k_index;
             int state_local_size2_counter = 0;
             state_local.resize(state_local_size2);
+            std::fill(state_local.begin(), state_local.end(), 0.0);
             for(int twp = 0; twp < num_witness_probes; ++twp) {
                 /// Owner rank writes to file
                 if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
@@ -421,15 +476,15 @@ void myRHEA::calculateSourceTerms() {
                     i_index = temporal_witness_probes[twp].getLocalIndexI(); 
                     j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
                     k_index = temporal_witness_probes[twp].getLocalIndexK();
-                    /// Get state data: u-velocity
-                    state_local[state_local_size2_counter] = u_field[I1D(i_index,j_index,k_index)];
+                    /// Get state data: averaged u-velocity
+                    state_local[state_local_size2_counter] = avg_u_field[I1D(i_index,j_index,k_index)];
                     state_local_size2_counter += 1;
-                    /// Logging
-                    cout << "Rank " << my_rank << " has witness point #" << twp << " at coord: [" 
-                         << x_field[I1D(i_index,j_index,k_index)] << ", " 
-                         << y_field[I1D(i_index,j_index,k_index)] << ", " 
-                         << z_field[I1D(i_index,j_index,k_index)] << "], "
-                         << "and u_field value: " << u_field[I1D(i_index,j_index,k_index)] << endl;
+                    /// Logging, TODO: remove logging lines if not used in the future
+                    /// cout << "Rank " << my_rank << " has witness point #" << twp << " at coord: [" 
+                    ///      << x_field[I1D(i_index,j_index,k_index)] << ", " 
+                    ///      << y_field[I1D(i_index,j_index,k_index)] << ", " 
+                    ///      << z_field[I1D(i_index,j_index,k_index)] << "], "
+                    ///      << "and u_field value: " << avg_u_field[I1D(i_index,j_index,k_index)] << endl;
                 }
             }
             
@@ -441,26 +496,14 @@ void myRHEA::calculateSourceTerms() {
             }
             cout << endl << flush;
 
-            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write state..." << endl;};
             manager->writeState(state_local, state_key);
-
-            /// TODO: Update and write reward
-            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write reward..." << endl;};
-            reward = 0.0; /// TODO: update reward, choose which reward to use!
+            calculateReward();                              /// update reward attribute
             manager->writeReward(reward, reward_key);
-
-            // Read action value (from RL to environment) 
-            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to read action..." << endl;};
             manager->readAction(action_key);
             action_global = manager->getActionGlobal();
-
-            /// Update time
-            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write time..." << endl;};
             manager->writeTime(current_time, time_key);
-
             /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
             if (current_time + 2.0 * actuation_period > final_time) {
-                if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Calling manager to write step type..." << endl;};
                 manager->writeStepType(0, step_type_key);
             }
         }
@@ -484,7 +527,7 @@ void myRHEA::calculateSourceTerms() {
                     
                     /// Get perturbation values from RL agent
                     /// TODO: implement RL action here!
-                    // TODO: readAction()
+                    // TODO: use action_global and action_mask to add the action here!
                     DeltaRkk    = 0.0;
                     DeltaThetaZ = 0.0;
                     DeltaThetaY = 0.0;
@@ -1193,7 +1236,7 @@ void myRHEA::readControlCubes(){
 
 /*  Locate grid points within mesh partition which are located inside each cube defined by 4 vertices of 3 coordinates
     Updates 'action_mask' field: 0.0 for no action, 1.0 for 1st control cube, etc.
-    Updates 'num_control_points' and 'action_global_size2'
+    Updates 'num_control_points', 'action_global_size2', 'n_rl_envs'
     Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
 */
 void myRHEA::getControlCubes() {
@@ -1288,6 +1331,7 @@ void myRHEA::getControlCubes() {
             cout << "Cube " << icube << " has " << num_control_points_per_cube_global << " control points" << endl;
         }
     }
+    this->n_rl_envs = action_global_size2;
 
     /// Calculate total num_control_points from local values
     MPI_Allreduce(&num_control_points_local, &num_control_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'num_control_points'
@@ -1296,6 +1340,7 @@ void myRHEA::getControlCubes() {
     if (my_rank == 0) {
         cout << "Total number of control points: " << num_control_points << endl;
         cout << "Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
+        cout << "Action global size corresponds to the Number of RL Environments: " << n_rl_envs << endl; 
     }
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1327,6 +1372,62 @@ void myRHEA::initializeFromRestart() {
     }
 #endif
 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Calculate reward value for each n_rl_envs,
+/// -> updates attributes: reward, avg_u_field_rl_envs, avg_u_field_rl_envs_previous (all have shape n_rl_envs)
+void myRHEA::calculateReward() {
+
+    /// Re-initialize avg_u_field_rl_envs to 0.0
+    avg_u_field_rl_envs.resize(n_rl_envs, 0.0);
+    fill(avg_u_field_rl_envs.begin(), avg_u_field_rl_envs.end(), 0.0);
+    vector<int> rl_envs_points_counter(n_rl_envs, 0.0); 
+
+    /// TODO: Calculate new avg_u_field_rl_envs, the time-averaged u-field also space-averaged at each rl environment
+    for (int env = 0; env < n_rl_envs; env++) {
+        for(int i = iter_rl_envs[env][_INIX_]; i <= iter_rl_envs[env][_ENDX_]; i++) {
+            for(int j = iter_rl_envs[env][_INIY_]; j <= iter_rl_envs[env][_ENDY_]; j++) {
+                for(int k = iter_rl_envs[env][_INIZ_]; k <= iter_rl_envs[env][_ENDZ_]; k++) {
+                    avg_u_field_rl_envs[env]    += avg_u_field[I1D(i,j,k)];
+                    rl_envs_points_counter[env] += 1;       // TODO: perhaps fill this counter just one in the initRLParams, more computationally efficient
+                }
+            }
+        }
+        avg_u_field_rl_envs[env] /= rl_envs_points_counter[env];
+    }
+    
+    /// Calculate new reward, for each rl environment
+    for (int env = 0; env < n_rl_envs; env++) {
+        reward[env] = std::abs(avg_u_field_rl_envs[env] - avg_u_field_rl_envs_previous[env]); 
+    }
+
+    /// Store avg_u_field_rl_envs for next reward calculation
+    avg_u_field_rl_envs_previous = avg_u_field_rl_envs;
+
+    /// Logging
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
+        cout << "[calculateReward] RL Environments have number of points: ";
+        for (int env = 0; env < n_rl_envs; env++)
+            cout << rl_envs_points_counter[env] << " ";
+        cout << endl;
+        cout << "[calculateReward] RL Environments have local Reward: ";
+        for (int env = 0; env < n_rl_envs; env++)
+            cout << reward[env] << " ";
+        cout << endl << flush;
+        cout << "[calculateReward] RL Environments have avg_u_field: ";
+        for (int env = 0; env < n_rl_envs; env++)
+            cout << avg_u_field_rl_envs[env] << " ";
+        cout << endl << flush;
+        cout << "[calculateReward] RL Environments have previous avg_u_field: ";
+        for (int env = 0; env < n_rl_envs; env++)
+            cout << avg_u_field_rl_envs_previous[env] << " ";
+        cout << endl << flush;
+        
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

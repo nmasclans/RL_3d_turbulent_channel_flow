@@ -459,14 +459,16 @@ class RheaEnv(py_environment.PyEnvironment):
                     self.client.poll_tensor(self.reward_key[i], self.poll_freq_ms, self.poll_n_tries)
                     reward = self.client.get_tensor(self.reward_key[i])
                     self.client.delete_tensor(self.reward_key[i])
-                    logger.debug(f"[Env {i}] Got reward: {numpy_str(reward)}")  # shape [self.rl_n_envs], rewards from all rl env for a specific cfd env
-
                     local_reward = - reward / self.reward_norm
                     self._local_reward[i, :] = local_reward
                     global_reward = np.mean(local_reward)
                     for j in range(self.rl_n_envs):
-                        # TODO: check and understand
+                        # Weighted average between local rewards (of rl env inside same cfd simulation) and global reward (of cfd simulation)
                         self._reward[i * self.rl_n_envs + j] = self.reward_beta * global_reward + (1.0 - self.reward_beta) * local_reward[j]
+                    logger.debug(f"[Env {i}] (Read) Local Reward: {reward}")  # shape [self.rl_n_envs], rewards from all rl env for a specific cfd env
+                    logger.debug(f"[Env {i}] Normalized Local Reward: {local_reward}")
+                    logger.debug(f"[Env {i}] Global Reward: {global_reward}")
+                    logger.debug(f"[Env {i}] Weighted Reward: {self._reward[i*self.rl_n_envs:i*self.rl_n_envs+self.rl_n_envs]}")                  
                 except Exception as exc:
                     raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
 

@@ -75,7 +75,6 @@ class myRHEA : public FlowSolverRHEA {
         double actuation_period;
         double begin_actuation_time;
         double previous_actuation_time;
-        double reward;
         bool db_clustered;
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
@@ -83,6 +82,10 @@ class myRHEA : public FlowSolverRHEA {
         std::vector<double> action_global;
         std::vector<double> action_global_previous;
         std::vector<double> state_local;
+        std::vector<double> reward;
+        std::vector<double> avg_u_field_rl_envs;
+        std::vector<double> avg_u_field_rl_envs_previous;
+        std::vector<std::vector<int>> iter_rl_envs;     /// iterator to move on the ComputationalDomain, shape [n_rl_envs, 6]
 
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
         void initSmartRedis();
@@ -91,6 +94,7 @@ class myRHEA : public FlowSolverRHEA {
         void readControlCubes();
         void getControlCubes();
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
+        void calculateReward();
 
     private:
 
