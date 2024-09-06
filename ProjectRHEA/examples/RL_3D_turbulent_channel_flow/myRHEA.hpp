@@ -59,6 +59,7 @@ class myRHEA : public FlowSolverRHEA {
 
         /// Cubic control regions
         DistributedArray action_mask;
+        DistributedArray action_field;
         std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
         std::string control_cubes_file; 
         int num_control_cubes;
@@ -95,6 +96,7 @@ class myRHEA : public FlowSolverRHEA {
         void getControlCubes();
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void calculateReward();
+        void distributeAction();
 
     private:
 

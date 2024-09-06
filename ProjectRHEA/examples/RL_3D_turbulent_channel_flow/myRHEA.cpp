@@ -95,46 +95,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
     action_mask.setTopology(topo, "action_mask");
+    action_field.setTopology(topo, "action");
 
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered);
     initSmartRedis();
 
-    /*
-    ////////////////////////////////////////////// Test manager //////////////////////////////////////////////
-    int mpi_size;
-    int my_rank;
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-
-    /// Construct SmartRedis client to communicate with Redis database
-    /// TODO: replace example arguments for actual arg
-    /// TODO: include SmartRedisManager input arguments into the configuration_file as case parameters
-    int state_local_size2 = 10; // Example value, replace with actual
-    int action_global_size2 = 25; // Example value, replace with actual
-    int n_pseudo_envs = 10; // Example value, replace with actual
-    std::string tag = "client_name"; // Example value, replace with actual
-    bool db_clustered = false; // if true, execution ERROR: Unable to connect to backend database: ERR This instance has cluster support disabled
-    SmartRedisManager manager(state_local_size2, action_global_size2, n_pseudo_envs, tag, db_clustered);
-
-    // write and read local states, and compare to original local states
-    vector<double> original_state_local(state_local_size2,0.0);
-    // Fill the vector with sequential values starting from 0.0
-    std::iota(original_state_local.begin(), original_state_local.end(), 0.0);   // 0.0, 1.0, 2.0, etc
-    // Sum 50.0 * my_rank to all elements
-    transform(original_state_local.begin(), original_state_local.end(), original_state_local.begin(),
-                [my_rank](double val) { return val + 50.0 * static_cast<double>(my_rank); });
-    manager.writeState(original_state_local, "state_key");
-    manager.printDatabaseContent();
-    manager.readState("state_key");
-    manager.printDatabaseContent();
-
-    double reward = 1.43; int step_type = 2; double time = 45.67;
-    manager.writeReward(reward, "reward_key");
-    manager.writeStepType(step_type, "step_type_key");
-    manager.writeTime(time, "time_key");
-    manager.printDatabaseContent();
-    manager.readAction("action_key");
-    */
 #endif
 
 };
@@ -207,7 +172,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Control cubic regions
     readControlCubes();
-    getControlCubes();              // updates action_global_size2, n_rl_envs
+    getControlCubes();              // updates 'action_global_size2', 'n_rl_envs', 'action_mask'
 
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
@@ -224,6 +189,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     std::fill(reward.begin(), reward.end(), 0.0);
     std::fill(avg_u_field_rl_envs.begin(), avg_u_field_rl_envs.end(), 0.0);
     std::fill(avg_u_field_rl_envs_previous.begin(), avg_u_field_rl_envs_previous.end(), 0.0);
+
     /// Define iterator 'iter_rl_envs' to move on the ComputationalDomain inside each rl environment
     /// ALERT: the rl_envs are distributed along x-direction only
     /* iter_rl_envs shape: [n_rl_envs, 6]
@@ -264,19 +230,26 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         cout << "Warning: consequently, the last RL environment will have " << lNx_inner % n_rl_envs << " additional yz-planes" << endl;
     }
     iter_rl_envs[n_rl_envs-1][_ENDX_] = lNx-2;
+    
     /// Logging
     cout << "[initRLParams] Rank " << my_rank << " has action global size: " << action_global_size2 << endl;
     cout << "[initRLParams] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
+    cout << "[initRLParams] Rank " << my_rank << " has local number of cells lNx, lNy, lNz: " << lNx << ", " << lNy << ", " << lNz << endl;
     cout << flush;
     if (my_rank == 0) {
         cout << "[initRLParams] ALERT: the rl_envs are distributed along x-direction only" << endl;
-        cout << "[initRLParams] Local number of cells lNx, lNy, lNz: " << lNx << ", " << lNy << ", " << lNz << endl;
         cout << "[initRLParams] Each of the " << n_rl_envs << " RL environments has " << lNx_rl_envs << " cells in the x-direction" << endl;
         for (int i = 0; i<n_rl_envs; i++) {
-            cout << "[initRLParams] RL env " << i << " has bounds indexes:" << endl 
+            cout << "[initRLParams] RL env " << i << " has bounds indices:" << endl 
                  << "_INIX_: " << iter_rl_envs[i][_INIX_] << ", _ENDX_: " << iter_rl_envs[i][_ENDX_] << endl
                  << "_INIY_: " << iter_rl_envs[i][_INIY_] << ", _ENDY_: " << iter_rl_envs[i][_ENDY_] << endl
                  << "_INIZ_: " << iter_rl_envs[i][_INIZ_] << ", _ENDZ_: " << iter_rl_envs[i][_ENDZ_] << endl;
+        }
+        for (int i = 0; i<n_rl_envs; i++) {
+            cout << "[initRLParams] RL env " << i << " has bounds coordinates:" << endl 
+                 << "x-coord init: " << x_field[I1D(iter_rl_envs[i][_INIX_],0,0)] << ", end: " << x_field[I1D(iter_rl_envs[i][_ENDX_],0,0)] << endl
+                 << "y-coord init: " << y_field[I1D(0,iter_rl_envs[i][_INIY_],0)] << ", end: " << y_field[I1D(0,iter_rl_envs[i][_ENDY_],0)] << endl
+                 << "z-coord init: " << z_field[I1D(0,0,iter_rl_envs[i][_INIZ_])] << ", end: " << z_field[I1D(0,0,iter_rl_envs[i][_ENDZ_])] << endl;
         }
     }
 
@@ -500,7 +473,8 @@ void myRHEA::calculateSourceTerms() {
             calculateReward();                              /// update reward attribute
             manager->writeReward(reward, reward_key);
             manager->readAction(action_key);
-            action_global = manager->getActionGlobal();
+            action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = n_rl_envs (currently only 1 action variable per rl env.)
+            distributeAction();
             manager->writeTime(current_time, time_key);
             /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
             if (current_time + 2.0 * actuation_period > final_time) {
@@ -526,9 +500,8 @@ void myRHEA::calculateSourceTerms() {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                     
                     /// Get perturbation values from RL agent
-                    /// TODO: implement RL action here!
-                    // TODO: use action_global and action_mask to add the action here!
-                    DeltaRkk    = 0.0;
+                    /// TODO: implement RL action for several variables!
+                    DeltaRkk    = action_field[I1D(i,j,k)];
                     DeltaThetaZ = 0.0;
                     DeltaThetaY = 0.0;
                     DeltaThetaX = 0.0;
@@ -1235,7 +1208,7 @@ void myRHEA::readControlCubes(){
 }
 
 /*  Locate grid points within mesh partition which are located inside each cube defined by 4 vertices of 3 coordinates
-    Updates 'action_mask' field: 0.0 for no action, 1.0 for 1st control cube, etc.
+    Updates 'action_mask' field: 0.0 for no action, 1.0 for control point of any rl environment (of any cube)
     Updates 'num_control_points', 'action_global_size2', 'n_rl_envs'
     Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
 */
@@ -1257,6 +1230,9 @@ void myRHEA::getControlCubes() {
     num_control_points_local = 0;           // local var
     num_control_points_per_cube_global = 0; // global var
     num_control_points_per_cube_local = 0;  // local var
+
+    /// Initialize action_mask to 0 everywhere
+    action_mask = 0.0;
 
     for (int icube = 0; icube < num_control_cubes; icube++) {
 
@@ -1285,9 +1261,6 @@ void myRHEA::getControlCubes() {
             for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                     
-                    /// Reset action_mask to 0 (no action)
-                    action_mask[I1D(i,j,k)] = 0.0;
-
                     /// Geometric stuff
                     x = mesh->x[i];
                     y = mesh->y[j];
@@ -1308,7 +1281,7 @@ void myRHEA::getControlCubes() {
 
                     /// Store point if inside the cube
                     if (isInside) {
-                        action_mask[I1D(i,j,k)] = icube + 1.0;
+                        action_mask[I1D(i,j,k)] = 1.0;
                         num_control_points_local++;
                         num_control_points_per_cube_local++;
                         /// log point information
@@ -1385,7 +1358,7 @@ void myRHEA::calculateReward() {
     fill(avg_u_field_rl_envs.begin(), avg_u_field_rl_envs.end(), 0.0);
     vector<int> rl_envs_points_counter(n_rl_envs, 0.0); 
 
-    /// TODO: Calculate new avg_u_field_rl_envs, the time-averaged u-field also space-averaged at each rl environment
+    /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
     for (int env = 0; env < n_rl_envs; env++) {
         for(int i = iter_rl_envs[env][_INIX_]; i <= iter_rl_envs[env][_ENDX_]; i++) {
             for(int j = iter_rl_envs[env][_INIY_]; j <= iter_rl_envs[env][_ENDY_]; j++) {
@@ -1428,6 +1401,48 @@ void myRHEA::calculateReward() {
         cout << endl << flush;
         
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Distribute 'action_global' (class member, vector<double>, size n_rl_envs) over computational domain, 
+/// masked by 'action_mask' (class member, DistributedArray)
+/// Store distributed action in 'action_field' (class member, DistributedArray)
+/// Assumption: 'action_mask' = 0.0 for no action, 1.0 for control points (of any rl environment)
+void myRHEA::distributeAction() {
+    
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    cout << "[distributeAction] Rank " << my_rank << " is distributing action..." << endl;
+
+    /// Re-initialize 'action_field' to 0.0 everywhere in the DistributedArray
+    action_field = 0.0; 
+
+    /// Calculate 'action_field' with corresponding rl env. action, masked by 'action_mask'
+    for (int env = 0; env < n_rl_envs; env++) {
+        bool actionIsNullEverywhere = true;   // TODO: remove variable, just for checking 
+        for(int i = iter_rl_envs[env][_INIX_]; i <= iter_rl_envs[env][_ENDX_]; i++) {
+            for(int j = iter_rl_envs[env][_INIY_]; j <= iter_rl_envs[env][_ENDY_]; j++) {
+                for(int k = iter_rl_envs[env][_INIZ_]; k <= iter_rl_envs[env][_ENDZ_]; k++) {
+                    action_field[I1D(i,j,k)] = action_mask[I1D(i,j,k)] * action_global[env];
+                    
+                    /// Logging, TODO: remove logging if not used in the future
+                    if (action_mask[I1D(i,j,k)] != 0.0) {
+                        actionIsNullEverywhere = false;
+                        cout << "[distributeAction] Rank << " << my_rank << ", RL Env #" << env << " sets action: " << action_global[env] << " at x-coord index: " << i << " and control point: [" 
+                             << x_field[I1D(i,j,k)] << ", " 
+                             << y_field[I1D(i,j,k)] << ", " 
+                             << z_field[I1D(i,j,k)] << "], " << endl;
+                    } 
+
+                }
+            }
+        }
+        if (actionIsNullEverywhere) {
+            cout << "Rank " << my_rank << " found null action everywhere in RL Env #" << env << endl;
+        }
+    }
+    
 }
 
 ///////////////////////////////////////////////////////////////////////////////
