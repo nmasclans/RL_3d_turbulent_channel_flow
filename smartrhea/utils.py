@@ -40,7 +40,7 @@ def n_cubes(fname):
 
 def check_witness_xyz(fname):
     """
-    Make sure the witness points are written in such that the first moving coordinate is z, then y, and last x.
+    Make sure the witness points are written in such that the first moving coordinate is z, then x, and last y.
     Arguments:
         fname (str): witness points filename
     """
@@ -60,20 +60,20 @@ def check_witness_xyz(fname):
     #     # Update previous point
     #     prev_point = point
     # logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is x, then y, and last z.")
-    ### Check if z changes first, then y, then x
+    ### Check if z changes first, then x, then y
     for point in witness_points[1:]:
         # Ensure z changes first (x,y fixed)
         if point[0] == prev_point[0] and point[1] == prev_point[1]:
             assert point[2] >= prev_point[2], "Error: z should increase first, then y, then x"
-        # If z is reset (with different combination (x,y)), y should change next (x fixed)
-        elif point[0] == prev_point[0]:
-            assert point[1] >= prev_point[1], "Error: y should increase after z, then x"
-        # If both y and z are reset, x should change last
+        # If z is reset (with different combination (x,y)), x should change next (y fixed)
+        elif point[1] == prev_point[1]:
+            assert point[0] >= prev_point[0], "Error: x should increase after z, then y"
+        # If both x and z are reset, y should change last
         else:
-            assert point[0] >= prev_point[0], "Error: x should increase after y and z."
+            assert point[1] >= prev_point[1], "Error: y should increase after x and z."
         # Update previous point
         prev_point = point
-    logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is z, then y, and last x.")
+    logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is z, then x, and last y.")
 
 
 def get_witness_xyz(fname):

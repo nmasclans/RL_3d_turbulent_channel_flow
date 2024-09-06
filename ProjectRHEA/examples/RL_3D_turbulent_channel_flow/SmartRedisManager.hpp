@@ -20,12 +20,13 @@ public:
     void writeState(const std::vector<double>& state_local, const std::string& key);
     void readState(const std::string& key);
     void readAction(const std::string& key);
-    void writeReward(const std::vector<double>& reward, const std::string& key);
+    void writeReward(const double& reward_local, const std::string& key);
     void writeStepType(const int step_type, const std::string& key);
     void writeTime(const double time, const std::string& key);
 
     std::vector<double> getStateGlobal();
     std::vector<double> getActionGlobal();
+    double getActionLocal();
 
     void printDatabaseContent();
 
@@ -49,6 +50,7 @@ protected:
     int n_pseudo_envs;
     int read_interval;
     int read_tries;
+    double action_local;
 };
 
 #endif /* SMARTREDISMANAGER_H */

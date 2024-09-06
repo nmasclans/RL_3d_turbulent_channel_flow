@@ -177,81 +177,15 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
     ///             Actions is a global array living in all processes.
+    action_local = 0.0;
+    avg_u_field_local = 0.0;
+    avg_u_field_local_previous = 0.0;
     action_global.resize(action_global_size2);
     action_global_previous.resize(action_global_size2);
     state_local.resize(state_local_size2);
-    reward.resize(n_rl_envs);                                       /// n_rl_envs == n_pseudo_envs
-    avg_u_field_rl_envs.resize(n_rl_envs);
-    avg_u_field_rl_envs_previous.resize(n_rl_envs);
     std::fill(action_global.begin(), action_global.end(), 0.0);
     std::fill(action_global_previous.begin(), action_global_previous.end(), 0.0);
     std::fill(state_local.begin(), state_local.end(), 0.0);
-    std::fill(reward.begin(), reward.end(), 0.0);
-    std::fill(avg_u_field_rl_envs.begin(), avg_u_field_rl_envs.end(), 0.0);
-    std::fill(avg_u_field_rl_envs_previous.begin(), avg_u_field_rl_envs_previous.end(), 0.0);
-
-    /// Define iterator 'iter_rl_envs' to move on the ComputationalDomain inside each rl environment
-    /// ALERT: the rl_envs are distributed along x-direction only
-    /* iter_rl_envs shape: [n_rl_envs, 6]
-       dim 0: identifies rl envionment
-       dim 1: identifies limits in each direction, where it is used as indices (defined in MacroParameters.h):
-            #define _INIX_ 0
-            #define _ENDX_ 1
-            #define _INIY_ 2
-            #define _ENDY_ 3
-            #define _INIZ_ 4
-            #define _ENDZ_ 5
-    */ 
-    /// Get local number of cells in each direction (including inner + outer)
-    int lNx = topo->getlNx();
-    int lNy = topo->getlNy();
-    int lNz = topo->getlNz();
-    int lNx_inner = lNx-2;      /// Number of inner cells in the x-direction 
-    int lNx_rl_envs;
-    lNx_rl_envs = int(lNx_inner / n_rl_envs); /// Number of cells in the x-direction per each rl environment, except the last env if necessary
-    /// Resize iter_rl_envs
-    iter_rl_envs.resize(n_rl_envs);
-    for (int i = 0; i<n_rl_envs; i++){iter_rl_envs[i].resize(6);};
-    /// Fill iter_rl_envs
-    for (int i = 0; i<n_rl_envs; i++) {
-        iter_rl_envs[i][_INIX_] = 1 + i * lNx_rl_envs;
-        iter_rl_envs[i][_ENDX_] = (i + 1) * lNx_rl_envs;
-        iter_rl_envs[i][_INIY_] = 1;
-        iter_rl_envs[i][_ENDY_] = lNy-2;
-        iter_rl_envs[i][_INIZ_] = 1;
-        iter_rl_envs[i][_ENDZ_] = lNz-2;
-    }
-    /// The case when RL env cannot be evently distributed (lNx_inner % n_rl_envs!= 0),
-    /// will cause some last x-coord to not be taken by any RL environment
-    /// Ensure all x-coord are taken by a RL environment, by enlarging the last environment
-    /// Note that if (lNx_inner % n_rl_envs == 0) this will not have any effect, as iter_rl_envs[-1][_ENDX_] will already have lNx-2 value
-    if (lNx_inner % n_rl_envs!= 0) {
-        cout << "Warning: lNx_inner (" << lNx_inner << ") is not evenly divisible by n_rl_envs (" << n_rl_envs << ")." << endl;
-        cout << "Warning: consequently, the last RL environment will have " << lNx_inner % n_rl_envs << " additional yz-planes" << endl;
-    }
-    iter_rl_envs[n_rl_envs-1][_ENDX_] = lNx-2;
-    
-    /// Logging
-    cout << "[initRLParams] Rank " << my_rank << " has action global size: " << action_global_size2 << endl;
-    cout << "[initRLParams] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
-    cout << "[initRLParams] Rank " << my_rank << " has local number of cells lNx, lNy, lNz: " << lNx << ", " << lNy << ", " << lNz << endl;
-    cout << flush;
-    if (my_rank == 0) {
-        cout << "[initRLParams] ALERT: the rl_envs are distributed along x-direction only" << endl;
-        cout << "[initRLParams] Each of the " << n_rl_envs << " RL environments has " << lNx_rl_envs << " cells in the x-direction" << endl;
-        for (int i = 0; i<n_rl_envs; i++) {
-            cout << "[initRLParams] RL env " << i << " has bounds indices:" << endl 
-                 << "_INIX_: " << iter_rl_envs[i][_INIX_] << ", _ENDX_: " << iter_rl_envs[i][_ENDX_] << endl
-                 << "_INIY_: " << iter_rl_envs[i][_INIY_] << ", _ENDY_: " << iter_rl_envs[i][_ENDY_] << endl
-                 << "_INIZ_: " << iter_rl_envs[i][_INIZ_] << ", _ENDZ_: " << iter_rl_envs[i][_ENDZ_] << endl;
-        }
-        for (int i = 0; i<n_rl_envs; i++) {
-            cout << "[initRLParams] RL env " << i << " has bounds coordinates:" << endl 
-                 << "x-coord init: " << x_field[I1D(iter_rl_envs[i][_INIX_],0,0)] << ", end: " << x_field[I1D(iter_rl_envs[i][_ENDX_],0,0)] << endl
-                 << "y-coord init: " << y_field[I1D(0,iter_rl_envs[i][_INIY_],0)] << ", end: " << y_field[I1D(0,iter_rl_envs[i][_ENDY_],0)] << endl
-                 << "z-coord init: " << z_field[I1D(0,0,iter_rl_envs[i][_INIZ_])] << ", end: " << z_field[I1D(0,0,iter_rl_envs[i][_ENDZ_])] << endl;
-        }
-    }
 
 };
 
@@ -272,7 +206,6 @@ void myRHEA::initSmartRedis() {
 
     /// Write step type = 1
     manager->writeStepType(1, "ensemble_" + tag + ".step_type");
-
 
 };
 
@@ -433,11 +366,11 @@ void myRHEA::calculateSourceTerms() {
             }
 
             /// Save old action values and time - useful for interpolating to new action
+            /// TODO: use action_global and action_global_previous for something (output writing) or delete them
             action_global_previous  = action_global;     // a copy is made
             previous_actuation_time = current_time;      // TODO: SmartSOD2D use instead "this%previousActuationTime = this%previousActuationTime + this%periodActuation"
 
             // Update & Write state (from environment to RL) 
-            if (my_rank == 0) {cout << "[myRHEA::calculateSourceTerms] Updating local state..." << endl;};
             int i_index, j_index, k_index;
             int state_local_size2_counter = 0;
             state_local.resize(state_local_size2);
@@ -461,19 +394,19 @@ void myRHEA::calculateSourceTerms() {
                 }
             }
             
-            /// Logging
-            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has state local size: " << state_local_size2 << endl;
-            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has state local: ";
+            /// Logging // TODO: remove logging if not necessary for future debugging
+            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has local state of size " << state_local_size2 << " and values: ";
             for (int ii = 0; ii<state_local_size2; ii++) {  
                 cout << state_local[ii] << " ";
             }
             cout << endl << flush;
 
             manager->writeState(state_local, state_key);
-            calculateReward();                              /// update reward attribute
-            manager->writeReward(reward, reward_key);
+            calculateReward();                              /// update reward_local attribute
+            manager->writeReward(reward_local, reward_key);
             manager->readAction(action_key);
             action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = n_rl_envs (currently only 1 action variable per rl env.)
+            action_local  = manager->getActionLocal();      /// action_local: double, unique for each mpi process / RL env
             distributeAction();
             manager->writeTime(current_time, time_key);
             /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
@@ -1233,6 +1166,7 @@ void myRHEA::getControlCubes() {
 
     /// Initialize action_mask to 0 everywhere
     action_mask = 0.0;
+    int num_cubes_local = 0;                // number of cubes contained in local mpi process
 
     for (int icube = 0; icube < num_control_cubes; icube++) {
 
@@ -1294,26 +1228,50 @@ void myRHEA::getControlCubes() {
         /// Check if cube contains any control point
         MPI_Allreduce(&num_control_points_per_cube_local, &num_control_points_per_cube_global, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update num_control_points_per_cube_global
         if (num_control_points_per_cube_global == 0){
-            cerr << "Not found control points for cube #" << icube << endl;
-            return;
+            cerr << "[myRHEA::getControlCubes] ERROR: Not found control points for cube #" << icube << endl;
+            MPI_Abort( MPI_COMM_WORLD, 1);
         } else {
             action_global_size2++;
         }
+        /// Update number of cubes in each mpi process
+        if (num_control_points_per_cube_local != 0) {
+            num_cubes_local += 1;
+        }
+
         /// Logging
         if (my_rank == 0) {
-            cout << "Cube " << icube << " has " << num_control_points_per_cube_global << " control points" << endl;
+            cout << "[myRHEA::getControlCubes] Cube " << icube << " has " << num_control_points_per_cube_global << " control points" << endl;
         }
     }
-    this->n_rl_envs = action_global_size2;
 
     /// Calculate total num_control_points from local values
     MPI_Allreduce(&num_control_points_local, &num_control_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'num_control_points'
+    
+    /// Necessary check: num. of control cubes == num. mpi processes, and mpi processes must be distributed only along y-coordinate
+    this->n_rl_envs = action_global_size2;
+    if ((np_x == 1) && (np_y == n_rl_envs) && (np_z == 1) && (n_rl_envs == np_y) && (num_cubes_local == 1)) {
+        /// Logging successful distribution
+        if (my_rank == 0) {
+            stringstream ss;
+            ss << "[myRHEA::getControlCubes] Correct RL environments (control cubes) and computational domain distribution: "
+               << "1 RL environment per MPI process distributed along y-coordinate, with "
+               << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs;
+            cout << ss.str() << endl;
+        }
+    } else {
+        stringstream ss;
+        ss << "[myRHEA::getControlCubes] ERROR: Invalid RL environments & computational domain distribution, with "
+           << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs
+           << ", Rank " << my_rank << " has " << num_cubes_local << " RL environments / control cubes";
+        cerr << endl << ss.str() << endl;     
+        MPI_Abort( MPI_COMM_WORLD, 1);
+    }
 
     /// Logging
     if (my_rank == 0) {
-        cout << "Total number of control points: " << num_control_points << endl;
-        cout << "Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
-        cout << "Action global size corresponds to the Number of RL Environments: " << n_rl_envs << endl; 
+        cout << "[myRHEA::getControlCubes] Total number of control points: " << num_control_points << endl;
+        cout << "[myRHEA::getControlCubes] Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
+        cout << "[myRHEA::getControlCubes] Action global size corresponds to the Number of RL Environments: " << n_rl_envs << endl; 
     }
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1349,58 +1307,38 @@ void myRHEA::initializeFromRestart() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Calculate reward value for each n_rl_envs,
-/// -> updates attributes: reward, avg_u_field_rl_envs, avg_u_field_rl_envs_previous (all have shape n_rl_envs)
+/// Calculate reward local value (local to single mpi process, which corresponds to RL environment)
+/// -> updates attributes: reward_local, avg_u_field_local, avg_u_field_local_previous
 void myRHEA::calculateReward() {
 
-    /// Re-initialize avg_u_field_rl_envs to 0.0
-    avg_u_field_rl_envs.resize(n_rl_envs, 0.0);
-    fill(avg_u_field_rl_envs.begin(), avg_u_field_rl_envs.end(), 0.0);
-    vector<int> rl_envs_points_counter(n_rl_envs, 0.0); 
+    /// Initialize variables
+    int points_counter_local = 0;
+    avg_u_field_local = 0.0; 
 
     /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
-    for (int env = 0; env < n_rl_envs; env++) {
-        for(int i = iter_rl_envs[env][_INIX_]; i <= iter_rl_envs[env][_ENDX_]; i++) {
-            for(int j = iter_rl_envs[env][_INIY_]; j <= iter_rl_envs[env][_ENDY_]; j++) {
-                for(int k = iter_rl_envs[env][_INIZ_]; k <= iter_rl_envs[env][_ENDZ_]; k++) {
-                    avg_u_field_rl_envs[env]    += avg_u_field[I1D(i,j,k)];
-                    rl_envs_points_counter[env] += 1;       // TODO: perhaps fill this counter just one in the initRLParams, more computationally efficient
-                }
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                avg_u_field_local += avg_u_field[I1D(i,j,k)];
+                points_counter_local++;       // TODO: perhaps fill this counter just one in the initRLParams, more computationally efficient
             }
         }
-        avg_u_field_rl_envs[env] /= rl_envs_points_counter[env];
     }
-    
-    /// Calculate new reward, for each rl environment
-    for (int env = 0; env < n_rl_envs; env++) {
-        reward[env] = std::abs(avg_u_field_rl_envs[env] - avg_u_field_rl_envs_previous[env]); 
-    }
+    avg_u_field_local /= points_counter_local;
+    reward_local = std::abs(avg_u_field_local - avg_u_field_local_previous); 
 
-    /// Store avg_u_field_rl_envs for next reward calculation
-    avg_u_field_rl_envs_previous = avg_u_field_rl_envs;
+    /// Store avg_u_field_local for next reward calculation
+    avg_u_field_local_previous = avg_u_field_local;
 
     /// Logging
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    if (my_rank == 0) {
-        cout << "[calculateReward] RL Environments have number of points: ";
-        for (int env = 0; env < n_rl_envs; env++)
-            cout << rl_envs_points_counter[env] << " ";
-        cout << endl;
-        cout << "[calculateReward] RL Environments have local Reward: ";
-        for (int env = 0; env < n_rl_envs; env++)
-            cout << reward[env] << " ";
-        cout << endl << flush;
-        cout << "[calculateReward] RL Environments have avg_u_field: ";
-        for (int env = 0; env < n_rl_envs; env++)
-            cout << avg_u_field_rl_envs[env] << " ";
-        cout << endl << flush;
-        cout << "[calculateReward] RL Environments have previous avg_u_field: ";
-        for (int env = 0; env < n_rl_envs; env++)
-            cout << avg_u_field_rl_envs_previous[env] << " ";
-        cout << endl << flush;
-        
-    }
+
+    stringstream ss;
+    ss << "[myRHEA::calculateReward] Rank " << my_rank << " has num. points: " << points_counter_local
+       << ", local avg_u_field: " << avg_u_field_local
+       << ", local reward: " << reward_local;
+    cout << ss.str() << endl;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1413,34 +1351,33 @@ void myRHEA::distributeAction() {
     
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    cout << "[distributeAction] Rank " << my_rank << " is distributing action..." << endl;
 
     /// Re-initialize 'action_field' to 0.0 everywhere in the DistributedArray
     action_field = 0.0; 
 
     /// Calculate 'action_field' with corresponding rl env. action, masked by 'action_mask'
-    for (int env = 0; env < n_rl_envs; env++) {
-        bool actionIsNullEverywhere = true;   // TODO: remove variable, just for checking 
-        for(int i = iter_rl_envs[env][_INIX_]; i <= iter_rl_envs[env][_ENDX_]; i++) {
-            for(int j = iter_rl_envs[env][_INIY_]; j <= iter_rl_envs[env][_ENDY_]; j++) {
-                for(int k = iter_rl_envs[env][_INIZ_]; k <= iter_rl_envs[env][_ENDZ_]; k++) {
-                    action_field[I1D(i,j,k)] = action_mask[I1D(i,j,k)] * action_global[env];
-                    
-                    /// Logging, TODO: remove logging if not used in the future
-                    if (action_mask[I1D(i,j,k)] != 0.0) {
-                        actionIsNullEverywhere = false;
-                        cout << "[distributeAction] Rank << " << my_rank << ", RL Env #" << env << " sets action: " << action_global[env] << " at x-coord index: " << i << " and control point: [" 
-                             << x_field[I1D(i,j,k)] << ", " 
-                             << y_field[I1D(i,j,k)] << ", " 
-                             << z_field[I1D(i,j,k)] << "], " << endl;
-                    } 
+    bool isAction = false;   // TODO: remove variable, just for checking 
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                action_field[I1D(i,j,k)] = action_mask[I1D(i,j,k)] * action_local; // action_local unique for each mpi process / rl env
+                
+                /// Logging, TODO: remove logging if not used in the future
+                if (action_mask[I1D(i,j,k)] != 0.0) {
+                    isAction = true;
+                    /// TODO: permanently remove cout if not used in future debugging
+                    ///cout << "[myRHEA::distributeAction] Rank " << my_rank << " sets action: " << action_local << " at y-coord index: " << j << " and control point: [" 
+                    ///        << x_field[I1D(i,j,k)] << ", " 
+                    ///        << y_field[I1D(i,j,k)] << ", " 
+                    ///        << z_field[I1D(i,j,k)] << "], " << endl;
+                } 
 
-                }
             }
         }
-        if (actionIsNullEverywhere) {
-            cout << "Rank " << my_rank << " found null action everywhere in RL Env #" << env << endl;
-        }
+    }
+    if (!isAction) {   // TODO: maybe delete 'isAction' and check alltogether
+        cout << "[myRHEA::distributeAction] ERROR: Rank " << my_rank << " found null action everywhere" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1);
     }
     
 }
