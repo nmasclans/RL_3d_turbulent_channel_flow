@@ -48,9 +48,10 @@ if params["use_XLA"]:   # activate XLA (Accelerated Linear Algebra) for performa
         <timestamp>: time when the file is created
         <host_name>: host name of the machine where TensorFlow process runs, e.g. triton
         <pid>: pid of the TensorFlow process that created the event file    """
-train_dir           = os.path.join(cwd, "train")
 run_id              = datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")+"--"+str(uuid.uuid4())[:4]
-summary_writter_dir = os.path.join(train_dir, "summary", run_id)
+train_parent_dir    = os.path.join(cwd, "train")
+train_dir           = os.path.join(train_parent_dir, f"train_{run_id}")
+summary_writter_dir = os.path.join(train_parent_dir, "summary", run_id)
 summary_writer = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
 summary_writer.set_as_default()
 print("")
@@ -75,6 +76,7 @@ collect_py_env = RheaEnv(
     hosts,
     params["rhea_exe"],
     cwd,
+    dump_data_path = train_dir,
     mode = "collect",
     db_is_clustered = db_is_clustered,
     **env_params,
