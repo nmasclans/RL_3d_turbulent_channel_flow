@@ -104,8 +104,10 @@ class RheaEnv(py_environment.PyEnvironment):
         reward_key = "reward",
         dump_data_flag = True,
         ### Not in **env_params:
+        dump_data_path = "train_<run_id>",
         mode = "collect",           # TODO: consider using params['mode'], which is currently train/eval
         db_is_clustered = False,
+
     ):
 
         # Store input parameters
@@ -138,11 +140,11 @@ class RheaEnv(py_environment.PyEnvironment):
         self.reward_norm = reward_norm
         self.reward_beta = reward_beta
         self.dump_data_flag = dump_data_flag
+        self.dump_data_path = dump_data_path
         self.mode = mode
 
         # calculated parameters
         self.n_envs = cfd_n_envs * rl_n_envs
-        self.dump_data_path = os.path.join(self.cwd, "train") if mode == "collect" else os.path.join(self.cwd, "eval")
         
         # preliminary checks
         if (2 * rl_neighbors + 1 > rl_n_envs):
@@ -151,6 +153,8 @@ class RheaEnv(py_environment.PyEnvironment):
                 Total witness blocks: {rl_n_envs}\n")
         
         # manage directories
+        if not os.path.exists(os.path.join(self.dump_data_path)):
+            os.makedirs(os.path.join(self.dump_data_path))
         if self.mode == "eval" and os.path.exists(self.dump_data_path):
             counter = 0
             path = self.dump_data_path + f"_{counter}"
@@ -166,6 +170,8 @@ class RheaEnv(py_environment.PyEnvironment):
                 os.makedirs(os.path.join(self.dump_data_path, "reward"))
             if not os.path.exists(os.path.join(self.dump_data_path, "action")):
                 os.makedirs(os.path.join(self.dump_data_path, "action"))
+            if not os.path.exists(os.path.join(self.dump_data_path, "time")):
+                os.makedirs(os.path.join(self.dump_data_path, "time"))
 
         # generate database ensemble keys
         self.time_key = ["ensemble_" + str(i) + "." + time_key for i in range(self.cfd_n_envs)]
@@ -349,9 +355,9 @@ class RheaEnv(py_environment.PyEnvironment):
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
                     if i == 0:
-                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
+                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output.out 2>&1")
                     else:
-                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args}")
+                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output_env{i}.out 2>&1")
                 f.write("\n")
             # Make the script executable
             os.chmod(runit_script, 0o755)
@@ -543,6 +549,10 @@ class RheaEnv(py_environment.PyEnvironment):
             with open(os.path.join(self.dump_data_path , "action", f"action_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
                 np.savetxt(f, self._action[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
             f.close()
+            with open(os.path.join(self.dump_data_path , "time", f"time_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+                np.savetxt(f, self._time[i][np.newaxis], fmt='%.6f', delimiter=' ')
+            f.close()
+            
 
 
     def _stop_exp(self):
@@ -632,6 +642,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self._get_state() # updates self._state
         self._redistribute_state() # updates self._state_rl
         self._get_reward() # updates self._reward
+        self._get_time()
 
         # write RL data into disk
         if self.dump_data_flag: self._dump_rl_data()
