@@ -40,7 +40,6 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         state_displs.resize(mpi_size);                          // vector<int>
         action_global.resize(action_global_size, 0.0);          // vector<double>
         reward_global.resize(reward_global_size, 0.0);
-        action_local = 0.0;
     } catch (const std::length_error& e) {
         std::cerr << "Length error: " << e.what() << ", with mpi_size: " << mpi_size << ", action_global_size: " << action_global_size << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -329,18 +328,20 @@ void SmartRedisManager::readAction(const std::string& key) {
 	                          const MPI::Datatype& datatype, 
                               int root) const = 0 */
     MPI_Bcast(action_global.data(), action_global_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        
-    // Scatter action_global to corresponding action_local of each mpi process (corresponding to each RL environment)
-    /* void MPI_Scatter(
-        const void* sendbuf : address of send buffer (choice) 
-        int sendcount : number of elements sent to each process (non-negative integer) 
-        const MPI::Datatype& sendtype : data type of send buffer elements (handle) 
-        void* recvbuf : address of receive buffer (choice) 
-        int recvcount : number of elements in receive buffer (non-negative integer) 
-        const MPI::Datatype& recvtype : data type of receive buffer elements (handle) 
-        int root : rank of sending process (integer) 
-    */
-    MPI_Scatter(action_global.data(), 1, MPI_DOUBLE, &action_local, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    /// TODO: delete if not used in the future    
+    /// // Scatter action_global to corresponding action_local of each mpi process (corresponding to each RL environment)
+    /// /* void MPI_Scatter(
+    ///     const void* sendbuf : address of send buffer (choice) 
+    ///     int sendcount : number of elements sent to each process (non-negative integer) 
+    ///     const MPI::Datatype& sendtype : data type of send buffer elements (handle) 
+    ///     void* recvbuf : address of receive buffer (choice) 
+    ///     int recvcount : number of elements in receive buffer (non-negative integer) 
+    ///     const MPI::Datatype& recvtype : data type of receive buffer elements (handle) 
+    ///     int root : rank of sending process (integer) 
+    /// */
+    /// MPI_Scatter(action_global.data(), 1, MPI_DOUBLE, &action_local, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    /// std::cout << "[SmartRedisManager::readAction] Rank " << my_rank << " has local action " << action_local << std::endl << std::flush;
 
     if (my_rank == 0) {
         std::cout << "[SmartRedisManager::readAction] Action read (and deleted): ";
@@ -348,7 +349,7 @@ void SmartRedisManager::readAction(const std::string& key) {
             std::cout << action_global[i] << " ";
         std::cout << std::endl;
     }
-    std::cout << "[SmartRedisManager::readAction] Rank " << my_rank << " has local action " << action_local << std::endl << std::flush; // TODO: delete cout once action_local has been check to be equal to corresponding element of action_global
+    
 }
 
 void SmartRedisManager::writeReward(const double& reward_local, const std::string& key) {
@@ -406,10 +407,6 @@ std::vector<double> SmartRedisManager::getStateGlobal(){
 
 std::vector<double> SmartRedisManager::getActionGlobal(){
     return action_global;
-}
-
-double SmartRedisManager::getActionLocal(){
-    return action_local;
 }
 
 /// Check I: test SmartRedis, RedisAI and Redis installation and compilation

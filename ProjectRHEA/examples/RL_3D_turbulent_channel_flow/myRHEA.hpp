@@ -59,7 +59,6 @@ class myRHEA : public FlowSolverRHEA {
 
         /// Cubic control regions
         DistributedArray action_mask;
-        DistributedArray action_field;
         std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
         std::string control_cubes_file; 
         int num_control_cubes;
@@ -77,15 +76,16 @@ class myRHEA : public FlowSolverRHEA {
         double begin_actuation_time;
         double previous_actuation_time;
         bool db_clustered;
+        bool first_actuation;
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
         int action_global_size2;                 /// or nRectangleControl
         double avg_u_field_local;
         double avg_u_field_local_previous;
         double reward_local;
-        double action_local;
         std::vector<double> action_global;
         std::vector<double> action_global_previous;
+        std::vector<double> action_global_instant;
         std::vector<double> state_local;
 
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
@@ -96,7 +96,7 @@ class myRHEA : public FlowSolverRHEA {
         void getControlCubes();
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void calculateReward();
-        void distributeAction();
+        void smoothControlFunction();
 
     private:
 

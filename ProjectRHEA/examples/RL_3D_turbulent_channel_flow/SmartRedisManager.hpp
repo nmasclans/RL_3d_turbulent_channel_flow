@@ -26,7 +26,6 @@ public:
 
     std::vector<double> getStateGlobal();
     std::vector<double> getActionGlobal();
-    double getActionLocal();
 
     void printDatabaseContent();
 
@@ -50,7 +49,6 @@ protected:
     int n_pseudo_envs;
     int read_interval;
     int read_tries;
-    double action_local;
 };
 
 #endif /* SMARTREDISMANAGER_H */
