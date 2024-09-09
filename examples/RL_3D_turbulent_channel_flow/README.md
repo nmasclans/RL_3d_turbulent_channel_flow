@@ -45,3 +45,10 @@ with open("smartsim_db.dat","rb") as file:
     data = pickle.load(file)
 print(data)
 ```
+
+### Run training
+
+```bash
+nohup ./run_triton.sh > nohup.out 2>&1 &
+[2] 97066
+```

@@ -2,12 +2,12 @@ import random, os, numpy as np
 
 # TODO: set custom values
 # t_phys = delta / u_tau = 1
-t_action = 0.00002      # action time duration
+t_action = 0.1       # action time duration
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = 1.0
 t_episode_eval = 5.0
 cfd_n_envs = 1          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
-rl_n_envs = 3           # num. regions del domini en wall-normal direction -> gets the witness points
+rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
 params = {
@@ -21,15 +21,15 @@ params = {
     "run_command": "bash",              # TODO: rm if not used
     "mpirun_mca": "btl_base_warn_component_unused 0",   # mpirun argument --mca
     "mpirun_hostfile": "my-hostfile",   # mpirun argument --hostfile
-    "mpirun_np": 3,                     # mpirun argument -np
+    "mpirun_np": rl_n_envs,             # mpirun argument -np
     "cluster_account": None,
     "modules_sh": None,
     "episode_walltime": None,
     "cfd_n_envs": cfd_n_envs,
     "rl_n_envs": rl_n_envs,
     ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
-    "control_cubes_file": "cubeControl.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
-    "witness_file": "witness.txt",
+    "control_cubes_file": f"cubeControl{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
+    "witness_file": f"witness{rl_n_envs}.txt",
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
