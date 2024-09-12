@@ -28,7 +28,10 @@ export SR_LOG_FILE="nohup.out"
 export SR_LOG_LEVEL="INFO"
 export SMARTSIM_LOG_LEVEL="DEBUG"
 
-# Compile ProjectRHEA code
+# Remove nohup.out, if necessary
+rm -f ensemble.out ensemble.err mpi_output.out
+
+# Compile ProjectRHEA code TODO: uncomment compilation lines
 echo ">>> Compiling ProjectRHEA..."
 CURRENT_DIR=$(pwd)
 cd "$RHEA_EXE_DIR"
@@ -41,9 +44,6 @@ echo ">>> ProjectRHEA compiled!"
 eval "$(conda shell.bash hook)"
 conda activate smartrhea-env
 echo ">>> Conda environment 'smartrhea-env' activated"
-
-# Remove nohup.out, if necessary
-rm -f nohup.out ensemble.out ensemble.err mpi_output.out
 
 # Run training
 echo ">>> Running training 'run.py'..."

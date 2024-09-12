@@ -95,6 +95,7 @@ class myRHEA : public FlowSolverRHEA {
         void readControlCubes();
         void getControlCubes();
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
+        void updateState();
         void calculateReward();
         void smoothControlFunction();
 

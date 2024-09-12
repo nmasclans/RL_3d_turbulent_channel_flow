@@ -347,15 +347,24 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             replay_buffer.clear()
             train_time += time.time() - start_time
 
+            logger.info("Writing tensorflow summary")
             for train_metric in train_metrics:
                 train_metric.tf_summaries(train_step=global_step, step_metrics=step_metrics)
 
             if global_step_val % params["ckpt_interval"] == 0:
-                logger.info(f"Saving checkpoint to: {ckpt_dir}")
+                logger.info(f"Saving checkpoint at global_step_val: {global_step_val} to: {ckpt_dir}")
                 train_checkpointer.save(global_step_val)
                 policy_checkpointer.save(global_step_val)
                 saved_model_path = os.path.join(saved_model_dir, 'policy_' + ('%d' % global_step_val).zfill(9))
-                saved_model.save(saved_model_path)
+                #try:
+                #    saved_model.save(saved_model_path)
+                #except AttributeError as e:
+                #    logger.warning(f"Warning while saving the model: {e}")
+                #    policy_saver_instance = policy_saver.PolicySaver(collect_policy)
+                #    policy_saver_instance.save(saved_model_path)
+                #    # Manually save the policy if possible, e.g., with a different method
+                #    # Here you can use tf.saved_model.save as an alternative
+                    
 
             if global_step_val % params["log_interval"] == 0:
                 logger.info(f"{bcolors.OKCYAN}Training stats:{bcolors.ENDC}")
@@ -376,6 +385,7 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
                 timed_at_step = agent.train_step_counter.numpy()
                 collect_time = 0
                 train_time = 0
+
         logger.info(f"{bcolors.BOLD}Ended training loop!{bcolors.ENDC}\n")
 
     elif params['mode'] == "eval":

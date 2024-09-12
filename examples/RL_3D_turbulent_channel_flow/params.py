@@ -2,9 +2,9 @@ import random, os, numpy as np
 
 # TODO: set custom values
 # t_phys = delta / u_tau = 1
-t_action = 0.1       # action time duration
+t_action = 0.0001       # action time duration
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = 1.0
+t_episode_train = 0.0003
 t_episode_eval = 5.0
 cfd_n_envs = 1          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
@@ -59,11 +59,11 @@ params = {
     "net": (128, 128),              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
     "learning_rate": 5e-4,                                                              # TODO: set custom value
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1,                      # trajectories buffer expand a full train episode
-###    "log_interval": 1, # save model, policy, metrics, interval
+    "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]
     "seed": 16,
     "ckpt_num": int(1e6),
-###    "ckpt_interval": 1,
+    "ckpt_interval": 1,
 ###    "do_profile": False,
     "use_tf_functions": True
 }
