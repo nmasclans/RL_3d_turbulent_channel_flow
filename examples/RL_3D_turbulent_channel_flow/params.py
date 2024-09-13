@@ -4,8 +4,8 @@ import random, os, numpy as np
 # t_phys = delta / u_tau = 1
 t_action = 0.001        # action time duration
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = 0.005
-t_episode_eval = 5.0
+t_episode_train = 0.0051
+t_episode_eval = 5.0001
 cfd_n_envs = 1          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
