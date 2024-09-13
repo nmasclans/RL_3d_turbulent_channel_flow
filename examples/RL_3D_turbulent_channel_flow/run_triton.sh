@@ -28,7 +28,7 @@ export SR_LOG_FILE="nohup.out"
 export SR_LOG_LEVEL="INFO"
 export SMARTSIM_LOG_LEVEL="DEBUG"
 
-# Remove nohup.out, if necessary
+# Remove .out and .err files, if necessary
 rm -f ensemble.out ensemble.err mpi_output.out
 
 # Compile ProjectRHEA code TODO: uncomment compilation lines

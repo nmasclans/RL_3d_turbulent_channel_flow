@@ -96,8 +96,8 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
     action_mask.setTopology(topo, "action_mask");
     timers->createTimer( "rl_smartredis_communications" );
-    timers->createTimer( "update_rl_DeltaRij" );
-    timers->createTimer( "update_rl_control_term" );
+    timers->createTimer( "rl_update_DeltaRij" );
+    timers->createTimer( "rl_update_control_term" );
 
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered);
     initSmartRedis();
@@ -364,9 +364,9 @@ void myRHEA::calculateSourceTerms() {
             cout << endl << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
         } 
         /// TODO: remove cout for less debugging
-        if (my_rank == 0) {
-            cout << "[myRHEA::calculateSourceTerms] RL control applied at time " << current_time << endl;
-        }
+        /// if (my_rank == 0) {
+        ///     cout << "[myRHEA::calculateSourceTerms] RL control applied at time " << current_time << endl;
+        /// }
         
         /// Check if new action is needed
         if (current_time - previous_actuation_time >= actuation_period) {
@@ -400,7 +400,7 @@ void myRHEA::calculateSourceTerms() {
 
         }
 
-        timers->start( "update_rl_DeltaRij" );
+        timers->start( "rl_update_DeltaRij" );
 
         /// Calculate smooth action 
         smoothControlFunction();        /// updates 'action_global_instant'
@@ -510,7 +510,7 @@ void myRHEA::calculateSourceTerms() {
             }
         }
 
-        timers->stop( "update_rl_DeltaRij" );
+        timers->stop( "rl_update_DeltaRij" );
 
         /// Check action is applied and non-neglegible in some control point for each RL environment / control cube / mpi process
         /// TODO: remove cout if not necessary in future debugging
@@ -519,7 +519,7 @@ void myRHEA::calculateSourceTerms() {
         /// }               
         
         /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-        timers->start( "update_rl_control_term" );
+        timers->start( "rl_update_control_term" );
         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
             for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -548,7 +548,7 @@ void myRHEA::calculateSourceTerms() {
                 }
             }
         }
-        timers->stop( "update_rl_control_term" );
+        timers->stop( "rl_update_control_term" );
 
     } else {
 

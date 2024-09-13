@@ -2,9 +2,9 @@ import random, os, numpy as np
 
 # TODO: set custom values
 # t_phys = delta / u_tau = 1
-t_action = 0.0001       # action time duration
+t_action = 0.001        # action time duration
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = 0.0003
+t_episode_train = 0.005
 t_episode_eval = 5.0
 cfd_n_envs = 1          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
@@ -33,7 +33,7 @@ params = {
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
-    "poll_n_tries": 5000,               # num. tries of database poll
+    "poll_n_tries": 1000000,               # num. tries of database poll
     "poll_freq_ms": 100,                # time between database poll tries [miliseconds]
     "time_key": "time",
     "step_type_key": "step_type",
