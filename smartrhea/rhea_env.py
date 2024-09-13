@@ -257,7 +257,7 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         # Create Multi-Process Multi-Data (mpmd) ensemble
         if not self.ensemble or new_ensamble:
-            self.ensemble = self._create_mpmd_ensemble(restart_file)
+            self.ensemble = self._create_mpmd_ensemble(restart_file, global_step)
             logger.debug(f"New MPMD ensemble created")
 
         self.exp.start(self.ensemble, block=False) # non-blocking start of RHEA solver(s)
@@ -289,7 +289,7 @@ class RheaEnv(py_environment.PyEnvironment):
             self._dump_rl_data()
 
 
-    def _create_mpmd_ensemble(self, restart_file):
+    def _create_mpmd_ensemble(self, restart_file, global_step):
         # TODO: add method description
         """
         # TODO: custom this implementation if several random restart files are used
@@ -355,9 +355,9 @@ class RheaEnv(py_environment.PyEnvironment):
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
                     if i == 0:
-                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output.out 2>&1")
+                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output_env{i}_step{global_step}.out 2>&1")
                     else:
-                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output_env{i}.out 2>&1")
+                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output_env{i}_step{global_step}.out 2>&1")
                 f.write("\n")
             # Make the script executable
             os.chmod(runit_script, 0o755)
