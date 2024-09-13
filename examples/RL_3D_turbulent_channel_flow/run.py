@@ -52,7 +52,7 @@ run_id              = datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")+"--
 train_parent_dir    = os.path.join(cwd, "train")
 train_dir           = os.path.join(train_parent_dir, f"train_{run_id}")
 summary_writter_dir = os.path.join(train_parent_dir, "summary", run_id)
-summary_writer = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
+summary_writer      = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
 summary_writer.set_as_default()
 print("")
 logger.info(f"Tensorboard event file created: {summary_writter_dir}/events.out.tfevents.{int(time.time())}.{gethostname()}.{os.getpid()}")

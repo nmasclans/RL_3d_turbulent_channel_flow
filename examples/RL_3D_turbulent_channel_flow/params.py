@@ -1,11 +1,12 @@
 import random, os, numpy as np
 
 # TODO: set custom values
-# t_phys = delta / u_tau = 1
-t_action = 0.001        # action time duration
+# t_phys  = delta / u_tau = 1
+# dt_phys = 1e-5 (in myRHEA.cpp)
+t_action = 0.00500      # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = 0.0051
-t_episode_eval = 5.0001
+t_episode_train = 1.0
+t_episode_eval = 5.0
 cfd_n_envs = 1          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
@@ -28,8 +29,8 @@ params = {
     "cfd_n_envs": cfd_n_envs,
     "rl_n_envs": rl_n_envs,
     ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
-    "control_cubes_file": f"cubeControl{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
-    "witness_file": f"witness{rl_n_envs}.txt",
+    "control_cubes_file": f"config_control_witness/cubeControl{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
+    "witness_file": f"config_control_witness/witness{rl_n_envs}.txt",
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,

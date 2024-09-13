@@ -1,0 +1,1 @@
+Restart files in current folders are not used in this implementation, default `$RHEA_EXE_DIR/restart_data_file.h5` is used instead.

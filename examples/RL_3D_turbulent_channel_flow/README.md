@@ -49,6 +49,6 @@ print(data)
 ### Run training
 
 ```bash
-nohup ./run_triton.sh > nohup.out 2>&1 &
+rm nohup.out; nohup ./run_triton.sh > nohup.out 2>&1 &
 [2] 97066
 ```

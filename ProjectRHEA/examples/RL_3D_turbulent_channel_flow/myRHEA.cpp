@@ -159,8 +159,8 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// Additional arguments, defined here /// TODO: include this in some configuration file
-    this->witness_file = "witness8.txt";
-    this->control_cubes_file = "cubeControl8.txt";
+    this->witness_file = "config_control_witness/witness8.txt";
+    this->control_cubes_file = "config_control_witness/cubeControl8.txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
     this->state_key     = "ensemble_" + tag + ".state";
@@ -178,7 +178,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
     ///             Actions is a global array living in all processes.
-    first_actuation = true;
     avg_u_field_local = 0.0;
     avg_u_field_local_previous = 0.0;
     action_global.resize(action_global_size2);
@@ -189,6 +188,10 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     std::fill(action_global_previous.begin(), action_global_previous.end(), 0.0);
     std::fill(action_global_instant.begin(), action_global_instant.end(), 0.0);
     std::fill(state_local.begin(), state_local.end(), 0.0);
+
+    /// Initialize additional attribute members
+    first_actuation = true;
+    calculateInnerSizeTopo();   /// initialize 'num_points_local'
 
 };
 
@@ -352,18 +355,19 @@ void myRHEA::calculateSourceTerms() {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
-    if (k_time_stage == 1) {    /// only execute once per Runge-Kutta loop, i.e. execute on 1st Runge-Kutta iteration
+    if (rk_time_stage == 1) {    /// only execute once per Runge-Kutta loop, i.e. execute on 1st Runge-Kutta iteration
 
         /// Check if new action is needed
         if (current_time > begin_actuation_time) {
 
-            
-            /// TODO: it seems to me with the couts that this loop is made 3 times per time instant (i get x3 couts than expected)... why?
-            if (my_rank == 0 && first_actuation) {
+            if (first_actuation) {
                 first_actuation = false;    /// just cout once, for the first actuation
                 calculateReward();          /// only for initializing 'avg_u_field_local_previous' non-zero for the next reward calculation
-                cout << endl << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
+                if (my_rank == 0) {
+                    cout << endl << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
+                }
             } 
+
             /// TODO: remove cout for less debugging
             /// if (my_rank == 0) {
             ///     cout << "[myRHEA::calculateSourceTerms] RL control applied at time " << current_time << endl;
@@ -390,11 +394,14 @@ void myRHEA::calculateSourceTerms() {
                 manager->writeState(state_local, state_key);
                 calculateReward();                              /// update reward_local attribute
                 manager->writeReward(reward_local, reward_key);
+                manager->writeTime(current_time, time_key);
                 manager->readAction(action_key);
                 action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = n_rl_envs (currently only 1 action variable per rl env.)
-                manager->writeTime(current_time, time_key);
                 /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
                 if (current_time + 2.0 * actuation_period > final_time) {
+                    if (my_rank == 0) {
+
+                    }
                     manager->writeStepType(0, step_type_key);
                 }
 
@@ -412,8 +419,6 @@ void myRHEA::calculateSourceTerms() {
             /// Initialize variables
             double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
             double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
-            double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
-            double delta_x, delta_y, delta_z;
             double Rkk_inv, Akk;
             bool   isNegligibleAction, isNegligibleRkk;
             bool actionIsApplied = false;
@@ -523,9 +528,14 @@ void myRHEA::calculateSourceTerms() {
             ///     cout << "Warning: Rank " << my_rank << " applied at time: " << current_time << endl;
             /// }               
             
-            /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
             MPI_Barrier(MPI_COMM_WORLD);
             timers->start( "rl_update_control_term" );
+
+            /// Initialize variables
+            double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
+            double delta_x, delta_y, delta_z;
+            
+            /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
                     for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -580,7 +590,7 @@ void myRHEA::temporalHookFunction() {
 
     if ( ( print_timers ) && (current_time_iter%print_frequency_iter == 0) ) {
         char filename[200];
-        sprintf( filename,"timers_information_file_%d.txt",current_time_iter );
+        sprintf( filename,"rhea_exp/timers_info/timers_information_file_ensemble%s_iter%d.txt", tag.c_str(), current_time_iter );
         timers->printTimers( filename );
     }
 
@@ -1381,12 +1391,12 @@ void myRHEA::updateState() {
         }
     }
     
-    /// Logging // TODO: remove logging if not necessary for future debugging
-    cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has local state of size " << state_local_size2 << " and values: ";
-    for (int ii = 0; ii<state_local_size2; ii++) {  
-        cout << state_local[ii] << " ";
-    }
-    cout << endl << flush;
+    /// Logging, TODO: remove logging if not necessary for future debugging
+    /// cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has local state of size " << state_local_size2 << " and values: ";
+    /// for (int ii = 0; ii<state_local_size2; ii++) {  
+    ///     cout << state_local[ii] << " ";
+    /// }
+    /// cout << endl << flush;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1396,7 +1406,6 @@ void myRHEA::updateState() {
 void myRHEA::calculateReward() {
 
     /// Initialize variables
-    int points_counter_local = 0;
     avg_u_field_local = 0.0; 
 
     /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
@@ -1404,25 +1413,20 @@ void myRHEA::calculateReward() {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 avg_u_field_local += avg_u_field[I1D(i,j,k)];
-                points_counter_local++;       // TODO: perhaps fill this counter just one in the initRLParams, more computationally efficient
             }
         }
     }
-    avg_u_field_local /= points_counter_local;
+    avg_u_field_local /= num_points_local;
     reward_local = std::abs(avg_u_field_local - avg_u_field_local_previous); 
 
     /// Store avg_u_field_local for next reward calculation
     avg_u_field_local_previous = avg_u_field_local;
 
-    /// Logging
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    /// Logging,  TODO: remove cout if not necessary in future debugging
+    /// int my_rank;
+    /// MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    /// cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local avg_u_field: " << avg_u_field_local << ", local reward: " << reward_local << endl;
 
-    stringstream ss;
-    ss << "[myRHEA::calculateReward] Rank " << my_rank << " has num. points: " << points_counter_local
-       << ", local avg_u_field: " << avg_u_field_local
-       << ", local reward: " << reward_local;
-    cout << ss.str() << endl;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1437,6 +1441,23 @@ void myRHEA::smoothControlFunction() {
         action_global_instant[idx] = action_global_previous[idx] + f3 * (action_global[idx] - action_global_previous[idx]);
     }
 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void myRHEA::calculateInnerSizeTopo() {
+    num_points_local = 0;
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                num_points_local++;
+            }
+        }
+    }
+    /// Logging
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    cout << "[myRHEA::calculateInnerSizeTopo] Rank " << my_rank << " has number of grid points: " << num_points_local << endl;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

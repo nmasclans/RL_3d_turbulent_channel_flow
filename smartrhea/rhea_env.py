@@ -1,9 +1,10 @@
 import os
+import coloredlogs
 import glob
 import logging
-import random
 import numpy as np
-import coloredlogs
+import random
+import shutil
 
 from tf_agents.specs import array_spec
 from tf_agents.environments import py_environment
@@ -153,8 +154,8 @@ class RheaEnv(py_environment.PyEnvironment):
                 Total witness blocks: {rl_n_envs}\n")
         
         # manage directories
-        if not os.path.exists(os.path.join(self.dump_data_path)):
-            os.makedirs(os.path.join(self.dump_data_path))
+        if not os.path.exists(self.dump_data_path):
+            os.makedirs(self.dump_data_path)
         if self.mode == "eval" and os.path.exists(self.dump_data_path):
             counter = 0
             path = self.dump_data_path + f"_{counter}"
@@ -172,7 +173,23 @@ class RheaEnv(py_environment.PyEnvironment):
                 os.makedirs(os.path.join(self.dump_data_path, "action"))
             if not os.path.exists(os.path.join(self.dump_data_path, "time")):
                 os.makedirs(os.path.join(self.dump_data_path, "time"))
-
+        # manage directory 'rhea_exp/output' & 'rhea_exp/timers_info'
+        rhea_exp_dir = "rhea_exp"
+        if not os.path.exists(rhea_exp_dir):    # create directory 'rhea_exp'
+            os.makedirs(rhea_exp_dir)
+        else:                                   # empty directory 'rhea_exp'
+            for filename in os.listdir(rhea_exp_dir):
+                file_path = os.path.join(rhea_exp_dir, filename)
+                try: 
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    logger.error(f"Failed to delete '{file_path}': {e}")
+        os.makedirs(os.path.join(rhea_exp_dir, "output"))
+        os.makedirs(os.path.join(rhea_exp_dir, "timers_info"))
+        
         # generate database ensemble keys
         self.time_key = ["ensemble_" + str(i) + "." + time_key for i in range(self.cfd_n_envs)]
         self.step_type_key = ["ensemble_" + str(i) + "." + step_type_key for i in range(self.cfd_n_envs)]
@@ -283,6 +300,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self._get_state() # updates self._state
         self._redistribute_state() # updates self._state_marl
         self._get_reward() # updates self._reward
+        self._get_time()   # updates self._time
 
         # Write RL data into disk
         if self.dump_data_flag:
@@ -355,9 +373,9 @@ class RheaEnv(py_environment.PyEnvironment):
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
                     if i == 0:
-                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output_env{i}_step{global_step}.out 2>&1")
+                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > rhea_exp/output/mpi_output_env{i}_step{global_step}.out 2>&1")
                     else:
-                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > mpi_output_env{i}_step{global_step}.out 2>&1")
+                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > rhea_exp/output/mpi_output_env{i}_step{global_step}.out 2>&1")
                 f.write("\n")
             # Make the script executable
             os.chmod(runit_script, 0o755)
