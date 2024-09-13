@@ -29,7 +29,7 @@ export SR_LOG_LEVEL="INFO"
 export SMARTSIM_LOG_LEVEL="DEBUG"
 
 # Remove .out and .err files, if necessary
-rm -f ensemble.out ensemble.err mpi_output.out
+rm -f ensemble.out ensemble.err mpi_output*
 
 # Compile ProjectRHEA code TODO: uncomment compilation lines
 echo ">>> Compiling ProjectRHEA..."

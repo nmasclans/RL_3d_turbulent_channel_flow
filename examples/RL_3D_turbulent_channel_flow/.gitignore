@@ -1,8 +1,8 @@
 /__pycache__
 /train
 /rhea_exp
-ensemble.*
-timers_information_file.txt
+timers_information_file*
 *.h5
 *.xdmf
 *.out
+*.err
