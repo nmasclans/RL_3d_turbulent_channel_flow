@@ -1,0 +1,450 @@
+$ ./install_pyenv_v2.sh 
+Channels:
+ - defaults
+Platform: linux-64
+Collecting package metadata (repodata.json): done
+Solving environment: done
+
+## Package Plan ##
+
+  environment location: /home/jofre/miniconda3/envs/smartrhea-env-v2
+
+  added / updated specs:
+    - python=3.9
+
+
+The following NEW packages will be INSTALLED:
+
+  _libgcc_mutex      pkgs/main/linux-64::_libgcc_mutex-0.1-main 
+  _openmp_mutex      pkgs/main/linux-64::_openmp_mutex-5.1-1_gnu 
+  ca-certificates    pkgs/main/linux-64::ca-certificates-2024.7.2-h06a4308_0 
+  ld_impl_linux-64   pkgs/main/linux-64::ld_impl_linux-64-2.38-h1181459_1 
+  libffi             pkgs/main/linux-64::libffi-3.4.4-h6a678d5_1 
+  libgcc-ng          pkgs/main/linux-64::libgcc-ng-11.2.0-h1234567_1 
+  libgomp            pkgs/main/linux-64::libgomp-11.2.0-h1234567_1 
+  libstdcxx-ng       pkgs/main/linux-64::libstdcxx-ng-11.2.0-h1234567_1 
+  ncurses            pkgs/main/linux-64::ncurses-6.4-h6a678d5_0 
+  openssl            pkgs/main/linux-64::openssl-3.0.15-h5eee18b_0 
+  pip                pkgs/main/linux-64::pip-24.2-py39h06a4308_0 
+  python             pkgs/main/linux-64::python-3.9.19-h955ad1f_1 
+  readline           pkgs/main/linux-64::readline-8.2-h5eee18b_0 
+  setuptools         pkgs/main/linux-64::setuptools-72.1.0-py39h06a4308_0 
+  sqlite             pkgs/main/linux-64::sqlite-3.45.3-h5eee18b_0 
+  tk                 pkgs/main/linux-64::tk-8.6.14-h39e8969_0 
+  tzdata             pkgs/main/noarch::tzdata-2024a-h04d1e81_0 
+  wheel              pkgs/main/linux-64::wheel-0.44.0-py39h06a4308_0 
+  xz                 pkgs/main/linux-64::xz-5.4.6-h5eee18b_1 
+  zlib               pkgs/main/linux-64::zlib-1.2.13-h5eee18b_1 
+
+
+
+Downloading and Extracting Packages:
+
+Preparing transaction: done
+Verifying transaction: done
+Executing transaction: done
+#
+# To activate this environment, use
+#
+#     $ conda activate smartrhea-env-v2
+#
+# To deactivate an active environment, use
+#
+#     $ conda deactivate
+
+/home/jofre/miniconda3/envs/smartrhea-env-v2/bin/python
+Python 3.9.19
+Collecting smartsim==0.4.2
+  Downloading smartsim-0.4.2-cp39-cp39-manylinux2010_x86_64.whl.metadata (28 kB)
+Collecting psutil>=5.7.2 (from smartsim==0.4.2)
+  Downloading psutil-6.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (21 kB)
+Collecting coloredlogs==10.0 (from smartsim==0.4.2)
+  Downloading coloredlogs-10.0-py2.py3-none-any.whl.metadata (11 kB)
+Collecting tabulate>=0.8.9 (from smartsim==0.4.2)
+  Downloading tabulate-0.9.0-py3-none-any.whl.metadata (34 kB)
+Collecting redis-py-cluster==2.1.3 (from smartsim==0.4.2)
+  Downloading redis_py_cluster-2.1.3-py2.py3-none-any.whl.metadata (20 kB)
+Collecting redis==3.5.3 (from smartsim==0.4.2)
+  Downloading redis-3.5.3-py2.py3-none-any.whl.metadata (36 kB)
+Collecting tqdm>=4.50.2 (from smartsim==0.4.2)
+  Downloading tqdm-4.66.5-py3-none-any.whl.metadata (57 kB)
+Collecting filelock>=3.4.2 (from smartsim==0.4.2)
+  Downloading filelock-3.16.0-py3-none-any.whl.metadata (3.0 kB)
+Collecting protobuf~=3.20 (from smartsim==0.4.2)
+  Downloading protobuf-3.20.3-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.whl.metadata (679 bytes)
+Collecting smartredis>=0.4.0 (from smartsim==0.4.2)
+  Downloading smartredis-0.5.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.7 kB)
+Collecting humanfriendly>=4.7 (from coloredlogs==10.0->smartsim==0.4.2)
+  Downloading humanfriendly-10.0-py2.py3-none-any.whl.metadata (9.2 kB)
+Collecting numpy>=1.18.2 (from smartredis>=0.4.0->smartsim==0.4.2)
+  Downloading numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (60 kB)
+Downloading smartsim-0.4.2-cp39-cp39-manylinux2010_x86_64.whl (3.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.9/3.9 MB 83.0 MB/s eta 0:00:00
+Downloading coloredlogs-10.0-py2.py3-none-any.whl (47 kB)
+Downloading redis-3.5.3-py2.py3-none-any.whl (72 kB)
+Downloading redis_py_cluster-2.1.3-py2.py3-none-any.whl (42 kB)
+Downloading filelock-3.16.0-py3-none-any.whl (16 kB)
+Downloading protobuf-3.20.3-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.whl (1.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 151.0 MB/s eta 0:00:00
+Downloading psutil-6.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (290 kB)
+Downloading smartredis-0.5.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (734 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 734.2/734.2 kB 122.6 MB/s eta 0:00:00
+Downloading tabulate-0.9.0-py3-none-any.whl (35 kB)
+Downloading tqdm-4.66.5-py3-none-any.whl (78 kB)
+Downloading humanfriendly-10.0-py2.py3-none-any.whl (86 kB)
+Downloading numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (19.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 19.5/19.5 MB 109.9 MB/s eta 0:00:00
+Installing collected packages: tqdm, tabulate, redis, psutil, protobuf, numpy, humanfriendly, filelock, smartredis, redis-py-cluster, coloredlogs, smartsim
+Successfully installed coloredlogs-10.0 filelock-3.16.0 humanfriendly-10.0 numpy-2.0.2 protobuf-3.20.3 psutil-6.0.0 redis-3.5.3 redis-py-cluster-2.1.3 smartredis-0.5.3 smartsim-0.4.2 tabulate-0.9.0 tqdm-4.66.5
+Requirement already satisfied: smartredis in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (0.5.3)
+Requirement already satisfied: numpy>=1.18.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartredis) (2.0.2)
+Collecting numpy==1.21.0
+  Downloading numpy-1.21.0-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl.metadata (2.0 kB)
+Downloading numpy-1.21.0-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl (15.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.7/15.7 MB 106.7 MB/s eta 0:00:00
+Installing collected packages: numpy
+  Attempting uninstall: numpy
+    Found existing installation: numpy 2.0.2
+    Uninstalling numpy-2.0.2:
+      Successfully uninstalled numpy-2.0.2
+Successfully installed numpy-1.21.0
+Collecting contourpy==1.2.1
+  Downloading contourpy-1.2.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.8 kB)
+Requirement already satisfied: numpy>=1.20 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from contourpy==1.2.1) (1.21.0)
+Downloading contourpy-1.2.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (304 kB)
+Installing collected packages: contourpy
+Successfully installed contourpy-1.2.1
+Collecting scipy==1.6.0
+  Downloading scipy-1.6.0-cp39-cp39-manylinux1_x86_64.whl.metadata (2.0 kB)
+Requirement already satisfied: numpy>=1.16.5 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from scipy==1.6.0) (1.21.0)
+Downloading scipy-1.6.0-cp39-cp39-manylinux1_x86_64.whl (27.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 27.3/27.3 MB 110.5 MB/s eta 0:00:00
+Installing collected packages: scipy
+Successfully installed scipy-1.6.0
+Collecting matplotlib==3.7.0
+  Downloading matplotlib-3.7.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.6 kB)
+Requirement already satisfied: contourpy>=1.0.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib==3.7.0) (1.2.1)
+Collecting cycler>=0.10 (from matplotlib==3.7.0)
+  Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib==3.7.0)
+  Downloading fonttools-4.53.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (162 kB)
+Collecting kiwisolver>=1.0.1 (from matplotlib==3.7.0)
+  Downloading kiwisolver-1.4.7-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl.metadata (6.3 kB)
+Requirement already satisfied: numpy>=1.20 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib==3.7.0) (1.21.0)
+Collecting packaging>=20.0 (from matplotlib==3.7.0)
+  Downloading packaging-24.1-py3-none-any.whl.metadata (3.2 kB)
+Collecting pillow>=6.2.0 (from matplotlib==3.7.0)
+  Downloading pillow-10.4.0-cp39-cp39-manylinux_2_28_x86_64.whl.metadata (9.2 kB)
+Collecting pyparsing>=2.3.1 (from matplotlib==3.7.0)
+  Downloading pyparsing-3.1.4-py3-none-any.whl.metadata (5.1 kB)
+Collecting python-dateutil>=2.7 (from matplotlib==3.7.0)
+  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting importlib-resources>=3.2.0 (from matplotlib==3.7.0)
+  Downloading importlib_resources-6.4.5-py3-none-any.whl.metadata (4.0 kB)
+Collecting zipp>=3.1.0 (from importlib-resources>=3.2.0->matplotlib==3.7.0)
+  Downloading zipp-3.20.2-py3-none-any.whl.metadata (3.7 kB)
+Collecting six>=1.5 (from python-dateutil>=2.7->matplotlib==3.7.0)
+  Downloading six-1.16.0-py2.py3-none-any.whl.metadata (1.8 kB)
+Downloading matplotlib-3.7.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (11.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.6/11.6 MB 104.7 MB/s eta 0:00:00
+Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Downloading fonttools-4.53.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (4.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.6/4.6 MB 118.1 MB/s eta 0:00:00
+Downloading importlib_resources-6.4.5-py3-none-any.whl (36 kB)
+Downloading kiwisolver-1.4.7-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl (1.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 456.1 MB/s eta 0:00:00
+Downloading packaging-24.1-py3-none-any.whl (53 kB)
+Downloading pillow-10.4.0-cp39-cp39-manylinux_2_28_x86_64.whl (4.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 117.6 MB/s eta 0:00:00
+Downloading pyparsing-3.1.4-py3-none-any.whl (104 kB)
+Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Downloading six-1.16.0-py2.py3-none-any.whl (11 kB)
+Downloading zipp-3.20.2-py3-none-any.whl (9.2 kB)
+Installing collected packages: zipp, six, pyparsing, pillow, packaging, kiwisolver, fonttools, cycler, python-dateutil, importlib-resources, matplotlib
+Successfully installed cycler-0.12.1 fonttools-4.53.1 importlib-resources-6.4.5 kiwisolver-1.4.7 matplotlib-3.7.0 packaging-24.1 pillow-10.4.0 pyparsing-3.1.4 python-dateutil-2.9.0.post0 six-1.16.0 zipp-3.20.2
+Collecting tensorflow==2.8.0
+  Downloading tensorflow-2.8.0-cp39-cp39-manylinux2010_x86_64.whl.metadata (2.9 kB)
+Collecting absl-py>=0.4.0 (from tensorflow==2.8.0)
+  Downloading absl_py-2.1.0-py3-none-any.whl.metadata (2.3 kB)
+Collecting astunparse>=1.6.0 (from tensorflow==2.8.0)
+  Downloading astunparse-1.6.3-py2.py3-none-any.whl.metadata (4.4 kB)
+Collecting flatbuffers>=1.12 (from tensorflow==2.8.0)
+  Downloading flatbuffers-24.3.25-py2.py3-none-any.whl.metadata (850 bytes)
+Collecting gast>=0.2.1 (from tensorflow==2.8.0)
+  Downloading gast-0.6.0-py3-none-any.whl.metadata (1.3 kB)
+Collecting google-pasta>=0.1.1 (from tensorflow==2.8.0)
+  Downloading google_pasta-0.2.0-py3-none-any.whl.metadata (814 bytes)
+Collecting h5py>=2.9.0 (from tensorflow==2.8.0)
+  Downloading h5py-3.11.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.5 kB)
+Collecting keras-preprocessing>=1.1.1 (from tensorflow==2.8.0)
+  Downloading Keras_Preprocessing-1.1.2-py2.py3-none-any.whl.metadata (1.9 kB)
+Collecting libclang>=9.0.1 (from tensorflow==2.8.0)
+  Downloading libclang-18.1.1-py2.py3-none-manylinux2010_x86_64.whl.metadata (5.2 kB)
+Requirement already satisfied: numpy>=1.20 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0) (1.21.0)
+Collecting opt-einsum>=2.3.2 (from tensorflow==2.8.0)
+  Downloading opt_einsum-3.3.0-py3-none-any.whl.metadata (6.5 kB)
+Requirement already satisfied: protobuf>=3.9.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0) (3.20.3)
+Requirement already satisfied: setuptools in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0) (72.1.0)
+Requirement already satisfied: six>=1.12.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0) (1.16.0)
+Collecting termcolor>=1.1.0 (from tensorflow==2.8.0)
+  Downloading termcolor-2.4.0-py3-none-any.whl.metadata (6.1 kB)
+Collecting typing-extensions>=3.6.6 (from tensorflow==2.8.0)
+  Downloading typing_extensions-4.12.2-py3-none-any.whl.metadata (3.0 kB)
+Collecting wrapt>=1.11.0 (from tensorflow==2.8.0)
+  Downloading wrapt-1.16.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+Collecting tensorboard<2.9,>=2.8 (from tensorflow==2.8.0)
+  Downloading tensorboard-2.8.0-py3-none-any.whl.metadata (1.9 kB)
+Collecting tf-estimator-nightly==2.8.0.dev2021122109 (from tensorflow==2.8.0)
+  Downloading tf_estimator_nightly-2.8.0.dev2021122109-py2.py3-none-any.whl.metadata (1.2 kB)
+Collecting keras<2.9,>=2.8.0rc0 (from tensorflow==2.8.0)
+  Downloading keras-2.8.0-py2.py3-none-any.whl.metadata (1.3 kB)
+Collecting tensorflow-io-gcs-filesystem>=0.23.1 (from tensorflow==2.8.0)
+  Downloading tensorflow_io_gcs_filesystem-0.37.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (14 kB)
+Collecting grpcio<2.0,>=1.24.3 (from tensorflow==2.8.0)
+  Downloading grpcio-1.66.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (3.9 kB)
+Requirement already satisfied: wheel<1.0,>=0.23.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from astunparse>=1.6.0->tensorflow==2.8.0) (0.44.0)
+Collecting google-auth<3,>=1.6.3 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading google_auth-2.34.0-py2.py3-none-any.whl.metadata (4.7 kB)
+Collecting google-auth-oauthlib<0.5,>=0.4.1 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading google_auth_oauthlib-0.4.6-py2.py3-none-any.whl.metadata (2.7 kB)
+Collecting markdown>=2.6.8 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading Markdown-3.7-py3-none-any.whl.metadata (7.0 kB)
+Collecting requests<3,>=2.21.0 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading requests-2.32.3-py3-none-any.whl.metadata (4.6 kB)
+Collecting tensorboard-data-server<0.7.0,>=0.6.0 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading tensorboard_data_server-0.6.1-py3-none-manylinux2010_x86_64.whl.metadata (1.1 kB)
+Collecting tensorboard-plugin-wit>=1.6.0 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading tensorboard_plugin_wit-1.8.1-py3-none-any.whl.metadata (873 bytes)
+Collecting werkzeug>=0.11.15 (from tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading werkzeug-3.0.4-py3-none-any.whl.metadata (3.7 kB)
+Collecting cachetools<6.0,>=2.0.0 (from google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading cachetools-5.5.0-py3-none-any.whl.metadata (5.3 kB)
+Collecting pyasn1-modules>=0.2.1 (from google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading pyasn1_modules-0.4.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting rsa<5,>=3.1.4 (from google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading rsa-4.9-py3-none-any.whl.metadata (4.2 kB)
+Collecting requests-oauthlib>=0.7.0 (from google-auth-oauthlib<0.5,>=0.4.1->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading requests_oauthlib-2.0.0-py2.py3-none-any.whl.metadata (11 kB)
+Collecting importlib-metadata>=4.4 (from markdown>=2.6.8->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading importlib_metadata-8.5.0-py3-none-any.whl.metadata (4.8 kB)
+Collecting charset-normalizer<4,>=2 (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading charset_normalizer-3.3.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (33 kB)
+Collecting idna<4,>=2.5 (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading idna-3.10-py3-none-any.whl.metadata (10 kB)
+Collecting urllib3<3,>=1.21.1 (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading urllib3-2.2.3-py3-none-any.whl.metadata (6.5 kB)
+Collecting certifi>=2017.4.17 (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading certifi-2024.8.30-py3-none-any.whl.metadata (2.2 kB)
+Collecting MarkupSafe>=2.1.1 (from werkzeug>=0.11.15->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading MarkupSafe-2.1.5-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (3.0 kB)
+Requirement already satisfied: zipp>=3.20 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<2.9,>=2.8->tensorflow==2.8.0) (3.20.2)
+Collecting pyasn1<0.7.0,>=0.4.6 (from pyasn1-modules>=0.2.1->google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading pyasn1-0.6.1-py3-none-any.whl.metadata (8.4 kB)
+Collecting oauthlib>=3.0.0 (from requests-oauthlib>=0.7.0->google-auth-oauthlib<0.5,>=0.4.1->tensorboard<2.9,>=2.8->tensorflow==2.8.0)
+  Downloading oauthlib-3.2.2-py3-none-any.whl.metadata (7.5 kB)
+Downloading tensorflow-2.8.0-cp39-cp39-manylinux2010_x86_64.whl (497.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 497.6/497.6 MB 100.6 MB/s eta 0:00:00
+Downloading tf_estimator_nightly-2.8.0.dev2021122109-py2.py3-none-any.whl (462 kB)
+Downloading absl_py-2.1.0-py3-none-any.whl (133 kB)
+Downloading astunparse-1.6.3-py2.py3-none-any.whl (12 kB)
+Downloading flatbuffers-24.3.25-py2.py3-none-any.whl (26 kB)
+Downloading gast-0.6.0-py3-none-any.whl (21 kB)
+Downloading google_pasta-0.2.0-py3-none-any.whl (57 kB)
+Downloading grpcio-1.66.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (5.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.8/5.8 MB 119.8 MB/s eta 0:00:00
+Downloading h5py-3.11.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (5.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.3/5.3 MB 117.6 MB/s eta 0:00:00
+Downloading keras-2.8.0-py2.py3-none-any.whl (1.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 120.6 MB/s eta 0:00:00
+Downloading Keras_Preprocessing-1.1.2-py2.py3-none-any.whl (42 kB)
+Downloading libclang-18.1.1-py2.py3-none-manylinux2010_x86_64.whl (24.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 24.5/24.5 MB 115.5 MB/s eta 0:00:00
+Downloading opt_einsum-3.3.0-py3-none-any.whl (65 kB)
+Downloading tensorboard-2.8.0-py3-none-any.whl (5.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.8/5.8 MB 116.2 MB/s eta 0:00:00
+Downloading tensorflow_io_gcs_filesystem-0.37.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (5.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.1/5.1 MB 116.5 MB/s eta 0:00:00
+Downloading termcolor-2.4.0-py3-none-any.whl (7.7 kB)
+Downloading typing_extensions-4.12.2-py3-none-any.whl (37 kB)
+Downloading wrapt-1.16.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (80 kB)
+Downloading google_auth-2.34.0-py2.py3-none-any.whl (200 kB)
+Downloading google_auth_oauthlib-0.4.6-py2.py3-none-any.whl (18 kB)
+Downloading Markdown-3.7-py3-none-any.whl (106 kB)
+Downloading requests-2.32.3-py3-none-any.whl (64 kB)
+Downloading tensorboard_data_server-0.6.1-py3-none-manylinux2010_x86_64.whl (4.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 119.9 MB/s eta 0:00:00
+Downloading tensorboard_plugin_wit-1.8.1-py3-none-any.whl (781 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 781.3/781.3 kB 209.7 MB/s eta 0:00:00
+Downloading werkzeug-3.0.4-py3-none-any.whl (227 kB)
+Downloading cachetools-5.5.0-py3-none-any.whl (9.5 kB)
+Downloading certifi-2024.8.30-py3-none-any.whl (167 kB)
+Downloading charset_normalizer-3.3.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (142 kB)
+Downloading idna-3.10-py3-none-any.whl (70 kB)
+Downloading importlib_metadata-8.5.0-py3-none-any.whl (26 kB)
+Downloading MarkupSafe-2.1.5-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (25 kB)
+Downloading pyasn1_modules-0.4.1-py3-none-any.whl (181 kB)
+Downloading requests_oauthlib-2.0.0-py2.py3-none-any.whl (24 kB)
+Downloading rsa-4.9-py3-none-any.whl (34 kB)
+Downloading urllib3-2.2.3-py3-none-any.whl (126 kB)
+Downloading oauthlib-3.2.2-py3-none-any.whl (151 kB)
+Downloading pyasn1-0.6.1-py3-none-any.whl (83 kB)
+Installing collected packages: tf-estimator-nightly, tensorboard-plugin-wit, libclang, keras, flatbuffers, wrapt, urllib3, typing-extensions, termcolor, tensorflow-io-gcs-filesystem, tensorboard-data-server, pyasn1, opt-einsum, oauthlib, MarkupSafe, keras-preprocessing, importlib-metadata, idna, h5py, grpcio, google-pasta, gast, charset-normalizer, certifi, cachetools, astunparse, absl-py, werkzeug, rsa, requests, pyasn1-modules, markdown, requests-oauthlib, google-auth, google-auth-oauthlib, tensorboard, tensorflow
+Successfully installed MarkupSafe-2.1.5 absl-py-2.1.0 astunparse-1.6.3 cachetools-5.5.0 certifi-2024.8.30 charset-normalizer-3.3.2 flatbuffers-24.3.25 gast-0.6.0 google-auth-2.34.0 google-auth-oauthlib-0.4.6 google-pasta-0.2.0 grpcio-1.66.1 h5py-3.11.0 idna-3.10 importlib-metadata-8.5.0 keras-2.8.0 keras-preprocessing-1.1.2 libclang-18.1.1 markdown-3.7 oauthlib-3.2.2 opt-einsum-3.3.0 pyasn1-0.6.1 pyasn1-modules-0.4.1 requests-2.32.3 requests-oauthlib-2.0.0 rsa-4.9 tensorboard-2.8.0 tensorboard-data-server-0.6.1 tensorboard-plugin-wit-1.8.1 tensorflow-2.8.0 tensorflow-io-gcs-filesystem-0.37.1 termcolor-2.4.0 tf-estimator-nightly-2.8.0.dev2021122109 typing-extensions-4.12.2 urllib3-2.2.3 werkzeug-3.0.4 wrapt-1.16.0
+Collecting tf_agents==0.12.0
+  Downloading tf_agents-0.12.0-py3-none-any.whl.metadata (11 kB)
+Requirement already satisfied: absl-py>=0.6.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (2.1.0)
+Collecting cloudpickle>=1.3 (from tf_agents==0.12.0)
+  Downloading cloudpickle-3.0.0-py3-none-any.whl.metadata (7.0 kB)
+Collecting gin-config>=0.4.0 (from tf_agents==0.12.0)
+  Downloading gin_config-0.5.0-py3-none-any.whl.metadata (2.9 kB)
+Collecting gym>=0.17.0 (from tf_agents==0.12.0)
+  Downloading gym-0.26.2.tar.gz (721 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 721.7/721.7 kB 37.6 MB/s eta 0:00:00
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+Requirement already satisfied: numpy>=1.13.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (1.21.0)
+Requirement already satisfied: pillow in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (10.4.0)
+Requirement already satisfied: six>=1.10.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (1.16.0)
+Requirement already satisfied: protobuf>=3.11.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (3.20.3)
+Requirement already satisfied: wrapt>=1.11.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (1.16.0)
+Requirement already satisfied: typing-extensions>=3.7.4.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0) (4.12.2)
+Collecting tensorflow-probability>=0.16.0 (from tf_agents==0.12.0)
+  Downloading tensorflow_probability-0.24.0-py2.py3-none-any.whl.metadata (13 kB)
+Collecting gym-notices>=0.0.4 (from gym>=0.17.0->tf_agents==0.12.0)
+  Downloading gym_notices-0.0.8-py3-none-any.whl.metadata (1.0 kB)
+Requirement already satisfied: importlib-metadata>=4.8.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from gym>=0.17.0->tf_agents==0.12.0) (8.5.0)
+Collecting decorator (from tensorflow-probability>=0.16.0->tf_agents==0.12.0)
+  Downloading decorator-5.1.1-py3-none-any.whl.metadata (4.0 kB)
+Requirement already satisfied: gast>=0.3.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability>=0.16.0->tf_agents==0.12.0) (0.6.0)
+Collecting dm-tree (from tensorflow-probability>=0.16.0->tf_agents==0.12.0)
+  Downloading dm_tree-0.1.8-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.9 kB)
+Requirement already satisfied: zipp>=3.20 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from importlib-metadata>=4.8.0->gym>=0.17.0->tf_agents==0.12.0) (3.20.2)
+Downloading tf_agents-0.12.0-py3-none-any.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 83.3 MB/s eta 0:00:00
+Downloading cloudpickle-3.0.0-py3-none-any.whl (20 kB)
+Downloading gin_config-0.5.0-py3-none-any.whl (61 kB)
+Downloading tensorflow_probability-0.24.0-py2.py3-none-any.whl (6.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.9/6.9 MB 117.4 MB/s eta 0:00:00
+Downloading gym_notices-0.0.8-py3-none-any.whl (3.0 kB)
+Downloading decorator-5.1.1-py3-none-any.whl (9.1 kB)
+Downloading dm_tree-0.1.8-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (153 kB)
+Building wheels for collected packages: gym
+  Building wheel for gym (pyproject.toml) ... done
+  Created wheel for gym: filename=gym-0.26.2-py3-none-any.whl size=827625 sha256=025bb2a39633b6844fd2ca32142b82f2dd607820ae66c4e68e71407e0ceeb88c
+  Stored in directory: /tmp/pip-ephem-wheel-cache-7ppvk6k1/wheels/af/2b/30/5e78b8b9599f2a2286a582b8da80594f654bf0e18d825a4405
+Successfully built gym
+Installing collected packages: gym-notices, gin-config, dm-tree, decorator, cloudpickle, tensorflow-probability, gym, tf_agents
+Successfully installed cloudpickle-3.0.0 decorator-5.1.1 dm-tree-0.1.8 gin-config-0.5.0 gym-0.26.2 gym-notices-0.0.8 tensorflow-probability-0.24.0 tf_agents-0.12.0
+Collecting tensorflow-probability==0.16.0
+  Downloading tensorflow_probability-0.16.0-py2.py3-none-any.whl.metadata (13 kB)
+Requirement already satisfied: absl-py in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (2.1.0)
+Requirement already satisfied: six>=1.10.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (1.16.0)
+Requirement already satisfied: numpy>=1.13.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (1.21.0)
+Requirement already satisfied: decorator in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (5.1.1)
+Requirement already satisfied: cloudpickle>=1.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (3.0.0)
+Requirement already satisfied: gast>=0.3.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (0.6.0)
+Requirement already satisfied: dm-tree in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0) (0.1.8)
+Downloading tensorflow_probability-0.16.0-py2.py3-none-any.whl (6.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 88.9 MB/s eta 0:00:00
+Installing collected packages: tensorflow-probability
+  Attempting uninstall: tensorflow-probability
+    Found existing installation: tensorflow-probability 0.24.0
+    Uninstalling tensorflow-probability-0.24.0:
+      Successfully uninstalled tensorflow-probability-0.24.0
+Successfully installed tensorflow-probability-0.16.0
+[SmartSim] INFO Running SmartSim build process...
+[SmartSim] INFO Checking requested versions...
+[SmartSim] INFO Checking for build tools...
+[SmartSim] INFO Redis build complete!
+
+ML Backends Requested
+╒════════════╤════════╤═══════╕
+│ PyTorch    │ 1.11.0 │ False │
+│ TensorFlow │ 2.8.0  │ False │
+│ ONNX       │ 1.11.0 │ False │
+╘════════════╧════════╧═══════╛
+
+Building for GPU support: False
+
+[SmartSim] INFO Building RedisAI version 1.2.7 from https://github.com/RedisAI/RedisAI.git/
+[SmartSim] INFO ML Backends and RedisAI build complete!
+[SmartSim] INFO No backend(s) built
+[SmartSim] INFO SmartSim build complete!
+Obtaining file:///home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
+  Preparing metadata (setup.py) ... done
+Requirement already satisfied: numpy==1.21.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (1.21.0)
+Requirement already satisfied: smartsim==0.4.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (0.4.2)
+Requirement already satisfied: smartredis==0.5.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (0.5.3)
+Requirement already satisfied: tensorflow==2.8.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (2.8.0)
+Requirement already satisfied: tensorflow-probability==0.16.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (0.16.0)
+Requirement already satisfied: tf_agents==0.12.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (0.12.0)
+Requirement already satisfied: matplotlib in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartrhea==1.0) (3.7.0)
+Requirement already satisfied: psutil>=5.7.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (6.0.0)
+Requirement already satisfied: coloredlogs==10.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (10.0)
+Requirement already satisfied: tabulate>=0.8.9 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (0.9.0)
+Requirement already satisfied: redis-py-cluster==2.1.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (2.1.3)
+Requirement already satisfied: redis==3.5.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (3.5.3)
+Requirement already satisfied: tqdm>=4.50.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (4.66.5)
+Requirement already satisfied: filelock>=3.4.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (3.16.0)
+Requirement already satisfied: protobuf~=3.20 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from smartsim==0.4.2->smartrhea==1.0) (3.20.3)
+Requirement already satisfied: absl-py>=0.4.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (2.1.0)
+Requirement already satisfied: astunparse>=1.6.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (1.6.3)
+Requirement already satisfied: flatbuffers>=1.12 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (24.3.25)
+Requirement already satisfied: gast>=0.2.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (0.6.0)
+Requirement already satisfied: google-pasta>=0.1.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (0.2.0)
+Requirement already satisfied: h5py>=2.9.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (3.11.0)
+Requirement already satisfied: keras-preprocessing>=1.1.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (1.1.2)
+Requirement already satisfied: libclang>=9.0.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (18.1.1)
+Requirement already satisfied: opt-einsum>=2.3.2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (3.3.0)
+Requirement already satisfied: setuptools in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (72.1.0)
+Requirement already satisfied: six>=1.12.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (1.16.0)
+Requirement already satisfied: termcolor>=1.1.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (2.4.0)
+Requirement already satisfied: typing-extensions>=3.6.6 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (4.12.2)
+Requirement already satisfied: wrapt>=1.11.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (1.16.0)
+Requirement already satisfied: tensorboard<2.9,>=2.8 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (2.8.0)
+Requirement already satisfied: tf-estimator-nightly==2.8.0.dev2021122109 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (2.8.0.dev2021122109)
+Requirement already satisfied: keras<2.9,>=2.8.0rc0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (2.8.0)
+Requirement already satisfied: tensorflow-io-gcs-filesystem>=0.23.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (0.37.1)
+Requirement already satisfied: grpcio<2.0,>=1.24.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow==2.8.0->smartrhea==1.0) (1.66.1)
+Requirement already satisfied: decorator in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0->smartrhea==1.0) (5.1.1)
+Requirement already satisfied: cloudpickle>=1.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0->smartrhea==1.0) (3.0.0)
+Requirement already satisfied: dm-tree in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorflow-probability==0.16.0->smartrhea==1.0) (0.1.8)
+Requirement already satisfied: gin-config>=0.4.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0->smartrhea==1.0) (0.5.0)
+Requirement already satisfied: gym>=0.17.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0->smartrhea==1.0) (0.26.2)
+Requirement already satisfied: pillow in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tf_agents==0.12.0->smartrhea==1.0) (10.4.0)
+Requirement already satisfied: humanfriendly>=4.7 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from coloredlogs==10.0->smartsim==0.4.2->smartrhea==1.0) (10.0)
+Requirement already satisfied: contourpy>=1.0.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (1.2.1)
+Requirement already satisfied: cycler>=0.10 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (0.12.1)
+Requirement already satisfied: fonttools>=4.22.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (4.53.1)
+Requirement already satisfied: kiwisolver>=1.0.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (1.4.7)
+Requirement already satisfied: packaging>=20.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (24.1)
+Requirement already satisfied: pyparsing>=2.3.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (3.1.4)
+Requirement already satisfied: python-dateutil>=2.7 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (2.9.0.post0)
+Requirement already satisfied: importlib-resources>=3.2.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from matplotlib->smartrhea==1.0) (6.4.5)
+Requirement already satisfied: wheel<1.0,>=0.23.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from astunparse>=1.6.0->tensorflow==2.8.0->smartrhea==1.0) (0.44.0)
+Requirement already satisfied: gym-notices>=0.0.4 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from gym>=0.17.0->tf_agents==0.12.0->smartrhea==1.0) (0.0.8)
+Requirement already satisfied: importlib-metadata>=4.8.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from gym>=0.17.0->tf_agents==0.12.0->smartrhea==1.0) (8.5.0)
+Requirement already satisfied: zipp>=3.1.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from importlib-resources>=3.2.0->matplotlib->smartrhea==1.0) (3.20.2)
+Requirement already satisfied: google-auth<3,>=1.6.3 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (2.34.0)
+Requirement already satisfied: google-auth-oauthlib<0.5,>=0.4.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (0.4.6)
+Requirement already satisfied: markdown>=2.6.8 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (3.7)
+Requirement already satisfied: requests<3,>=2.21.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (2.32.3)
+Requirement already satisfied: tensorboard-data-server<0.7.0,>=0.6.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (0.6.1)
+Requirement already satisfied: tensorboard-plugin-wit>=1.6.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (1.8.1)
+Requirement already satisfied: werkzeug>=0.11.15 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (3.0.4)
+Requirement already satisfied: cachetools<6.0,>=2.0.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (5.5.0)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (0.4.1)
+Requirement already satisfied: rsa<5,>=3.1.4 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (4.9)
+Requirement already satisfied: requests-oauthlib>=0.7.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from google-auth-oauthlib<0.5,>=0.4.1->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (2.0.0)
+Requirement already satisfied: charset-normalizer<4,>=2 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (3.3.2)
+Requirement already satisfied: idna<4,>=2.5 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (3.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (2.2.3)
+Requirement already satisfied: certifi>=2017.4.17 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from requests<3,>=2.21.0->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (2024.8.30)
+Requirement already satisfied: MarkupSafe>=2.1.1 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from werkzeug>=0.11.15->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (2.1.5)
+Requirement already satisfied: pyasn1<0.7.0,>=0.4.6 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from pyasn1-modules>=0.2.1->google-auth<3,>=1.6.3->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (0.6.1)
+Requirement already satisfied: oauthlib>=3.0.0 in /home/jofre/miniconda3/envs/smartrhea-env-v2/lib/python3.9/site-packages (from requests-oauthlib>=0.7.0->google-auth-oauthlib<0.5,>=0.4.1->tensorboard<2.9,>=2.8->tensorflow==2.8.0->smartrhea==1.0) (3.2.2)
+Installing collected packages: smartrhea
+  DEPRECATION: Legacy editable install of smartrhea==1.0 from file:///home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow (setup.py develop) is deprecated. pip 25.0 will enforce this behaviour change. A possible replacement is to add a pyproject.toml or enable --use-pep517, and use setuptools >= 64. If the resulting installation is not behaving as expected, try using --config-settings editable_mode=compat. Please consult the setuptools documentation for more information. Discussion can be found at https://github.com/pypa/pip/issues/11457
+  Running setup.py develop for smartrhea
+Successfully installed smartrhea

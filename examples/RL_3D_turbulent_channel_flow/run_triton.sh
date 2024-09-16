@@ -29,9 +29,9 @@ export SR_LOG_LEVEL="INFO"
 export SMARTSIM_LOG_LEVEL="DEBUG"
 
 # Remove .out and .err files, if necessary
-rm -f ensemble.out ensemble.err mpi_output*
+rm -f ensemble.out ensemble.err
 
-# Compile ProjectRHEA code TODO: uncomment compilation lines
+# Compile ProjectRHEA code
 echo ">>> Compiling ProjectRHEA..."
 CURRENT_DIR=$(pwd)
 cd "$RHEA_EXE_DIR"
@@ -42,8 +42,8 @@ echo ">>> ProjectRHEA compiled!"
 
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"
-conda activate smartrhea-env
-echo ">>> Conda environment 'smartrhea-env' activated"
+conda activate smartrhea-env-v2
+echo ">>> Conda environment 'smartrhea-env-v2' activated"
 
 # Run training
 echo ">>> Running training 'run.py'..."

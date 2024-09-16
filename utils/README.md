@@ -16,6 +16,9 @@ g++ -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/usr/lib/x86_64-linux-gnu/open
 The output we are seeing from the `mpicxx -show` command indicates that mpicxx is using `g++` as the underlying C++ compiler and linking it with the OpenMPI libraries.
 
 
+### Python environment
 
+Conda environment `smartrhea-env` works well for training, but experiences an error when saving the model, due to an incompatibility issue between `tensorflow-probability` and `tf-agents`.
+To solve this issue, `smartrhea-env-v2` installs a different version of these libraries.
 
 
