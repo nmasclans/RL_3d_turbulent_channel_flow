@@ -173,23 +173,16 @@ class RheaEnv(py_environment.PyEnvironment):
                 os.makedirs(os.path.join(self.dump_data_path, "action"))
             if not os.path.exists(os.path.join(self.dump_data_path, "time")):
                 os.makedirs(os.path.join(self.dump_data_path, "time"))
+            if not os.path.exists(os.path.join(self.dump_data_path, "mpi_output")):
+                os.makedirs(os.path.join(self.dump_data_path, "mpi_output"))
+
         # manage directory 'rhea_exp/output' & 'rhea_exp/timers_info'
         rhea_exp_dir = "rhea_exp"
         if not os.path.exists(rhea_exp_dir):    # create directory 'rhea_exp'
             os.makedirs(rhea_exp_dir)
-        else:                                   # empty directory 'rhea_exp'
-            for filename in os.listdir(rhea_exp_dir):
-                file_path = os.path.join(rhea_exp_dir, filename)
-                try: 
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    logger.error(f"Failed to delete '{file_path}': {e}")
-        os.makedirs(os.path.join(rhea_exp_dir, "output"))
-        os.makedirs(os.path.join(rhea_exp_dir, "timers_info"))
-        
+        if not os.path.exists(os.path.join(rhea_exp_dir, "timers_info")):
+            os.makedirs(os.path.join(rhea_exp_dir, "timers_info"))
+
         # generate database ensemble keys
         self.time_key = ["ensemble_" + str(i) + "." + time_key for i in range(self.cfd_n_envs)]
         self.step_type_key = ["ensemble_" + str(i) + "." + step_type_key for i in range(self.cfd_n_envs)]
@@ -331,7 +324,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # Edit my-hostfile
         write_hosts(self.hosts, self.mpirun_np, os.path.join(self.rhea_exe_dir, self.mpirun_hostfile))
 
-        if self.run_command == "mpirun": # not working, problems with run_args being interpreted as the executable
+        if self.run_command == "mpirun": # TODO: not working, problems with run_args being interpreted as the executable
             # Set model arguments
             f_mpmd = None
             for i in range(self.cfd_n_envs):
@@ -373,9 +366,9 @@ class RheaEnv(py_environment.PyEnvironment):
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
                     if i == 0:
-                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > rhea_exp/output/mpi_output_env{i}_step{global_step}.out 2>&1")
+                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step}.out 2>&1")
                     else:
-                        f.write(f" : \\\n -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > rhea_exp/output/mpi_output_env{i}_step{global_step}.out 2>&1")
+                        f.write(f" & \\\nmpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step}.out 2>&1")
                 f.write("\n")
             # Make the script executable
             os.chmod(runit_script, 0o755)
