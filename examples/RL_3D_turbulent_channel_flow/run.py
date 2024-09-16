@@ -48,7 +48,11 @@ if params["use_XLA"]:   # activate XLA (Accelerated Linear Algebra) for performa
         <timestamp>: time when the file is created
         <host_name>: host name of the machine where TensorFlow process runs, e.g. triton
         <pid>: pid of the TensorFlow process that created the event file    """
-run_id              = datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")+"--"+str(uuid.uuid4())[:4]
+if params["run_id"] == "":
+    run_id              = datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")+"--"+str(uuid.uuid4())[:4]
+else:
+    run_id = params["run_id"]
+    logger.info(f"Continue training from '{run_id}' past training")
 train_parent_dir    = os.path.join(cwd, "train")
 train_dir           = os.path.join(train_parent_dir, f"train_{run_id}")
 summary_writter_dir = os.path.join(train_parent_dir, "summary", run_id)
@@ -278,12 +282,17 @@ train_checkpointer = common.Checkpointer(
     ckpt_dir=ckpt_dir,
     max_to_keep=params["ckpt_num"],     # if necessary, oldest checkpoints are deleted
     agent=agent,                        # **kwargs: items to include in the checkpoint
-    policy=agent.policy,
+    policy=eval_policy,
     replay_buffer=replay_buffer,
     metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'),
     global_step=global_step,
 )
 # Checkpointer to evaluation policy
+""" Why to use policy param as 'eval_policy' instead of 'collect_policy':
+    For checkpointing during training, it's common to store the evaluation policy (eval_policy=agent.policy) because:
+    The evaluation policy reflects the "best" learned policy (without exploration noise).
+    If you want to reload and evaluate the agent's performance from the checkpoint, you would use this greedy evaluation policy to get the actual learned behavior.
+    Using collect_policy in the checkpoint doesn't make sense in this context because it includes exploration, which is more about gathering training data, not representing the final learned behavior.    """
 policy_checkpointer = common.Checkpointer(
     ckpt_dir=os.path.join(train_dir, 'policy'),
     policy=eval_policy,
@@ -291,13 +300,21 @@ policy_checkpointer = common.Checkpointer(
 )
 # Initialize PolicySaver, allows to save a tf_policy.Policy to SavedModel
 saved_model = policy_saver.PolicySaver(eval_policy, train_step=global_step)
-""" Restore training process if existing saved checkpoints
-    initialize_or_restore(self, session=None)
+
+# Restore training process if existing saved checkpoints
+""" initialize_or_restore(self, session=None)
         Initialize or restore graph (based on checkpoint if exists).
     If not checkpoints available, this will return:
         INFO:absl:No checkpoint available at <train_dir>/ckpt
         INFO:absl:No checkpoint available at <train_dir>/policy     """
-train_checkpointer.initialize_or_restore()  
+if params["run_id"] != "":
+    try:
+        train_checkpointer.initialize_or_restore()  
+        if not train_checkpointer._checkpoint_exists:
+            raise RuntimeError(f"No checkpoint available for run_id '{params['run_id']}' at the specified path: {train_checkpointer._manager.latest_checkpoint}")
+        logger.info(f"Train checkpointer restored from '{{train_checkpointer._manager.latest_checkpoint}}'")
+    except Exception as e:
+        raise RuntimeError(f"Error occurred during checkpoint restore: {str(e)}")
 
 #--------------------------- Training / Evaluation ---------------------------
 with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
@@ -356,14 +373,7 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
                 train_checkpointer.save(global_step_val)
                 policy_checkpointer.save(global_step_val)
                 saved_model_path = os.path.join(saved_model_dir, 'policy_' + ('%d' % global_step_val).zfill(9))
-                #try:
-                #    saved_model.save(saved_model_path)
-                #except AttributeError as e:
-                #    logger.warning(f"Warning while saving the model: {e}")
-                #    policy_saver_instance = policy_saver.PolicySaver(collect_policy)
-                #    policy_saver_instance.save(saved_model_path)
-                #    # Manually save the policy if possible, e.g., with a different method
-                #    # Here you can use tf.saved_model.save as an alternative
+                saved_model.save(saved_model_path)
                     
 
             if global_step_val % params["log_interval"] == 0:
