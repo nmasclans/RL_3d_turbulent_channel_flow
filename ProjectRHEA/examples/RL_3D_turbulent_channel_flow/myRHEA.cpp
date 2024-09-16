@@ -1417,7 +1417,7 @@ void myRHEA::calculateReward() {
         }
     }
     avg_u_field_local /= num_points_local;
-    reward_local = std::abs(avg_u_field_local - avg_u_field_local_previous); 
+    reward_local = std::abs( ( avg_u_field_local - avg_u_field_local_previous ) / ( avg_u_field_local_previous + EPS ) ); 
 
     /// Store avg_u_field_local for next reward calculation
     avg_u_field_local_previous = avg_u_field_local;
