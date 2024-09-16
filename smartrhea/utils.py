@@ -44,6 +44,7 @@ def check_witness_xyz(fname):
     Arguments:
         fname (str): witness points filename
     """
+    logger.debug(f"[utils:check_witness_xyz] filename: {fname}")
     witness_points = np.loadtxt(fname)
     prev_point = witness_points[0]
     # ### Check if x changes first, then y, then z
