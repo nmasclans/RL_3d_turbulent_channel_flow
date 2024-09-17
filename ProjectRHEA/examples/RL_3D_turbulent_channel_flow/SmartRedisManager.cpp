@@ -163,26 +163,11 @@ void SmartRedisManager::writeState(const std::vector<double>& state_local, const
                                    const SRTensorType type,
                                    const SRMemoryLayout mem_layout) */
         client->put_tensor(key, state_global.data(), state_global_size_vec, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
-        std::cout << "[SmartRedisManager::writeState] State written: ";
+        std::cout << "[SmartRedisManager::writeState] Written state '" << key << "': ";
         for (int i=0; i<state_global_size; i++)
             std::cout << state_global[i] << " ";
         std::cout << std::endl << std::flush;
     } 
-
-    // Checks   // TODO: remove cout lines if not used in the future
-    // if (my_rank == 0) {
-    //     std::cout << "[writeState] State sizes: ";
-    //     for (int i = 0; i < mpi_size; ++i) {
-    //         std::cout << state_sizes[i] << " ";
-    //     }
-    //     std::cout << std::endl;
-
-    //     std::cout << "[writeState] State displacements: ";
-    //     for (int i = 0; i < mpi_size; ++i) {
-    //         std::cout << state_displs[i] << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
 
 }
 
@@ -371,7 +356,7 @@ void SmartRedisManager::writeReward(const double& reward_local, const std::strin
     if (my_rank == 0) {
         client->put_tensor(key, reward_global.data(), reward_global_size_vec, SRTensorType::SRTensorTypeDouble, SRMemoryLayout::SRMemLayoutContiguous);
         /// Logging
-        std::cout << "[SmartRedisManager::writeReward] Reward written: ";
+        std::cout << "[SmartRedisManager::writeReward] Written reward '" << key << "': ";
         for (int i=0; i<reward_global_size; i++)
             std::cout << reward_global[i] << " ";
         std::cout << std::endl << std::flush; 
