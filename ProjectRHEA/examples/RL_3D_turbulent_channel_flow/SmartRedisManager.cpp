@@ -328,7 +328,7 @@ void SmartRedisManager::readAction(const std::string& key) {
     /// std::cout << "[SmartRedisManager::readAction] Rank " << my_rank << " has local action " << action_local << std::endl << std::flush;
 
     if (my_rank == 0) {
-        std::cout << "[SmartRedisManager::readAction] Action read (and deleted): ";
+        std::cout << "[SmartRedisManager::readAction] Read Action (and deleted) '" << key << "': ";
         for (int i=0; i<action_global_size; i++) 
             std::cout << action_global[i] << " ";
         std::cout << std::endl;
