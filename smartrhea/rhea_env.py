@@ -460,7 +460,7 @@ class RheaEnv(py_environment.PyEnvironment):
             for j in range(self.rl_n_envs):
                 self._state_rl[i * self.rl_n_envs + j,:] = state_extended[i, block_wit * (j - self.rl_neighbors) + \
                     self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state]
-                logger.debug(f"[Env {i} - Pseudo Env {j}] (Read) State: {self._state_rl[i * self.rl_n_envs + j,:]}")
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] (Read) State: {self._state_rl[i * self.rl_n_envs + j,:]}")
         # -> _redistribute_state has been CHECKED, the state information is distributed successfully along rl env., including the neighboring rl env.  
 
 
@@ -476,6 +476,10 @@ class RheaEnv(py_environment.PyEnvironment):
         mean               = np.mean(flattened_state_rl)
         std_dev            = np.std(flattened_state_rl)
         self._state_rl     = (self._state_rl - mean) / std_dev
+        # Logging
+        for i in range(self.cfd_n_envs):
+            for j in range(self.rl_n_envs):
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] (Read) Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
 
 
     def _get_reward(self):
@@ -492,10 +496,10 @@ class RheaEnv(py_environment.PyEnvironment):
                     for j in range(self.rl_n_envs):
                         # Weighted average between local rewards (of rl env inside same cfd simulation) and global reward (of cfd simulation)
                         self._reward[i * self.rl_n_envs + j] = self.reward_beta * global_reward + (1.0 - self.reward_beta) * local_reward[j]
-                    logger.debug(f"[Env {i}] (Read) Local Reward: {reward}")  # shape [self.rl_n_envs], rewards from all rl env for a specific cfd env
-                    logger.debug(f"[Env {i}] Normalized Local Reward: {local_reward}")
-                    logger.debug(f"[Env {i}] Global Reward: {global_reward}")
-                    logger.debug(f"[Env {i}] Weighted Reward: {self._reward[i*self.rl_n_envs:i*self.rl_n_envs+self.rl_n_envs]}")                  
+                    logger.debug(f"[Cfd Env {i}] (Read) Local Reward: {reward}")  # shape [self.rl_n_envs], rewards from all rl env for a specific cfd env
+                    logger.debug(f"[Cfd Env {i}] Normalized Local Reward: {local_reward}")
+                    logger.debug(f"[Cfd Env {i}] Global Reward: {global_reward}")
+                    logger.debug(f"[Cfd Env {i}] Weighted Reward: {self._reward[i*self.rl_n_envs:i*self.rl_n_envs+self.rl_n_envs]}")                  
                 except Exception as exc:
                     raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
 
@@ -506,7 +510,7 @@ class RheaEnv(py_environment.PyEnvironment):
                 self.client.poll_tensor(self.time_key[i], self.poll_freq_ms, self.poll_n_tries)
                 self._time[i] = self.client.get_tensor(self.time_key[i])[0]
                 self.client.delete_tensor(self.time_key[i])
-                logger.debug(f"[Env {i}] Got time: {numpy_str(self._time[i])}")
+                logger.debug(f"[Cfd Env {i}] Got time: {numpy_str(self._time[i])}")
             except Exception as exc:
                 raise Warning(f"Could not read time from key: {self.time_key[i]}") from exc
 
