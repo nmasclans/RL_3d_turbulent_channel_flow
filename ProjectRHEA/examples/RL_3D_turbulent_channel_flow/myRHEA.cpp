@@ -489,13 +489,14 @@ void myRHEA::calculateSourceTerms() {
                                 /// Eigen-values Barycentric coordinates (dof #5-6)
                                 eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
 
-                                /// Build perturbed Rij d.o.f.
-                                Rkk    += DeltaRkk;
-                                thetaZ += DeltaThetaZ;
-                                thetaY += DeltaThetaY;
-                                thetaX += DeltaThetaX;
-                                xmap1  += DeltaXmap1;
-                                xmap2  += DeltaXmap2;
+                                /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
+                                /// Delta_* are standarized values between 'action_bounds' RL parameter
+                                Rkk    = Rkk    * (1 + DeltaRkk);
+                                thetaZ = thetaZ * (1 + DeltaThetaZ);
+                                thetaY = thetaY * (1 + DeltaThetaY);
+                                thetaX = thetaX * (1 + DeltaThetaX);
+                                xmap1  = xmap1  * (1 + DeltaXmap1);
+                                xmap2  = xmap2  * (1 + DeltaXmap2);
 
                                 /// Enforce realizability to perturbed Rij d.o.f
                                 enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
@@ -1397,7 +1398,10 @@ void myRHEA::updateState() {
     ///     cout << state_local[ii] << " ";
     /// }
     /// cout << endl << flush;
-}
+
+    /// State Standarization
+    /// Standarization is performed in the Python RL counterpart, using full batch data of all cfd environments & rl pseudo-environments
+}   
 
 ///////////////////////////////////////////////////////////////////////////////
 

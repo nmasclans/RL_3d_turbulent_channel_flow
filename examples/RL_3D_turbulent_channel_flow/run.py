@@ -142,6 +142,14 @@ actor_net = actor_net_builder.create_sequential_actor_net(params["net"], action_
         preprocessing_combiner=None, conv_layer_params=None, fc_layer_params=(75, 40), 
         dropout_layer_params=None, activation_fn=<function relu at 0x79f78275c280>, 
         kernel_initializer=None, batch_squash=True, dtype=tf.float32, name='ValueNetwork')
+    Generatres actor net as:
+    - Several dense layers (based on 'fc_layer_units') with tanh activation.
+    - A 'means projection' layer that outputs the action means ('loc').
+    - A 'Lambda' layer that initializes 'scale' as zeros.
+    - A 'NestMap' layer that:
+        · Passes 'loc' unchanged through a no-op layer.
+        · Passes 'scale' through a 'std_layers' to compute the standard deviation, which is converted to positive using 'softplus'.
+    - A 'Lambda' layer that creates a multivariate normal distribution from 'loc' and 'scale'.
 """
 value_net = value_network.ValueNetwork(
     observation_tensor_spec,

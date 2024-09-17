@@ -228,15 +228,15 @@ class RheaEnv(py_environment.PyEnvironment):
             self.n_action = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
 
         # create and allocate array objects
-        self._state = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
-        self._state_rl = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
-        self._action = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
-        self._action_znmf = np.zeros((self.cfd_n_envs, 2 * self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
+        self._state        = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
+        self._state_rl     = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
+        self._action       = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
+        self._action_znmf  = np.zeros((self.cfd_n_envs, 2 * self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
         self._local_reward = np.zeros((self.cfd_n_envs, self.rl_n_envs))
-        self._reward = np.zeros(self.n_envs)
-        self._time = np.zeros(self.cfd_n_envs, dtype=self.model_dtype)
-        self._step_type = - np.ones(self.cfd_n_envs, dtype=int) # init status in -1
-        self._episode_global_step= -1
+        self._reward       = np.zeros(self.n_envs)
+        self._time         = np.zeros(self.cfd_n_envs, dtype=self.model_dtype)
+        self._step_type    = - np.ones(self.cfd_n_envs, dtype=int) # init status in -1
+        self._episode_global_step = -1
         logger.debug(f"n_state: {self.n_state}, n_state_rl: {self.n_state_rl}, rl_n_envs: {rl_n_envs}, n_action: {self.n_action}")
         logger.debug(f"Shape of _state: {self._state.shape}, _state_rl: {self._state_rl.shape}, _action: {self._action.shape}, _action_znmf: {self._action_znmf.shape}, " +
                      f"_local_reward: {self._local_reward.shape}, _reward: {self._reward.shape}")
@@ -275,7 +275,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self.envs_initialised = False
 
         # Check simulations have started
-        status = self.get_status()
+        status = self._get_status()
         logger.info(f"Initial status: {status}")
         assert np.all(status > 0), "RHEA environments could not start."
         self._episode_global_step = global_step
@@ -291,7 +291,8 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # Get the initial state and reward
         self._get_state() # updates self._state
-        self._redistribute_state() # updates self._state_marl
+        self._redistribute_state() # updates self._state_rl
+        self._standarize_state()   # updates self._state_rl
         self._get_reward() # updates self._reward
         self._get_time()   # updates self._time
 
@@ -463,6 +464,20 @@ class RheaEnv(py_environment.PyEnvironment):
         # -> _redistribute_state has been CHECKED, the state information is distributed successfully along rl env., including the neighboring rl env.  
 
 
+    def _standarize_state(self):
+        """
+        Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
+        
+        Additional info: 
+        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
+                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
+        """
+        flattened_state_rl = self._state_rl.flatten()
+        mean               = np.mean(flattened_state_rl)
+        std_dev            = np.std(flattened_state_rl)
+        self._state_rl     = (self._state_rl - mean) / std_dev
+
+
     def _get_reward(self):
         for i in range(self.cfd_n_envs):
             if self._step_type[i] > 0: # environment still running
@@ -496,7 +511,7 @@ class RheaEnv(py_environment.PyEnvironment):
                 raise Warning(f"Could not read time from key: {self.time_key[i]}") from exc
 
 
-    def get_status(self):
+    def _get_status(self):
         """
         Reads the step_type tensors from database (one for each environment).
         Once created, these tensor are never deleted afterwards
@@ -650,16 +665,17 @@ class RheaEnv(py_environment.PyEnvironment):
         self._set_action(action)
 
         # poll new state and reward. This waits for the RHEA to finish the action period and send the state and reward data
-        self._get_state() # updates self._state
-        self._redistribute_state() # updates self._state_rl
-        self._get_reward() # updates self._reward
+        self._get_state()           # updates self._state
+        self._redistribute_state()  # updates self._state_rl
+        self._standarize_state()    # updates self._state_rl
+        self._get_reward()          # updates self._reward
         self._get_time()
 
         # write RL data into disk
         if self.dump_data_flag: self._dump_rl_data()
 
         # determine if simulation finished
-        status = self.get_status()
+        status = self._get_status()
         self._episode_ended = np.all(status == 0) # update self._episode_ended
 
         # Return transition if episode ended with current action

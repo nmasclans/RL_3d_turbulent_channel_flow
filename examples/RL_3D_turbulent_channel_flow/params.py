@@ -55,10 +55,10 @@ params = {
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-0.3, 0.3),                                                       # TODO: set custom value
-    "reward_norm": t_action,                                                            # TODO: set custom variable, t_action set as a test
+    "reward_norm": 1.0                                                                  # another possible normalization: reward_norm = t_action
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local,  # TODO: set custom value
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
-    "net": (128, 128),              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
+    "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
     "learning_rate": 5e-4,                                                              # TODO: set custom value
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1,                      # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
