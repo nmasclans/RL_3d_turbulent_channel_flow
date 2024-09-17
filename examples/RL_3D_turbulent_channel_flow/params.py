@@ -20,7 +20,7 @@ params = {
     "use_XLA": True,
     "num_dbs": 1,                       # not used if launcher == 'local'   TODO: rm if not used
     "launcher": "local",
-    "run_command": "bash",              # TODO: rm if not used
+    "run_command": "bash",
     "mpirun_mca": "btl_base_warn_component_unused 0",   # mpirun argument --mca
     "mpirun_hostfile": "my-hostfile",   # mpirun argument --hostfile
     "mpirun_np": rl_n_envs,             # mpirun argument -np

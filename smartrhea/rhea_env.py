@@ -327,39 +327,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # Edit my-hostfile
         write_hosts(self.hosts, self.mpirun_np, os.path.join(self.rhea_exe_dir, self.mpirun_hostfile))
 
-        if self.run_command == "mpirun": # TODO: not working, problems with run_args being interpreted as the executable
-            # Set model arguments
-            f_mpmd = None
-            for i in range(self.cfd_n_envs):
-                exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
-                run_args = {"mca": self.mpirun_mca, "hostfile": "$RHEA_EXE_DIR/"+self.mpirun_hostfile}
-                run = MpirunSettings(self.rhea_exe_path, exe_args=exe_args, run_args=run_args)   # MpirunSettings add '--' to run_args keys
-                run.set_tasks(self.mpirun_np) # added differently than run_args (--<arg_name>) as np has (-np) single dash
-                logger.debug(f"CFD ENVIRONMENT {i}:")
-                logger.debug(f"MpirunSettings exe: {self.rhea_exe_path}")
-                logger.debug(f"MpirunSettings run_args: {run_args}")
-                logger.debug(f"MpirunSettings exe_args: {exe_args}")
-
-                if f_mpmd is None:
-                    f_mpmd = run
-                else:
-                    f_mpmd.make_mpmd(run)
-            logger.debug(f"MPMD main command (1st cfd env): {f_mpmd}")
-            logger.debug(f"MPMD appended commands: {[str(run) for run in f_mpmd.mpmd]}")
-            
-            batch_settings = None
-            # Alvis configuration if requested.
-            #  - RHEA simulations will be launched as external Slurm jobs.
-            #  - E.g. there are 4xA100 GPUs per node.
-            if self.launcher == "slurm_launcher":   # TODO: add possible launcher in params.py
-                gpus_required = self.cfd_n_envs * self.n_tasks_per_env
-                n_nodes = int(np.ceil(gpus_required / 4))
-                gpus_per_node = '4' if gpus_required >= 4 else gpus_required
-                batch_settings = create_batch_settings("slurm", nodes=n_nodes, account=self.cluster_account, time=self.episode_walltime,
-                        batch_args={'ntasks':gpus_required, 'gpus-per-node':'A100:' + str(gpus_per_node)})
-                batch_settings.add_preamble([". " + self.modules_sh])
-
-        elif self.run_command=="bash":
+        if self.run_command=="bash":
             # Generate the runit.sh script
             # TODO: currently taking restart_data_file from current directory, but it should be taken the one from $RHEA_EXE_DIR (execution working because restart_data_file input arg is not used in RHEA yet)
             runit_script = 'runit.sh'
