@@ -368,11 +368,6 @@ void myRHEA::calculateSourceTerms() {
                 }
             } 
 
-            /// TODO: remove cout for less debugging
-            /// if (my_rank == 0) {
-            ///     cout << "[myRHEA::calculateSourceTerms] RL control applied at time " << current_time << endl;
-            /// }
-            
             /// Check if new action is needed
             if (current_time - previous_actuation_time >= actuation_period) {
                 
@@ -421,7 +416,6 @@ void myRHEA::calculateSourceTerms() {
             double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
             double Rkk_inv, Akk;
             bool   isNegligibleAction, isNegligibleRkk;
-            bool actionIsApplied = false;
             size_t action_idx;
             vector<vector<double>> Aij(3, vector<double>(3, 0.0));
             vector<vector<double>> Dij(3, vector<double>(3, 0.0));
@@ -438,7 +432,7 @@ void myRHEA::calculateSourceTerms() {
 
                             /// Get perturbation values from RL agent
                             /// TODO: implement RL action for several variables!
-                            action_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
+                            action_idx  = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
                             DeltaRkk    = action_global_instant[action_idx];
                             DeltaThetaZ = 0.0;
                             DeltaThetaY = 0.0;
@@ -457,7 +451,6 @@ void myRHEA::calculateSourceTerms() {
                                 DeltaRxz_field[I1D(i,j,k)] = 0.0;
                                 DeltaRyz_field[I1D(i,j,k)] = 0.0;
                             } else {
-                                actionIsApplied = true;
 
                                 /// Rkk is Rij trace (dof #1)
                                 Rkk_inv = 1.0 / Rkk;
@@ -522,12 +515,6 @@ void myRHEA::calculateSourceTerms() {
 
             MPI_Barrier(MPI_COMM_WORLD);
             timers->stop( "rl_update_DeltaRij" );
-
-            /// Check action is applied and non-neglegible in some control point for each RL environment / control cube / mpi process
-            /// TODO: remove cout if not necessary in future debugging
-            /// if (!actionIsApplied) {
-            ///     cout << "Warning: Rank " << my_rank << " applied at time: " << current_time << endl;
-            /// }               
             
             MPI_Barrier(MPI_COMM_WORLD);
             timers->start( "rl_update_control_term" );
@@ -1022,11 +1009,6 @@ void myRHEA::readWitnessPoints() {
         num_witness_probes = static_cast<int>(twp_x_positions.size());
     
         cout << "Number of witness probes (global_state_size): " << num_witness_probes << endl;
-        /// TODO: delete cout if not necessary for future debugging
-        /// cout << "Candidate witness probes:" << endl;
-        /// for (int i=0; i<num_witness_probes; i++) {
-        ///     cout << twp_x_positions.at(i) << ", " << twp_y_positions.at(i) << ", " << twp_z_positions.at(i) << endl;
-        /// }
     }
 
     // Broadcast the number of witness probes to all mpi processes
@@ -1044,13 +1026,6 @@ void myRHEA::readWitnessPoints() {
     MPI_Bcast(twp_y_positions.data(), num_witness_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(twp_z_positions.data(), num_witness_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    // Check successfull broadcast, TODO: delete cout if not necessary for future debugging 
-    /// if (my_rank != 0) {
-    ///     cout << "Mpi with rank " << my_rank << " has received " << num_witness_probes << " witness probes" << endl;
-    ///     for (int i=0; i<num_witness_probes; i++) {
-    ///         cout << twp_x_positions.at(i) << ", " << twp_y_positions.at(i) << ", " << twp_z_positions.at(i) << endl;
-    ///     }
-    /// }
 }
 
 /* Pre-process witness points
@@ -1085,17 +1060,6 @@ void myRHEA::preproceWitnessPoints() {
         /// Owner rank writes to file
         if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
             state_local_size2_counter += 1;
-            /// TODO: delete cout if not used in future debugging
-            /// int i_index, j_index, k_index;
-            /// /// Get local indices i, j, k
-		    /// i_index = temporal_witness_probes[twp].getLocalIndexI(); 
-		    /// j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
-		    /// k_index = temporal_witness_probes[twp].getLocalIndexK();
-            /// /// Get coordinates of witness probe
-            /// cout << "Witness probe: " << twp << " , mpi rank: " << my_rank << ", coord: " 
-            ///      << x_field[I1D(i_index,j_index,k_index)] << " " 
-            ///      << y_field[I1D(i_index,j_index,k_index)] << " " 
-            ///      << z_field[I1D(i_index,j_index,k_index)] << endl;
         }
     }
     this->state_local_size2 = state_local_size2_counter;  // each mpi process updates attribute 'state_local_size2'
@@ -1171,20 +1135,6 @@ void myRHEA::readControlCubes(){
 
     /// Broadcast the control cubes vertices coordinates from rank=0 to all processes
     MPI_Bcast(control_cubes_vertices.data(), num_control_cubes * 4 * 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    /// Check successfull data reading and broadcast, TODO: delete cout if not necessary for future debugging
-    /// cout << "Mpi proc. with rank " << my_rank << " has received control cubes vertices:" << endl;
-    /// for (int i = 0; i < num_control_cubes; ++i) {
-    ///     cout << "   Cube " << i + 1 << " vertices:" << endl;
-    ///     for (int j = 0; j < 4; ++j) {                       /// loop along the 4 vertices
-    ///         cout << "      Vertex " << j + 1 << ": "
-    ///                 << control_cubes_vertices[i][j][0] << ", "
-    ///                 << control_cubes_vertices[i][j][1] << ", "
-    ///                 << control_cubes_vertices[i][j][2] << endl;
-    ///     }
-    /// }
-    /// cout.flush();
-    /// MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, delete if wanted
 
 }
 
@@ -1267,9 +1217,6 @@ void myRHEA::getControlCubes() {
                         action_mask[I1D(i,j,k)] = 1.0 + icube;
                         num_control_points_local++;
                         num_control_points_per_cube_local++;
-                        /// log point information, TODO: delete cout if not necessary for future debugging 
-                        /// cout << "[myRHEA::getControlCubes] rank: " << my_rank << ", cube: " << icube << ", action mask: " << action_mask[I1D(i,j,k)] << ", found control point: " 
-                        ///      << x_field[I1D(i,j,k)] << ", " << y_field[I1D(i,j,k)] << ", " << z_field[I1D(i,j,k)] << endl;
                     }
                 }
             }
@@ -1396,24 +1343,8 @@ void myRHEA::updateState() {
             /// Get state data: averaged u-velocity
             state_local[state_local_size2_counter] = avg_u_field[I1D(i_index,j_index,k_index)];
             state_local_size2_counter += 1;
-            /// Logging, TODO: remove logging lines if not used in the future
-            /// cout << "Rank " << my_rank << " has witness point #" << twp << " at coord: [" 
-            ///      << x_field[I1D(i_index,j_index,k_index)] << ", " 
-            ///      << y_field[I1D(i_index,j_index,k_index)] << ", " 
-            ///      << z_field[I1D(i_index,j_index,k_index)] << "], "
-            ///      << "and u_field value: " << avg_u_field[I1D(i_index,j_index,k_index)] << endl;
         }
     }
-    
-    /// Logging, TODO: remove logging if not necessary for future debugging
-    /// cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has local state of size " << state_local_size2 << " and values: ";
-    /// for (int ii = 0; ii<state_local_size2; ii++) {  
-    ///     cout << state_local[ii] << " ";
-    /// }
-    /// cout << endl << flush;
-
-    /// State Standarization
-    /// Standarization is performed in the Python RL counterpart, using full batch data of all cfd environments & rl pseudo-environments
 }   
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1438,11 +1369,6 @@ void myRHEA::calculateReward() {
 
     /// Store avg_u_field_local for next reward calculation
     avg_u_field_local_previous = avg_u_field_local;
-
-    /// Logging,  TODO: remove cout if not necessary in future debugging
-    /// int my_rank;
-    /// MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    /// cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local avg_u_field: " << avg_u_field_local << ", local reward: " << reward_local << endl;
 
 }
 
