@@ -39,6 +39,9 @@ class myRHEA : public FlowSolverRHEA {
  	    /// Calculate fixed time step
         void calculateTimeStep();
 
+        /// Output current solver state data, in dedicated RL directory 'rhea_exp/output_data'
+        void outputCurrentStateDataRL();
+
     protected:
 
         // RL variables

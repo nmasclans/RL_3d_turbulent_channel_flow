@@ -381,7 +381,7 @@ void myRHEA::calculateSourceTerms() {
 
                 /// Logging
                 if (my_rank == 0) {
-                    cout << "[myRHEA::calculateSourceTerms] Performing SmartRedis communications (state, action, reward) at time instant " << current_time << endl;
+                    cout << endl << "[myRHEA::calculateSourceTerms] Performing SmartRedis communications (state, action, reward) at time instant " << current_time << endl;
                 }
 
                 /// Save old action values and time - useful for interpolating to new action
@@ -590,9 +590,12 @@ void myRHEA::calculateSourceTerms() {
 void myRHEA::temporalHookFunction() {
 
     if ( ( print_timers ) && (current_time_iter%print_frequency_iter == 0) ) {
-        char filename[200];
-        sprintf( filename,"rhea_exp/timers_info/timers_information_file_ensemble%s_iter%d.txt", tag.c_str(), current_time_iter );
-        timers->printTimers( filename );
+        /// Print timers information
+        char filename_timers[256];
+        sprintf( filename_timers, "rhea_exp/timers_info/timers_information_file_%d_ensemble%s.txt", current_time_iter, tag.c_str() );
+        timers->printTimers( filename_timers );
+        /// Output current state in RL dedicated directory 'rhea_exp/output_data/'
+        this->outputCurrentStateDataRL();
     }
 
 };
@@ -605,6 +608,16 @@ void myRHEA::calculateTimeStep() {
 #else
     FlowSolverRHEA::calculateTimeStep();
 #endif
+
+};
+
+void myRHEA::outputCurrentStateDataRL() {
+
+    /// Write to file current solver state, time, time iteration and averaging time
+    writer_reader->setAttribute( "Time", current_time );
+    writer_reader->setAttribute( "Iteration", current_time_iter );
+    writer_reader->setAttribute( "AveragingTime", averaging_time );
+    writer_reader->writeRL( current_time_iter, tag );
 
 };
 

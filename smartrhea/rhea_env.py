@@ -182,6 +182,8 @@ class RheaEnv(py_environment.PyEnvironment):
             os.makedirs(rhea_exp_dir)
         if not os.path.exists(os.path.join(rhea_exp_dir, "timers_info")):
             os.makedirs(os.path.join(rhea_exp_dir, "timers_info"))
+        if not os.path.exists(os.path.join(rhea_exp_dir, "output_data")):
+            os.makedirs(os.path.join(rhea_exp_dir, "output_data"))
 
         # generate database ensemble keys
         self.time_key = ["ensemble_" + str(i) + "." + time_key for i in range(self.cfd_n_envs)]
