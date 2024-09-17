@@ -41,7 +41,6 @@ protected:
     int state_global_size;
     int action_global_size;
     int reward_global_size;
-    std::vector<size_t> state_local_size_vec;
     std::vector<size_t> state_global_size_vec;
     std::vector<size_t> action_global_size_vec;
     std::vector<size_t> reward_global_size_vec;

@@ -23,7 +23,6 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     action_global_size = action_global_size2;
     state_global_size  = 0; // further modified in constructor 
     reward_global_size = n_pseudo_envs2;
-    state_local_size_vec   = {static_cast<size_t>(state_local_size2)}; // TODO: not used?, delete?
     action_global_size_vec = {static_cast<size_t>(action_global_size2)};
     reward_global_size_vec = {static_cast<size_t>(reward_global_size)};
     if (my_rank == 0) {std::cout << "mpi size: " << mpi_size
