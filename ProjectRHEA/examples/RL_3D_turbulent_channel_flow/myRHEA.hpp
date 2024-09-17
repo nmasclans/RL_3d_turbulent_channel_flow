@@ -22,7 +22,8 @@ class myRHEA : public FlowSolverRHEA {
                const std::string t_action="", 
                const std::string t_episode="", 
                const std::string t_begin_control="",
-               const std::string db_clustered="");              /// Parametrized constructor
+               const std::string db_clustered="",
+               const std::string global_step="");               /// Parametrized constructor
         virtual ~myRHEA() {};									/// Destructor
 
 	////////// SOLVER METHODS //////////
@@ -70,6 +71,7 @@ class myRHEA : public FlowSolverRHEA {
         /// SmartRedis
         SmartRedisManager *manager;              /// TODO: should these vars be 'protected' or 'private'?
         std::string tag;
+        std::string global_step;
         std::string time_key;
         std::string step_type_key;
         std::string state_key;
@@ -92,7 +94,7 @@ class myRHEA : public FlowSolverRHEA {
         std::vector<double> action_global_instant;
         std::vector<double> state_local;
 
-        void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered);
+        void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered, const string &global_step);
         void initSmartRedis();
         void readWitnessPoints();
         void preproceWitnessPoints();

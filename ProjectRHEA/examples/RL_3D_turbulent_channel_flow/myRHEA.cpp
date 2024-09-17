@@ -85,7 +85,7 @@ vector<vector<double>> Deltaij = {
 
 ////////// myRHEA CLASS //////////
 
-myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string t_action, const string t_episode, const string t_begin_control, const string db_clustered) : FlowSolverRHEA(name_configuration_file) {
+myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string t_action, const string t_episode, const string t_begin_control, const string db_clustered, const string global_step) : FlowSolverRHEA(name_configuration_file) {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
@@ -99,14 +99,14 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
 
-    initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered);
+    initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step);
     initSmartRedis();
 #endif
 
 };
 
 
-void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered) {
+void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered, const string &global_step) {
 
     /// Logging
     int my_rank;
@@ -120,15 +120,17 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         cout << "--t_episode: " << t_episode << endl;
         cout << "--t_begin_control: " << t_begin_control << endl; 
         cout << "--db_clustered: " << db_clustered << endl;
+        cout << "--global_step: " << global_step << endl;
     }
 
     /// String arguments
     this->tag                = tag;
     this->restart_data_file  = restart_data_file;            // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
+    this->global_step        = global_step;
     /// Double arguments
     try {
-        // Set actuation attributes 
-        this->actuation_period        = std::stod(t_action);
+        // Set actuation attributes, from string to double
+        this->actuation_period        = std::stod(t_action);         
         this->begin_actuation_time    = std::stod(t_begin_control);
         this->previous_actuation_time = 0.0;
         this->final_time              = std::stod(t_episode);        // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
@@ -579,7 +581,7 @@ void myRHEA::temporalHookFunction() {
     if ( ( print_timers ) && (current_time_iter%print_frequency_iter == 0) ) {
         /// Print timers information
         char filename_timers[256];
-        sprintf( filename_timers, "rhea_exp/timers_info/timers_information_file_%d_ensemble%s.txt", current_time_iter, tag.c_str() );
+        sprintf( filename_timers, "rhea_exp/timers_info/timers_information_file_%d_ensemble%s_step%s.txt", current_time_iter, tag.c_str(), global_step.c_str() );
         timers->printTimers( filename_timers );
         /// Output current state in RL dedicated directory 'rhea_exp/output_data/'
         this->outputCurrentStateDataRL();
@@ -604,7 +606,7 @@ void myRHEA::outputCurrentStateDataRL() {
     writer_reader->setAttribute( "Time", current_time );
     writer_reader->setAttribute( "Iteration", current_time_iter );
     writer_reader->setAttribute( "AveragingTime", averaging_time );
-    writer_reader->writeRL( current_time_iter, tag );
+    writer_reader->writeRL( current_time_iter, tag, global_step );
 
 };
 
@@ -1435,8 +1437,8 @@ int main(int argc, char** argv) {
 
     /// Process command line arguments
 #if _ACTIVE_CONTROL_BODY_FORCE_
-    string configuration_file, tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered;
-    if (argc >= 8 ) {
+    string configuration_file, tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step;
+    if (argc >= 9 ) {
         /// Extract and validate input arguments
         configuration_file  = argv[1];
         tag                 = argv[2];
@@ -1445,12 +1447,13 @@ int main(int argc, char** argv) {
         t_episode           = argv[5];  // 1.0
         t_begin_control     = argv[6];  // 0.0
         db_clustered        = argv[7];  // False
+        global_step         = argv[8];  // 0
     } else {
-        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <t_action> <t_episode> <t_begin_control> <db_clustered>" << endl;
+        cerr << "Proper usage: RHEA.exe configuration_file.yaml <tag> <restart_data_file> <t_action> <t_episode> <t_begin_control> <db_clustered> <global_step>" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1 );
     }
     /// Construct my RHEA
-    myRHEA my_RHEA( configuration_file, tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered );
+    myRHEA my_RHEA( configuration_file, tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step );
 
 #else
     string configuration_file;

@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import shutil
 from smartsim.log import get_logger
 
 logger = get_logger(__name__)
@@ -120,6 +122,18 @@ def params_html_table(params, title=None):
 def numpy_str(a, precision=2):
     return np.array2string(a, precision=precision, floatmode='fixed')
 
+# Delete all files inside the directory
+def delete_all_files_in_dir(directory):
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)  # Remove the file or link
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)  # Remove the directory and all its contents
+        except Exception as e:
+            print(f'Failed to delete {file_path}. Reason: {e}')
+
 
 # --- TensorFlow utils ---
 def deactivate_tf_gpus():
@@ -128,4 +142,5 @@ def deactivate_tf_gpus():
     visible_devices = tf.config.get_visible_devices()
     for device in visible_devices:
         assert device.device_type != 'GPU'
+
 

@@ -4,7 +4,6 @@ import glob
 import logging
 import numpy as np
 import random
-import shutil
 
 from tf_agents.specs import array_spec
 from tf_agents.environments import py_environment
@@ -15,7 +14,7 @@ from smartsim.settings import MpirunSettings, RunSettings
 from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.init_smartsim import write_hosts
-from smartrhea.utils import n_witness_points, n_cubes, get_witness_xyz, numpy_str, bcolors
+from smartrhea.utils import n_witness_points, n_cubes, get_witness_xyz, numpy_str, bcolors, delete_all_files_in_dir
 
 logger = get_logger(__name__)
 
@@ -178,12 +177,16 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # manage directory 'rhea_exp/output' & 'rhea_exp/timers_info'
         rhea_exp_dir = "rhea_exp"
+        timers_info_dir = os.path.join(rhea_exp_dir, "timers_info")
+        output_data_dir = os.path.join(rhea_exp_dir, "output_data")
         if not os.path.exists(rhea_exp_dir):    # create directory 'rhea_exp'
             os.makedirs(rhea_exp_dir)
-        if not os.path.exists(os.path.join(rhea_exp_dir, "timers_info")):
-            os.makedirs(os.path.join(rhea_exp_dir, "timers_info"))
-        if not os.path.exists(os.path.join(rhea_exp_dir, "output_data")):
-            os.makedirs(os.path.join(rhea_exp_dir, "output_data"))
+        if not os.path.exists(timers_info_dir):
+            os.makedirs(timers_info_dir)
+        if not os.path.exists(output_data_dir):
+            os.makedirs(output_data_dir)
+        delete_all_files_in_dir(timers_info_dir)
+        delete_all_files_in_dir(output_data_dir)
 
         # generate database ensemble keys
         self.time_key = ["ensemble_" + str(i) + "." + time_key for i in range(self.cfd_n_envs)]
@@ -322,6 +325,7 @@ class RheaEnv(py_environment.PyEnvironment):
                      "t_episode": self.t_episode, 
                      "t_begin_control": self.t_begin_control,
                      "db_clustered": self.db_clustered,
+                     "global_step": [str(global_step) for _ in range(self.cfd_n_envs)],
         }
         
         # Edit my-hostfile
@@ -350,10 +354,8 @@ class RheaEnv(py_environment.PyEnvironment):
                 logger.debug(f"Edited {runit_script} as: \n{f.read()}")
             # Batch settings
             batch_settings = None
-
         else:
             raise Warning(f"Could not create Multi-Process Multi-Data run settings, not recognized run_command '{self.run_command}'")
-
 
         """ Create model:
             create_model(name: str, 
@@ -401,7 +403,7 @@ class RheaEnv(py_environment.PyEnvironment):
                     # self._state shape: [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
                     self._state[i, :] = self.client.get_tensor(self.state_key[i])
                     self.client.delete_tensor(self.state_key[i])
-                    logger.debug(f"[Env {i}] (Read) State: {numpy_str(self._state[i,:])}")
+                    logger.debug(f"[Env {i}] (Read) State: {self._state[i,:]}")
                 except Exception as exc:
                     raise Warning(f"Could not read state from key: {self.state_key[i]}") from exc
 
@@ -480,7 +482,7 @@ class RheaEnv(py_environment.PyEnvironment):
                 self.client.poll_tensor(self.time_key[i], self.poll_freq_ms, self.poll_n_tries)
                 self._time[i] = self.client.get_tensor(self.time_key[i])[0]
                 self.client.delete_tensor(self.time_key[i])
-                logger.debug(f"[Cfd Env {i}] Got time: {numpy_str(self._time[i])}")
+                logger.debug(f"[Cfd Env {i}] Got time: {numpy_str(self._time[i]):.8f}")
             except Exception as exc:
                 raise Warning(f"Could not read time from key: {self.time_key[i]}") from exc
 
@@ -532,7 +534,7 @@ class RheaEnv(py_environment.PyEnvironment):
         for i in range(self.cfd_n_envs):
             # self._action shape: np.zeros(self.n_action, dtype=self.rhea_dtype))
             self.client.put_tensor(self.action_key[i], self._action[i, ...].astype(self.rhea_dtype))
-            logger.debug(f"[Env {i}] (Written) Action: {numpy_str(self._action[i, :])}")
+            logger.debug(f"[Env {i}] (Written) Action: {self._action[i, :]}")
 
 
     def _dump_rl_data(self):
