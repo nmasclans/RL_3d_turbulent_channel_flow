@@ -43,9 +43,15 @@ class myRHEA : public FlowSolverRHEA {
         /// Output current solver state data, in dedicated RL directory 'rhea_exp/output_data'
         void outputCurrentStateDataRL();
 
+        /// Advance conserved variables in time
+        void timeAdvanceConservedVariables();
+
     protected:
 
         // RL variables
+        DistributedArray Delta_f_rhou_field_rk1;
+        DistributedArray Delta_f_rhov_field_rk1;
+        DistributedArray Delta_f_rhow_field_rk1;
         DistributedArray DeltaRxx_field;        /// 3-D field of DeltaRxx
         DistributedArray DeltaRxy_field;        /// 3-D field of DeltaRxy
         DistributedArray DeltaRxz_field;        /// 3-D field of DeltaRxz

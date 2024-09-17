@@ -88,6 +88,9 @@ vector<vector<double>> Deltaij = {
 myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string t_action, const string t_episode, const string t_begin_control, const string db_clustered, const string global_step) : FlowSolverRHEA(name_configuration_file) {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
+    Delta_f_rhou_field_rk1.setTopology(topo, "Delta_f_rhou_field_rk1");
+    Delta_f_rhov_field_rk1.setTopology(topo, "Delta_f_rhov_field_rk1");
+    Delta_f_rhow_field_rk1.setTopology(topo, "Delta_f_rhow_field_rk1");
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -509,6 +512,7 @@ void myRHEA::calculateSourceTerms() {
                                 DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
                                 DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
                                 DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+
                             }
                         }
                     }
@@ -524,6 +528,11 @@ void myRHEA::calculateSourceTerms() {
             /// Initialize variables
             double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
             double delta_x, delta_y, delta_z;
+
+            /// TODO: check, remove when check is successful
+            double f_rhou_field_ratio = 0.0;
+            int f_rhou_field_counter = 0;
+            /// TODO: end remove
             
             /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -546,15 +555,33 @@ void myRHEA::calculateSourceTerms() {
                         d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
                         d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
 
+                        /// TODO: check, remove when check is successful
+                        if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point 
+                            f_rhou_field_ratio   += std::abs( ( rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z ) ) / f_rhou_field[I1D(i,j,k)] );
+                            f_rhou_field_counter += 1;
+                        }
+                        /// TODO: end remove
+
                         /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                        f_rhou_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                        f_rhov_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                        f_rhow_field[I1D(i,j,k)] += ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                        Delta_f_rhou_field_rk1[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                        Delta_f_rhov_field_rk1[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                        Delta_f_rhow_field_rk1[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                        f_rhou_field[I1D(i,j,k)] += Delta_f_rhou_field_rk1[I1D(i,j,k)];
+                        f_rhov_field[I1D(i,j,k)] += Delta_f_rhov_field_rk1[I1D(i,j,k)];
+                        f_rhow_field[I1D(i,j,k)] += Delta_f_rhow_field_rk1[I1D(i,j,k)];
                         f_rhoE_field[I1D(i,j,k)] += 0.0;
+
                     }
                 }
             }
             
+            /// TODO: remove check log:
+            f_rhou_field_ratio /= f_rhou_field_counter;
+            if (my_rank < 4) {
+                cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has mean f_rhou_field_ratio: " << f_rhou_field_ratio << ", averaged over " << f_rhou_field_counter << " actuation points" << endl;
+            }
+            /// TODO: end remove
+
             MPI_Barrier(MPI_COMM_WORLD);
             timers->stop( "rl_update_control_term" );
 
@@ -565,7 +592,22 @@ void myRHEA::calculateSourceTerms() {
             }
 
         }
+    } else { /// rk iteration != 1
+        timers->start( "rl_update_control_term" );
+        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+            for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+	                f_rhou_field[I1D(i,j,k)] += Delta_f_rhou_field_rk1[I1D(i,j,k)];
+                    f_rhov_field[I1D(i,j,k)] += Delta_f_rhov_field_rk1[I1D(i,j,k)];
+                    f_rhow_field[I1D(i,j,k)] += Delta_f_rhow_field_rk1[I1D(i,j,k)];
+                    f_rhoE_field[I1D(i,j,k)] += 0.0;
+                }
+            }
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+        timers->stop( "rl_update_control_term" );
     }
+
 #endif
 
     /// Update halo values
@@ -575,6 +617,7 @@ void myRHEA::calculateSourceTerms() {
     //f_rhoE_field.update();
 
 };
+
 
 void myRHEA::temporalHookFunction() {
 
@@ -589,6 +632,7 @@ void myRHEA::temporalHookFunction() {
 
 };
 
+
 void myRHEA::calculateTimeStep() {
 
 #if _FIXED_TIME_STEP_
@@ -600,6 +644,7 @@ void myRHEA::calculateTimeStep() {
 
 };
 
+
 void myRHEA::outputCurrentStateDataRL() {
 
     /// Write to file current solver state, time, time iteration and averaging time
@@ -609,6 +654,126 @@ void myRHEA::outputCurrentStateDataRL() {
     writer_reader->writeRL( current_time_iter, tag, global_step );
 
 };
+
+/// TODO: check, remove function if not used anymore for checks
+void myRHEA::timeAdvanceConservedVariables() {
+
+    /// TODO: check, remove lines below
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    /// TODO: end remove
+
+    /// TODO: check relative value of rl control load
+    double rhou_inv_flux_ratio = 0.0;
+    double rhou_vis_flux_ratio = 0.0;
+    double f_rhou_field_total_ratio = 0.0;
+    double f_rhou_field_feedback_loop_ratio = 0.0;
+    double f_rhou_field_rl_action_ratio = 0.0;
+    int ratio_counter = 0;
+
+    /// Coefficients of explicit Runge-Kutta stages
+    double rk_a = 0.0, rk_b = 0.0, rk_c = 0.0;
+    runge_kutta_method->setStageCoefficients(rk_a,rk_b,rk_c,rk_time_stage);    
+
+    /// Inner points: rho, rhou, rhov, rhow and rhoE
+    double f_rhouvw = 0.0;
+    double rho_rhs_flux = 0.0, rhou_rhs_flux = 0.0, rhov_rhs_flux = 0.0, rhow_rhs_flux = 0.0, rhoE_rhs_flux = 0.0;
+#if _OPENACC_MANUAL_DATA_MOVEMENT_
+    const int local_size_x = _lNx_;
+    const int local_size_y = _lNy_;
+    const int local_size_z = _lNz_;
+    const int local_size   = local_size_x*local_size_y*local_size_z;
+    const int inix = topo->iter_common[_INNER_][_INIX_];
+    const int iniy = topo->iter_common[_INNER_][_INIY_];
+    const int iniz = topo->iter_common[_INNER_][_INIZ_];
+    const int endx = topo->iter_common[_INNER_][_ENDX_];
+    const int endy = topo->iter_common[_INNER_][_ENDY_];
+    const int endz = topo->iter_common[_INNER_][_ENDZ_];
+    #pragma acc enter data copyin (this)
+    #pragma acc data copyin (u_field.vector[0:local_size],v_field.vector[0:local_size],w_field.vector[0:local_size])
+    #pragma acc data copyin (rho_0_field.vector[0:local_size],rhou_0_field.vector[0:local_size],rhov_0_field.vector[0:local_size],rhow_0_field.vector[0:local_size],rhoE_0_field.vector[0:local_size])
+    #pragma acc data copyin (rho_inv_flux.vector[0:local_size],rhou_inv_flux.vector[0:local_size],rhov_inv_flux.vector[0:local_size],rhow_inv_flux.vector[0:local_size],rhoE_inv_flux.vector[0:local_size])
+    #pragma acc data copyin (rhou_vis_flux.vector[0:local_size],rhov_vis_flux.vector[0:local_size],rhow_vis_flux.vector[0:local_size],rhoE_vis_flux.vector[0:local_size])
+    #pragma acc data copyin (f_rhou_field.vector[0:local_size],f_rhov_field.vector[0:local_size],f_rhow_field.vector[0:local_size],f_rhoE_field.vector[0:local_size])
+    #pragma acc enter data copyin (rho_field.vector[0:local_size],rhou_field.vector[0:local_size],rhov_field.vector[0:local_size],rhow_field.vector[0:local_size],rhoE_field.vector[0:local_size])
+    #pragma acc parallel loop collapse (3)
+    for(int i = inix; i <= endx; i++) {
+        for(int j = iniy; j <= endy; j++) {
+            for(int k = iniz; k <= endz; k++) {
+#else
+    #pragma acc parallel loop collapse (3)
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+#endif
+                /// Work of momentum sources
+                f_rhouvw = f_rhou_field[I1D(i,j,k)]*u_field[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)]*v_field[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)]*w_field[I1D(i,j,k)];
+                /// Sum right-hand-side (RHS) fluxes
+                rho_rhs_flux  = ( -1.0 )*rho_inv_flux[I1D(i,j,k)]; 
+                rhou_rhs_flux = ( -1.0 )*rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)]; 
+                rhov_rhs_flux = ( -1.0 )*rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)]; 
+                rhow_rhs_flux = ( -1.0 )*rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)]; 
+                rhoE_rhs_flux = ( -1.0 )*rhoE_inv_flux[I1D(i,j,k)] + rhoE_vis_flux[I1D(i,j,k)] + f_rhoE_field[I1D(i,j,k)] + f_rhouvw;
+                /// Runge-Kutta step
+                rho_field[I1D(i,j,k)]  = rk_a*rho_0_field[I1D(i,j,k)]  + rk_b*rho_field[I1D(i,j,k)]  + rk_c*delta_t*rho_rhs_flux;
+                rhou_field[I1D(i,j,k)] = rk_a*rhou_0_field[I1D(i,j,k)] + rk_b*rhou_field[I1D(i,j,k)] + rk_c*delta_t*rhou_rhs_flux;
+                rhov_field[I1D(i,j,k)] = rk_a*rhov_0_field[I1D(i,j,k)] + rk_b*rhov_field[I1D(i,j,k)] + rk_c*delta_t*rhov_rhs_flux;
+                rhow_field[I1D(i,j,k)] = rk_a*rhow_0_field[I1D(i,j,k)] + rk_b*rhow_field[I1D(i,j,k)] + rk_c*delta_t*rhow_rhs_flux;
+                rhoE_field[I1D(i,j,k)] = rk_a*rhoE_0_field[I1D(i,j,k)] + rk_b*rhoE_field[I1D(i,j,k)] + rk_c*delta_t*rhoE_rhs_flux;
+
+                // TODO: remove checks
+                if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point    
+                    rhou_inv_flux_ratio              += std::abs( rhou_inv_flux[I1D(i,j,k)] / rhou_rhs_flux );
+                    rhou_vis_flux_ratio              += std::abs( rhou_vis_flux[I1D(i,j,k)] / rhou_rhs_flux );
+                    f_rhou_field_total_ratio         += std::abs( f_rhou_field[I1D(i,j,k)] / rhou_rhs_flux );
+                    f_rhou_field_feedback_loop_ratio += std::abs( (tau_w/delta) / rhou_rhs_flux );
+                    f_rhou_field_rl_action_ratio     += std::abs( (f_rhou_field[I1D(i,j,k)] - (tau_w/delta)) / rhou_rhs_flux );
+                    ratio_counter += 1;
+                }
+                /// TODO: end remove
+	        }
+        }
+    }
+    // TODO: remove checks logs
+    rhou_inv_flux_ratio /= ratio_counter;
+    rhou_vis_flux_ratio /= ratio_counter;
+    f_rhou_field_total_ratio /= ratio_counter;
+    f_rhou_field_feedback_loop_ratio /= ratio_counter;
+    f_rhou_field_rl_action_ratio /= ratio_counter;
+    if ( my_rank < 4 ) {
+        cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
+             << endl << "Ratio (rhou_inv_flux              / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
+             << endl << "Ratio (rhou_vis_flux              / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
+             << endl << "Ratio (f_rhou_field_total         / rhou_rhs_flux): " <<  f_rhou_field_total_ratio
+             << endl << "Ratio (f_rhou_field_feedback_loop / rhou_rhs_flux): " <<  f_rhou_field_feedback_loop_ratio
+             << endl << "Ratio (f_rhou_field_rl_action     / rhou_rhs_flux): " <<  f_rhou_field_rl_action_ratio << endl;
+    }
+    /// TODO: end remove
+
+#if _OPENACC_MANUAL_DATA_MOVEMENT_
+    #pragma acc exit data copyout (rho_field.vector[0:local_size],rhou_field.vector[0:local_size],rhov_field.vector[0:local_size],rhow_field.vector[0:local_size],rhoE_field.vector[0:local_size])
+#endif    
+    
+    ///// Attention! Communications performed only at the last stage of the Runge-Kutta to improve computational performance
+    ///// ... temporal integration is first-order at points connecting partitions
+    //if( rk_time_stage == rk_number_stages ) {
+
+        /// Update halo values
+        rho_field.update();
+        rhou_field.update();
+        rhov_field.update();
+        rhow_field.update();
+        rhoE_field.update();
+
+    //}
+
+    if( transport_pressure_scheme ) {
+        this->timeAdvancePressure();
+    }
+
+};
+/// TODO: end remove
+
 
 ///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
@@ -1385,7 +1550,16 @@ void myRHEA::smoothControlFunction() {
     for (int idx=0; idx<action_global_size2; idx++) {
         action_global_instant[idx] = action_global_previous[idx] + f3 * (action_global[idx] - action_global_previous[idx]);
     }
-
+    /// Logging
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
+        cout << "[myRHEA::smoothControlFunction] Rank " << my_rank << " has smooth global action: ";
+        for (int idx=0; idx<action_global_size2; idx++) {
+            cout << action_global_instant[idx] << " ";
+        }
+        cout << endl;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
