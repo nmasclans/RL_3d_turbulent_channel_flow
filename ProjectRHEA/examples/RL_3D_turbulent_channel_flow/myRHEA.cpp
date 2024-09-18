@@ -88,9 +88,9 @@ vector<vector<double>> Deltaij = {
 myRHEA::myRHEA(const string name_configuration_file, const string tag, const string restart_data_file, const string t_action, const string t_episode, const string t_begin_control, const string db_clustered, const string global_step) : FlowSolverRHEA(name_configuration_file) {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
-    Delta_f_rhou_field_rk1.setTopology(topo, "Delta_f_rhou_field_rk1");
-    Delta_f_rhov_field_rk1.setTopology(topo, "Delta_f_rhov_field_rk1");
-    Delta_f_rhow_field_rk1.setTopology(topo, "Delta_f_rhow_field_rk1");
+    rl_f_rhou_field.setTopology(topo, "rl_f_rhou_field");
+    rl_f_rhov_field.setTopology(topo, "rl_f_rhov_field");
+    rl_f_rhow_field.setTopology(topo, "rl_f_rhow_field");
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -529,11 +529,6 @@ void myRHEA::calculateSourceTerms() {
             double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
             double delta_x, delta_y, delta_z;
 
-            /// TODO: check, remove when check is successful
-            /// double f_rhou_field_ratio = 0.0;
-            /// int f_rhou_field_counter = 0;
-            /// TODO: end remove
-            
             /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
@@ -555,59 +550,36 @@ void myRHEA::calculateSourceTerms() {
                         d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
                         d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
 
-                        /// TODO: check, remove when check is successful
-                        /// if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point 
-                        ///     f_rhou_field_ratio   += std::abs( ( rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z ) ) / f_rhou_field[I1D(i,j,k)] );
-                        ///     f_rhou_field_counter += 1;
-                        /// }
-                        /// TODO: end remove
-
                         /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                        Delta_f_rhou_field_rk1[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                        Delta_f_rhov_field_rk1[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                        Delta_f_rhow_field_rk1[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
-                        f_rhou_field[I1D(i,j,k)] += Delta_f_rhou_field_rk1[I1D(i,j,k)];
-                        f_rhov_field[I1D(i,j,k)] += Delta_f_rhov_field_rk1[I1D(i,j,k)];
-                        f_rhow_field[I1D(i,j,k)] += Delta_f_rhow_field_rk1[I1D(i,j,k)];
-                        f_rhoE_field[I1D(i,j,k)] += 0.0;
-
+                        /// Only calculate at 1st Runge-Kutta iteration
+                        rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                        rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                        rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
                     }
                 }
             }
-            
-            /// TODO: remove check log:
-            /// f_rhou_field_ratio /= f_rhou_field_counter;
-            /// if (my_rank < 4) {
-            ///     cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " has mean f_rhou_field_ratio: " << f_rhou_field_ratio << ", averaged over " << f_rhou_field_counter << " actuation points" << endl;
-            /// }
-            /// TODO: end remove
 
             MPI_Barrier(MPI_COMM_WORLD);
             timers->stop( "rl_update_control_term" );
 
-        } else {
+        } else {    /// current_time <= begin_actuation_time
 
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        rl_f_rhou_field[I1D(i,j,k)] = 0.0;
+                        rl_f_rhov_field[I1D(i,j,k)] = 0.0;
+                        rl_f_rhow_field[I1D(i,j,k)] = 0.0;
+                    }
+                }
+            }
             if (my_rank == 0) {
                 cout << "[myRHEA::calculateSourceTerms] RL Control is NOT applied yet, as current time (" << scientific << current_time << ") " << "< time begin control (" << scientific << begin_actuation_time << ")" << endl;
             }
 
         }
-    } else { /// rk iteration != 1
-        timers->start( "rl_update_control_term" );
-        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-            for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-	                f_rhou_field[I1D(i,j,k)] += Delta_f_rhou_field_rk1[I1D(i,j,k)];
-                    f_rhov_field[I1D(i,j,k)] += Delta_f_rhov_field_rk1[I1D(i,j,k)];
-                    f_rhow_field[I1D(i,j,k)] += Delta_f_rhow_field_rk1[I1D(i,j,k)];
-                    f_rhoE_field[I1D(i,j,k)] += 0.0;
-                }
-            }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-        timers->stop( "rl_update_control_term" );
     }
-
+    
 #endif
 
     /// Update halo values
@@ -651,7 +623,7 @@ void myRHEA::outputCurrentStateDataRL() {
     writer_reader->setAttribute( "Time", current_time );
     writer_reader->setAttribute( "Iteration", current_time_iter );
     writer_reader->setAttribute( "AveragingTime", averaging_time );
-    writer_reader->writeRL( current_time_iter, tag, global_step );
+    writer_reader->writeRL( current_time_iter, tag, global_step, "rhea_exp/output_data" );
 
 };
 
@@ -659,18 +631,23 @@ void myRHEA::outputCurrentStateDataRL() {
 void myRHEA::timeAdvanceConservedVariables() {
 
     /// TODO: check, remove lines below
-    /// int my_rank;
-    /// MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    /// TODO: end remove
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    /// TODO: check relative value of rl control load
-    /// double rhou_inv_flux_ratio = 0.0;
-    /// double rhou_vis_flux_ratio = 0.0;
-    /// double f_rhou_field_total_ratio = 0.0;
-    /// double f_rhou_field_feedback_loop_ratio = 0.0;
-    /// double f_rhou_field_rl_action_ratio = 0.0;
-    /// int ratio_counter = 0;
-    /// TODO: end remove
+    /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+    /// Apply smooth regularization when RL control term << RHS term
+    double rhou_rhs, rhov_rhs, rhow_rhs;
+    double rhou_rl_f, rhov_rl_f, rhow_rl_f;
+    double rhou_rl_f_reg, rhov_rl_f_reg, rhow_rl_f_reg;
+    /// Debugging variables
+    double rhou_inv_flux_ratio   = 0.0;
+    double rhou_vis_flux_ratio   = 0.0;
+    double f_rhou_field_ratio    = 0.0;
+    double rl_f_rhou_field_ratio = 0.0;
+    double rl_f_rhou_field_nonreg_ratio = 0.0;
+    double rl_f_rhou_field_reg_factor   = 0.0;
+    int ratio_counter            = 0;
+    /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
 
     /// Coefficients of explicit Runge-Kutta stages
     double rk_a = 0.0, rk_b = 0.0, rk_c = 0.0;
@@ -709,12 +686,28 @@ void myRHEA::timeAdvanceConservedVariables() {
 #endif
                 /// Work of momentum sources
                 f_rhouvw = f_rhou_field[I1D(i,j,k)]*u_field[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)]*v_field[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)]*w_field[I1D(i,j,k)];
+                
+                /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+                /// Calculate RL control load ratio wrt RHS with no RL control load
+                rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
+                rhov_rhs      = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)];
+                rhow_rhs      = ( -1.0 ) * rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)];
+                rhou_rl_f     = 1.0 * rl_f_rhou_field[I1D(i,j,k)];  /// TODO: 1.0 may be modified, define param fEps >= 1.0
+                rhov_rl_f     = 1.0 * rl_f_rhov_field[I1D(i,j,k)];
+                rhow_rl_f     = 1.0 * rl_f_rhow_field[I1D(i,j,k)];
+                /// Apply smooth regularization approach when |rl_f| < |rhs|/10.0, E = 0.1 achieves regularization to be smooth enough
+                rhou_rl_f_reg = rhou_rl_f + ( rhou_rhs / 2.0 ) * std::tanh( rhou_rl_f / ( 0.1 * ( rhou_rhs / 2.0 ) ) ); /// TODO: define param lambda, eta (see mail Lluis)
+                rhov_rl_f_reg = rhov_rl_f + ( rhov_rhs / 2.0 ) * std::tanh( rhov_rl_f / ( 0.1 * ( rhov_rhs / 2.0 ) ) );
+                rhow_rl_f_reg = rhow_rl_f + ( rhow_rhs / 2.0 ) * std::tanh( rhow_rl_f / ( 0.1 * ( rhow_rhs / 2.0 ) ) );
+                /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+           
                 /// Sum right-hand-side (RHS) fluxes
                 rho_rhs_flux  = ( -1.0 )*rho_inv_flux[I1D(i,j,k)]; 
-                rhou_rhs_flux = ( -1.0 )*rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)]; 
-                rhov_rhs_flux = ( -1.0 )*rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)]; 
-                rhow_rhs_flux = ( -1.0 )*rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)]; 
+                rhou_rhs_flux = rhou_rhs + rhou_rl_f_reg;
+                rhov_rhs_flux = rhov_rhs + rhov_rl_f_reg; 
+                rhow_rhs_flux = rhow_rhs + rhow_rl_f_reg; 
                 rhoE_rhs_flux = ( -1.0 )*rhoE_inv_flux[I1D(i,j,k)] + rhoE_vis_flux[I1D(i,j,k)] + f_rhoE_field[I1D(i,j,k)] + f_rhouvw;
+                
                 /// Runge-Kutta step
                 rho_field[I1D(i,j,k)]  = rk_a*rho_0_field[I1D(i,j,k)]  + rk_b*rho_field[I1D(i,j,k)]  + rk_c*delta_t*rho_rhs_flux;
                 rhou_field[I1D(i,j,k)] = rk_a*rhou_0_field[I1D(i,j,k)] + rk_b*rhou_field[I1D(i,j,k)] + rk_c*delta_t*rhou_rhs_flux;
@@ -722,34 +715,35 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rhow_field[I1D(i,j,k)] = rk_a*rhow_0_field[I1D(i,j,k)] + rk_b*rhow_field[I1D(i,j,k)] + rk_c*delta_t*rhow_rhs_flux;
                 rhoE_field[I1D(i,j,k)] = rk_a*rhoE_0_field[I1D(i,j,k)] + rk_b*rhoE_field[I1D(i,j,k)] + rk_c*delta_t*rhoE_rhs_flux;
 
-                /// TODO: remove checks
-                /// if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point    
-                ///     rhou_inv_flux_ratio              += std::abs( rhou_inv_flux[I1D(i,j,k)] / rhou_rhs_flux );
-                ///     rhou_vis_flux_ratio              += std::abs( rhou_vis_flux[I1D(i,j,k)] / rhou_rhs_flux );
-                ///     f_rhou_field_total_ratio         += std::abs( f_rhou_field[I1D(i,j,k)] / rhou_rhs_flux );
-                ///     f_rhou_field_feedback_loop_ratio += std::abs( (tau_w/delta) / rhou_rhs_flux );
-                ///     f_rhou_field_rl_action_ratio     += std::abs( (f_rhou_field[I1D(i,j,k)] - (tau_w/delta)) / rhou_rhs_flux );
-                ///     ratio_counter += 1;
-                /// }
-                /// TODO: end remove
+                /// Debugging information
+                if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point    
+                    rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / rhou_rhs_flux );
+                    rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / rhou_rhs_flux );
+                    f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / rhou_rhs_flux );
+                    rl_f_rhou_field_ratio        += std::abs( rhou_rl_f_reg               / rhou_rhs_flux );
+                    rl_f_rhou_field_nonreg_ratio += std::abs( rl_f_rhou_field[I1D(i,j,k)] / rhou_rhs );
+                    rl_f_rhou_field_reg_factor   += std::abs( rhou_rl_f_reg               / ( rhou_rl_f + EPS) );
+                    ratio_counter += 1;
+                }
 	        }
         }
     }
-    /// TODO: remove checks logs
-    /// rhou_inv_flux_ratio /= ratio_counter;
-    /// rhou_vis_flux_ratio /= ratio_counter;
-    /// f_rhou_field_total_ratio /= ratio_counter;
-    /// f_rhou_field_feedback_loop_ratio /= ratio_counter;
-    /// f_rhou_field_rl_action_ratio /= ratio_counter;
-    /// if ( my_rank < 4 ) {
-    ///     cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
-    ///          << endl << "Ratio (rhou_inv_flux              / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
-    ///          << endl << "Ratio (rhou_vis_flux              / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
-    ///          << endl << "Ratio (f_rhou_field_total         / rhou_rhs_flux): " <<  f_rhou_field_total_ratio
-    ///          << endl << "Ratio (f_rhou_field_feedback_loop / rhou_rhs_flux): " <<  f_rhou_field_feedback_loop_ratio
-    ///          << endl << "Ratio (f_rhou_field_rl_action     / rhou_rhs_flux): " <<  f_rhou_field_rl_action_ratio << endl;
-    /// }
-    /// TODO: end remove
+    rhou_inv_flux_ratio          /= ratio_counter;
+    rhou_vis_flux_ratio          /= ratio_counter;
+    f_rhou_field_ratio           /= ratio_counter;
+    rl_f_rhou_field_ratio        /= ratio_counter;
+    rl_f_rhou_field_nonreg_ratio /= ratio_counter;
+    rl_f_rhou_field_reg_factor   /= ratio_counter;
+    if ( my_rank < 4 ) {
+        cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
+             << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
+             << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
+             << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
+             << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
+             << endl << "Ratio (rl_f_rhou_field_nonReg / rhou_rhs_flux_nonReg): " << rl_f_rhou_field_nonreg_ratio
+             << endl << "Ratio (rl_f_rhou_field / rl_f_rhou_field_nonReg): " <<  rl_f_rhou_field_reg_factor
+             << endl;
+    }
 
 #if _OPENACC_MANUAL_DATA_MOVEMENT_
     #pragma acc exit data copyout (rho_field.vector[0:local_size],rhou_field.vector[0:local_size],rhov_field.vector[0:local_size],rhow_field.vector[0:local_size],rhoE_field.vector[0:local_size])
