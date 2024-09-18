@@ -396,6 +396,7 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         Get current flow state from the database.
         """
+        logger.debug("Reading state...")
         for i in range(self.cfd_n_envs):
             if self._step_type[i] > 0: # environment still running
                 try:
@@ -455,6 +456,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
 
     def _get_reward(self):
+        logger.debug("Reading reward...")
         for i in range(self.cfd_n_envs):
             if self._step_type[i] > 0: # environment still running
                 # poll_tensor(name: str, poll_frequency_ms: int, num_tries: int) → bool
@@ -477,6 +479,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
 
     def _get_time(self):
+        logger.debug("Reading time...")
         for i in range(self.cfd_n_envs):
             try:
                 self.client.poll_tensor(self.time_key[i], self.poll_freq_ms, self.poll_n_tries)
@@ -497,6 +500,7 @@ class RheaEnv(py_environment.PyEnvironment):
             2: Running          (ts.StepType.MID)
         Returns array with step_type from every environment.
         """
+        logger.debug("Reading status...")
         if not self.envs_initialised: # initialising environments - poll and wait for them to get started
             for i in range(self.cfd_n_envs):
                 try:
