@@ -31,8 +31,8 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
                                  << ", action_global_size: " << action_global_size << std::endl;};
 
     /// Set read parameters
-    read_interval = 100;    // in miliseconds // TODO: input as params?
-    read_tries    = 1000;                     // TODO: input as params?
+    read_interval = 100;     // in miliseconds // TODO: input as params?
+    read_tries    = 360000;                    // TODO: input as params?
 
     try {
         state_sizes.resize(mpi_size);                           // vector<int>
