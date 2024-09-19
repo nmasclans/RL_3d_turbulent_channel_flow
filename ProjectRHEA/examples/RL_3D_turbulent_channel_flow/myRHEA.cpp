@@ -196,7 +196,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Initialize additional attribute members
     first_actuation = true;
-    calculateInnerSizeTopo();   /// initialize 'num_points_local'
 
 };
 
@@ -684,9 +683,6 @@ void myRHEA::timeAdvanceConservedVariables() {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 #endif
-                /// Work of momentum sources
-                f_rhouvw = f_rhou_field[I1D(i,j,k)]*u_field[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)]*v_field[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)]*w_field[I1D(i,j,k)];
-                
                 /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
                 /// Calculate RL control load ratio wrt RHS with no RL control load
                 rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
@@ -696,11 +692,16 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rhov_rl_f     = 1.0 * rl_f_rhov_field[I1D(i,j,k)];
                 rhow_rl_f     = 1.0 * rl_f_rhow_field[I1D(i,j,k)];
                 /// Apply smooth regularization approach when |rl_f| < |rhs|/10.0, E = 0.1 achieves regularization to be smooth enough
-                rhou_rl_f_reg = rhou_rl_f + ( rhou_rhs / 2.0 ) * std::tanh( rhou_rl_f / ( 0.1 * ( rhou_rhs / 2.0 ) ) ); /// TODO: define param lambda, eta (see mail Lluis)
-                rhov_rl_f_reg = rhov_rl_f + ( rhov_rhs / 2.0 ) * std::tanh( rhov_rl_f / ( 0.1 * ( rhov_rhs / 2.0 ) ) );
-                rhow_rl_f_reg = rhow_rl_f + ( rhow_rhs / 2.0 ) * std::tanh( rhow_rl_f / ( 0.1 * ( rhow_rhs / 2.0 ) ) );
+                rhou_rl_f_reg = rhou_rl_f + ( rhou_rhs / 10.0 ) * std::tanh( rhou_rl_f / ( 0.1 * ( rhou_rhs / 10.0 ) ) ); /// TODO: define param lambda, eta (see mail Lluis)
+                rhov_rl_f_reg = rhov_rl_f + ( rhov_rhs / 10.0 ) * std::tanh( rhov_rl_f / ( 0.1 * ( rhov_rhs / 10.0 ) ) );
+                rhow_rl_f_reg = rhow_rl_f + ( rhow_rhs / 10.0 ) * std::tanh( rhow_rl_f / ( 0.1 * ( rhow_rhs / 10.0 ) ) );
                 /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
            
+                /// Work of momentum sources
+                f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rhou_rl_f_reg) * u_field[I1D(i,j,k)]
+                         + (f_rhov_field[I1D(i,j,k)] + rhov_rl_f_reg) * v_field[I1D(i,j,k)]
+                         + (f_rhow_field[I1D(i,j,k)] + rhow_rl_f_reg) * w_field[I1D(i,j,k)];
+                
                 /// Sum right-hand-side (RHS) fluxes
                 rho_rhs_flux  = ( -1.0 )*rho_inv_flux[I1D(i,j,k)]; 
                 rhou_rhs_flux = rhou_rhs + rhou_rl_f_reg;
@@ -1517,16 +1518,25 @@ void myRHEA::calculateReward() {
 
     /// Initialize variables
     avg_u_field_local = 0.0; 
+    double total_volume_local = 0.0,
+    double delta_x, delta_y, delta_z, delta_volume;
 
     /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                avg_u_field_local += avg_u_field[I1D(i,j,k)];
+                /// Geometric stuff
+                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                delta_volume =  delta_x * delta_y * delta_z;
+                /// Calculate volume-averaged avg_u
+                avg_u_field_local  += avg_u_field[I1D(i,j,k)] * delta_volume;
+                total_volume_local += delta_volume;
             }
         }
     }
-    avg_u_field_local /= num_points_local;
+    avg_u_field_local /= total_volume_local;
     reward_local = std::abs( ( avg_u_field_local - avg_u_field_local_previous ) / ( avg_u_field_local_previous + EPS ) ); 
 
     /// Store avg_u_field_local for next reward calculation
@@ -1555,23 +1565,6 @@ void myRHEA::smoothControlFunction() {
         }
         cout << endl;
     }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void myRHEA::calculateInnerSizeTopo() {
-    num_points_local = 0;
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                num_points_local++;
-            }
-        }
-    }
-    /// Logging
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    cout << "[myRHEA::calculateInnerSizeTopo] Rank " << my_rank << " has number of grid points: " << num_points_local << endl;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

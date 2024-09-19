@@ -91,7 +91,6 @@ class myRHEA : public FlowSolverRHEA {
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
         int action_global_size2;                 /// or nRectangleControl
-        int num_points_local;
         double avg_u_field_local;
         double avg_u_field_local_previous;
         double reward_local;
@@ -110,7 +109,6 @@ class myRHEA : public FlowSolverRHEA {
         void updateState();
         void calculateReward();
         void smoothControlFunction();
-        void calculateInnerSizeTopo();
 
     private:
 
