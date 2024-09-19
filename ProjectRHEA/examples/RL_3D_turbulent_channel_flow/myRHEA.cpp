@@ -734,7 +734,7 @@ void myRHEA::timeAdvanceConservedVariables() {
     rl_f_rhou_field_ratio        /= ratio_counter;
     rl_f_rhou_field_nonreg_ratio /= ratio_counter;
     rl_f_rhou_field_reg_factor   /= ratio_counter;
-    if ( my_rank < 4 ) {
+    if ( my_rank == 3 ) {
         cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
              << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
              << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
