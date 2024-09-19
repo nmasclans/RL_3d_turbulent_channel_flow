@@ -496,13 +496,13 @@ class RheaEnv(py_environment.PyEnvironment):
         old_mean           = self._state_running_mean
         self._state_running_mean += ( current_epoch_mean - old_mean ) / self._counter_running_avg      # equivalent to: self._state_running_mean = ( self._state_running_mean * (self._counter_running_avg - 1) + current_mean ) / self._counter_running_avg
         # Update running variance (Welford's method)
-        self._state_runnning_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._counter_running_avg
+        self._state_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._counter_running_avg
         # Calculate running standart deviation
-        std_dev = np.sqrt( self._state_runnning_var / self._counter_running_avg )
+        std_dev = np.sqrt( self._state_running_var / self._counter_running_avg )
         # Standarize state
         self._state_rl = ( self._state_rl - self._state_running_mean ) / ( std_dev + EPS )
         # Logging
-        logger.debug(f"[RheaEnv::_standarize_state] State Standarization, updated running mean: {self._state_running_mean}, variance: {self._state_runnning_var}, std_dev: {std_dev}")
+        logger.debug(f"[RheaEnv::_standarize_state] State Standarization, updated running mean: {self._state_running_mean}, variance: {self._state_running_var}, std_dev: {std_dev}")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")

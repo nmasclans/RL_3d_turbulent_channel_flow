@@ -1535,7 +1535,7 @@ void myRHEA::calculateReward() {
 
     /// Initialize variables
     avg_u_field_local = 0.0; 
-    double total_volume_local = 0.0,
+    double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
 
     /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
