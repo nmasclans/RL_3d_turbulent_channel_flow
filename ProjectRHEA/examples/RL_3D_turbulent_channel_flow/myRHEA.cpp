@@ -12,6 +12,7 @@ using namespace std;
 #define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
+#define _REGULARIZE_RL_ACTION_ 0                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
 
 /// AUXILIAR PARAMETERS ///
 //const double pi = 2.0*asin( 1.0 );				/// pi number (fixed)
@@ -633,20 +634,23 @@ void myRHEA::timeAdvanceConservedVariables() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
-    /// Apply smooth regularization when RL control term << RHS term
-    double rhou_rhs, rhov_rhs, rhow_rhs;
-    double rhou_rl_f, rhov_rl_f, rhow_rl_f;
-    double rhou_rl_f_reg, rhov_rl_f_reg, rhow_rl_f_reg;
     /// Debugging variables
     double rhou_inv_flux_ratio   = 0.0;
     double rhou_vis_flux_ratio   = 0.0;
     double f_rhou_field_ratio    = 0.0;
     double rl_f_rhou_field_ratio = 0.0;
+    int ratio_counter            = 0;
+#if _REGULARIZE_RL_ACTION_
+    /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+    /// Apply smooth regularization when RL control term << RHS term
+    double rhou_rhs, rhov_rhs, rhow_rhs;
+    double rhou_rl_f, rhov_rl_f, rhow_rl_f;
+    double rhou_rl_f_reg, rhov_rl_f_reg, rhow_rl_f_reg;
+    /// Debugging additional variables
     double rl_f_rhou_field_nonreg_ratio = 0.0;
     double rl_f_rhou_field_reg_factor   = 0.0;
-    int ratio_counter            = 0;
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+#endif
 
     /// Coefficients of explicit Runge-Kutta stages
     double rk_a = 0.0, rk_b = 0.0, rk_c = 0.0;
@@ -683,30 +687,35 @@ void myRHEA::timeAdvanceConservedVariables() {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 #endif
+#if _REGULARIZE_RL_ACTION_
                 /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
                 /// Calculate RL control load ratio wrt RHS with no RL control load
                 rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
                 rhov_rhs      = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)];
                 rhow_rhs      = ( -1.0 ) * rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)];
-                rhou_rl_f     = 1.0 * rl_f_rhou_field[I1D(i,j,k)];  /// TODO: 1.0 may be modified, define param fEps >= 1.0
-                rhov_rl_f     = 1.0 * rl_f_rhov_field[I1D(i,j,k)];
-                rhow_rl_f     = 1.0 * rl_f_rhow_field[I1D(i,j,k)];
+                rhou_rl_f     = rl_f_rhou_field[I1D(i,j,k)];  /// TODO: 1.0 may be modified, define param fEps >= 1.0
+                rhov_rl_f     = rl_f_rhov_field[I1D(i,j,k)];
+                rhow_rl_f     = rl_f_rhow_field[I1D(i,j,k)];
                 /// Apply smooth regularization approach when |rl_f| < |rhs|/10.0, E = 0.1 achieves regularization to be smooth enough
                 rhou_rl_f_reg = rhou_rl_f + ( rhou_rhs / 10.0 ) * std::tanh( rhou_rl_f / ( 0.1 * ( rhou_rhs / 10.0 ) ) ); /// TODO: define param lambda, eta (see mail Lluis)
                 rhov_rl_f_reg = rhov_rl_f + ( rhov_rhs / 10.0 ) * std::tanh( rhov_rl_f / ( 0.1 * ( rhov_rhs / 10.0 ) ) );
                 rhow_rl_f_reg = rhow_rl_f + ( rhow_rhs / 10.0 ) * std::tanh( rhow_rl_f / ( 0.1 * ( rhow_rhs / 10.0 ) ) );
+                /// Update 'rl_f_rhow_field'
+                rl_f_rhou_field[I1D(i,j,k)] = rhou_rl_f_reg;
+                rl_f_rhov_field[I1D(i,j,k)] = rhov_rl_f_reg;
+                rl_f_rhow_field[I1D(i,j,k)] = rhow_rl_f_reg;
                 /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
-           
+#endif
                 /// Work of momentum sources
-                f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rhou_rl_f_reg) * u_field[I1D(i,j,k)]
-                         + (f_rhov_field[I1D(i,j,k)] + rhov_rl_f_reg) * v_field[I1D(i,j,k)]
-                         + (f_rhow_field[I1D(i,j,k)] + rhow_rl_f_reg) * w_field[I1D(i,j,k)];
+                f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)]) * u_field[I1D(i,j,k)]
+                         + (f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]) * v_field[I1D(i,j,k)]
+                         + (f_rhow_field[I1D(i,j,k)] + rl_f_rhow_field[I1D(i,j,k)]) * w_field[I1D(i,j,k)];
                 
                 /// Sum right-hand-side (RHS) fluxes
                 rho_rhs_flux  = ( -1.0 )*rho_inv_flux[I1D(i,j,k)]; 
-                rhou_rhs_flux = rhou_rhs + rhou_rl_f_reg;
-                rhov_rhs_flux = rhov_rhs + rhov_rl_f_reg; 
-                rhow_rhs_flux = rhow_rhs + rhow_rl_f_reg; 
+                rhou_rhs_flux = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)];
+                rhov_rhs_flux = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]; 
+                rhow_rhs_flux = ( -1.0 ) * rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)] + rl_f_rhow_field[I1D(i,j,k)]; 
                 rhoE_rhs_flux = ( -1.0 )*rhoE_inv_flux[I1D(i,j,k)] + rhoE_vis_flux[I1D(i,j,k)] + f_rhoE_field[I1D(i,j,k)] + f_rhouvw;
                 
                 /// Runge-Kutta step
@@ -721,9 +730,13 @@ void myRHEA::timeAdvanceConservedVariables() {
                     rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / rhou_rhs_flux );
                     rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / rhou_rhs_flux );
                     f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / rhou_rhs_flux );
+#if _REGULARIZE_RL_ACTION_
                     rl_f_rhou_field_ratio        += std::abs( rhou_rl_f_reg               / rhou_rhs_flux );
-                    rl_f_rhou_field_nonreg_ratio += std::abs( rl_f_rhou_field[I1D(i,j,k)] / rhou_rhs );
+                    rl_f_rhou_field_nonreg_ratio += std::abs( rhou_rl_f                   / rhou_rhs );
                     rl_f_rhou_field_reg_factor   += std::abs( rhou_rl_f_reg               / ( rhou_rl_f + EPS) );
+#else
+                    rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / rhou_rhs_flux );
+#endif
                     ratio_counter += 1;
                 }
 	        }
@@ -733,16 +746,20 @@ void myRHEA::timeAdvanceConservedVariables() {
     rhou_vis_flux_ratio          /= ratio_counter;
     f_rhou_field_ratio           /= ratio_counter;
     rl_f_rhou_field_ratio        /= ratio_counter;
+#if _REGULARIZE_RL_ACTION_
     rl_f_rhou_field_nonreg_ratio /= ratio_counter;
     rl_f_rhou_field_reg_factor   /= ratio_counter;
+#endif
     if ( my_rank == 3 ) {
         cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
              << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
              << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
              << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
              << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
+#if _REGULARIZE_RL_ACTION_
              << endl << "Ratio (rl_f_rhou_field_nonReg / rhou_rhs_flux_nonReg): " << rl_f_rhou_field_nonreg_ratio
              << endl << "Ratio (rl_f_rhou_field / rl_f_rhou_field_nonReg): " <<  rl_f_rhou_field_reg_factor
+#endif
              << endl;
     }
 
