@@ -16,6 +16,8 @@ from smartsim.log import get_logger
 from smartrhea.init_smartsim import write_hosts
 from smartrhea.utils import n_witness_points, n_cubes, get_witness_xyz, numpy_str, bcolors, delete_all_files_in_dir
 
+EPS = 1e-8
+
 logger = get_logger(__name__)
 
 class RheaEnv(py_environment.PyEnvironment):
@@ -246,6 +248,13 @@ class RheaEnv(py_environment.PyEnvironment):
         logger.debug(f"Shape of _state: {self._state.shape}, _state_rl: {self._state_rl.shape}, _action: {self._action.shape}, _action_znmf: {self._action_znmf.shape}, " +
                      f"_local_reward: {self._local_reward.shape}, _reward: {self._reward.shape}")
 
+        # define variables for state & reward standarization
+        self._state_running_mean  = 0.0
+        self._state_running_var   = 1.0
+        self._reward_running_mean = 0.0
+        self._reward_running_var  = 1.0
+        self._counter_running_avg = 0
+
         # define initial state and action array properties. Omit batch dimension (shape is per (rl) environment)
         self._observation_spec = array_spec.ArraySpec(shape=(self.n_state_rl,), dtype=self.model_dtype, name="observation")
         self._action_spec = array_spec.BoundedArraySpec(shape=(self.n_action,), dtype=self.model_dtype, name="action",
@@ -294,12 +303,14 @@ class RheaEnv(py_environment.PyEnvironment):
                 \nRHEA n_state: {n_state}   \nPython env n_state: {self.n_state} \
                 \nRHEA n_action: {n_action} \nPython env n_action * RL_envs: {self.n_action * self.rl_n_envs}")
 
-        # Get the initial state and reward
+        # Get the initial state, reward and time (poll database tensors)
         self._get_state() # updates self._state
-        self._redistribute_state() # updates self._state_rl
-        self._standarize_state()   # updates self._state_rl
         self._get_reward() # updates self._reward
         self._get_time()   # updates self._time
+
+        # Transform state and reward: redistribute & standarize
+        self._redistribute_state()              # updates self._state_rl
+        self._standarize_state_and_reward()     # updates self._state_rl, self._reward
 
         # Write RL data into disk
         if self.dump_data_flag:
@@ -437,24 +448,6 @@ class RheaEnv(py_environment.PyEnvironment):
         # -> _redistribute_state has been CHECKED, the state information is distributed successfully along rl env., including the neighboring rl env.  
 
 
-    def _standarize_state(self):
-        """
-        Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
-        
-        Additional info: 
-        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
-                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
-        """
-        flattened_state_rl = self._state_rl.flatten()
-        mean               = np.mean(flattened_state_rl)
-        std_dev            = np.std(flattened_state_rl)
-        self._state_rl     = (self._state_rl - mean) / std_dev
-        # Logging
-        for i in range(self.cfd_n_envs):
-            for j in range(self.rl_n_envs):
-                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
-
-
     def _get_reward(self):
         logger.debug("Reading reward...")
         for i in range(self.cfd_n_envs):
@@ -476,6 +469,73 @@ class RheaEnv(py_environment.PyEnvironment):
                     logger.debug(f"[Cfd Env {i}] Weighted Reward: {self._reward[i*self.rl_n_envs:i*self.rl_n_envs+self.rl_n_envs]}")                  
                 except Exception as exc:
                     raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
+
+
+    def _standarize_state_and_reward(self):
+        self._counter_running_avg += 1
+        self._standarize_state()    # updates self._state_rl
+        self._standarize_reward()   # updates self._reward
+
+
+    def _standarize_state(self):
+        """
+        Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
+        
+        Additional info: 
+        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
+                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
+
+        Updated attributes:
+        self._state_running_mean
+        self._state_running_var
+        self._state_rl
+        """
+        flattened_state_rl = self._state_rl.flatten()
+        # Update running mean
+        current_epoch_mean = np.mean(flattened_state_rl)
+        old_mean           = self._state_running_mean
+        self._state_running_mean += ( current_epoch_mean - old_mean ) / self._counter_running_avg      # equivalent to: self._state_running_mean = ( self._state_running_mean * (self._counter_running_avg - 1) + current_mean ) / self._counter_running_avg
+        # Update running variance (Welford's method)
+        self._state_runnning_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._counter_running_avg
+        # Calculate running standart deviation
+        std_dev = np.sqrt( self._state_runnning_var / self._counter_running_avg )
+        # Standarize state
+        self._state_rl = ( self._state_rl - self._state_running_mean ) / ( std_dev + EPS )
+        # Logging
+        logger.debug(f"[RheaEnv::_standarize_state] State Standarization, updated running mean: {self._state_running_mean}, variance: {self._state_runnning_var}, std_dev: {std_dev}")
+        for i in range(self.cfd_n_envs):
+            for j in range(self.rl_n_envs):
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
+
+
+    def _standarize_reward(self):
+        """
+        Standarize 'self._reward' data to have mean = 0 and standard deviation = 1
+        
+        Additional info: 
+        self._reward shape: [self.n_envs], where self.n_envs = cfd_n_envs * rl_n_envs
+
+        Updated attributes:
+        self._reward_running_mean
+        self._reward_running_var
+        self._reward
+        """
+        # Update running mean
+        current_epoch_mean = np.mean(self._reward)
+        old_mean           = self._reward_running_mean
+        self._reward_running_mean += ( current_epoch_mean - old_mean ) / self._counter_running_avg
+        # Update running variance (Welford's method)
+        self._reward_runnning_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._reward_running_mean) ) / self._counter_running_avg
+        # Calculate running standart deviation
+        std_dev = np.sqrt( self._reward_runnning_var / self._counter_running_avg )
+        # Standarize reward
+        self._reward = ( self._reward - self._reward_running_mean ) / ( std_dev + EPS )
+        # Logging
+        logger.debug(f"[RheaEnv::_standarize_reward] Reward Standarization, updated running mean: {self._reward_running_mean}, variance: {self._reward_runnning_var}, std_dev: {std_dev}")
+        for i in range(self.cfd_n_envs):
+            for j in range(self.rl_n_envs):
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized Reward: {self._reward[i * self.rl_n_envs + j]}")
+
 
 
     def _get_time(self):
@@ -644,12 +704,15 @@ class RheaEnv(py_environment.PyEnvironment):
         # send predicted actions into DB for RHEA to collect and step
         self._set_action(action)
 
-        # poll new state and reward. This waits for the RHEA to finish the action period and send the state and reward data
+        # Poll new state, reward and time
+        # poll command waits for the RHEA to finish the action period and send the state and reward data
         self._get_state()           # updates self._state
-        self._redistribute_state()  # updates self._state_rl
-        self._standarize_state()    # updates self._state_rl
         self._get_reward()          # updates self._reward
-        self._get_time()
+        self._get_time()            # updates self._time
+
+        # Transform state and reward: redistribute & standarize
+        self._redistribute_state()              # updates self._state_rl
+        self._standarize_state_and_reward()     # updates self._state_rl, self._reward
 
         # write RL data into disk
         if self.dump_data_flag: self._dump_rl_data()
