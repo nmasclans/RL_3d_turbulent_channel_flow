@@ -364,9 +364,9 @@ void myRHEA::calculateSourceTerms() {
         cout << "[myRHEA::calculateSourceTerms] Current time: " << current_time << ", iteration: " << current_time_iter << ", rk it: " << rk_time_stage << endl;
     }
 
-    if (rk_time_stage == 1) {    /// only execute once per Runge-Kutta loop, i.e. execute on 1st Runge-Kutta iteration
+    if (rk_time_stage == 1) {    /// only recalculate f_rl_rhoi_field once per Runge-Kutta loop (1st rk iter.), if new action is needed
 
-        /// Check if new action is needed
+        /// If needed, get and post-process new action
         if (current_time > begin_actuation_time) {
 
             if (first_actuation) {
@@ -411,159 +411,165 @@ void myRHEA::calculateSourceTerms() {
                 MPI_Barrier(MPI_COMM_WORLD);
                 timers->stop( "rl_smartredis_communications" );
 
-            }
 
-            MPI_Barrier(MPI_COMM_WORLD);
-            timers->start( "rl_update_DeltaRij" );
+                MPI_Barrier(MPI_COMM_WORLD);
+                timers->start( "rl_update_DeltaRij" );
 
-            /// Calculate smooth action 
-            smoothControlFunction();        /// updates 'action_global_instant'
+                /// Calculate smooth action 
+                /// OPTION 1 (smooth action implementation): if DeltaRii_field are re-calculated at each time instant,
+                /// This option requires loop "if (current_time - previous_actuation_time >= actuation_period) {" to finish here!
+                /// smoothControlFunction();        /// updates 'action_global_instant' 
+                /// OPTION 2 (discrete non-smooth action implementation): if DeltaRii_field are calculated just once for each action, discrete value step
+                for (int i_act=0; i_act<action_global_size2; i_act++) {
+                   action_global_instant[i_act] = action_global_previous[i_act];
+                }
 
-            /// Initialize variables
-            double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
-            double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
-            double Rkk_inv, Akk;
-            bool   isNegligibleAction, isNegligibleRkk;
-            size_t action_idx;
-            vector<vector<double>> Aij(3, vector<double>(3, 0.0));
-            vector<vector<double>> Dij(3, vector<double>(3, 0.0));
-            vector<vector<double>> Qij(3, vector<double>(3, 0.0));
-            vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
+                /// Initialize variables
+                double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
+                double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
+                double Rkk_inv, Akk;
+                bool   isNegligibleAction, isNegligibleRkk;
+                size_t action_idx;
+                vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+                vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+                vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+                vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
 
-            /// Calculate DeltaRij = Rij_perturbated - Rij_original
-            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                /// Calculate DeltaRij = Rij_perturbated - Rij_original
+                for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                    for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                        for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
-                        /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
-                        if (action_mask[I1D(i,j,k)] != 0.0) {
+                            /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
+                            if (action_mask[I1D(i,j,k)] != 0.0) {
 
-                            /// Get perturbation values from RL agent
-                            /// TODO: implement RL action for several variables!
-                            action_idx  = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
-                            DeltaRkk    = action_global_instant[action_idx];
-                            DeltaThetaZ = 0.0;
-                            DeltaThetaY = 0.0;
-                            DeltaThetaX = 0.0;
-                            DeltaXmap1  = 0.0;
-                            DeltaXmap2  = 0.0;
+                                /// Get perturbation values from RL agent
+                                /// TODO: implement RL action for several variables!
+                                action_idx  = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
+                                DeltaRkk    = action_global_instant[action_idx];
+                                DeltaThetaZ = 0.0;
+                                DeltaThetaY = 0.0;
+                                DeltaThetaX = 0.0;
+                                DeltaXmap1  = 0.0;
+                                DeltaXmap2  = 0.0;
 
-                            isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
-                            Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                            isNegligibleRkk    = (abs(Rkk) < EPS);
-                            if (isNegligibleAction || isNegligibleRkk) {
-                                DeltaRxx_field[I1D(i,j,k)] = 0.0;
-                                DeltaRyy_field[I1D(i,j,k)] = 0.0;
-                                DeltaRzz_field[I1D(i,j,k)] = 0.0;
-                                DeltaRxy_field[I1D(i,j,k)] = 0.0;
-                                DeltaRxz_field[I1D(i,j,k)] = 0.0;
-                                DeltaRyz_field[I1D(i,j,k)] = 0.0;
-                            } else {
+                                isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                                Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                                isNegligibleRkk    = (abs(Rkk) < EPS);
+                                if (isNegligibleAction || isNegligibleRkk) {
+                                    DeltaRxx_field[I1D(i,j,k)] = 0.0;
+                                    DeltaRyy_field[I1D(i,j,k)] = 0.0;
+                                    DeltaRzz_field[I1D(i,j,k)] = 0.0;
+                                    DeltaRxy_field[I1D(i,j,k)] = 0.0;
+                                    DeltaRxz_field[I1D(i,j,k)] = 0.0;
+                                    DeltaRyz_field[I1D(i,j,k)] = 0.0;
+                                } else {
 
-                                /// Rkk is Rij trace (dof #1)
-                                Rkk_inv = 1.0 / Rkk;
+                                    /// Rkk is Rij trace (dof #1)
+                                    Rkk_inv = 1.0 / Rkk;
 
-                                /// Build anisotropy tensor (symmetric, trace-free)
-                                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                                Aij[1][0]  = Aij[0][1];
-                                Aij[2][0]  = Aij[0][2];
-                                Aij[2][1]  = Aij[1][2];
+                                    /// Build anisotropy tensor (symmetric, trace-free)
+                                    Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                                    Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                                    Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                                    Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                                    Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                                    Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                                    Aij[1][0]  = Aij[0][1];
+                                    Aij[2][0]  = Aij[0][2];
+                                    Aij[2][1]  = Aij[1][2];
 
-                                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                                Aij[0][0] -= Akk / 3.0;
-                                Aij[1][1] -= Akk / 3.0;
-                                Aij[2][2] -= Akk / 3.0;
+                                    /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                                    Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                                    Aij[0][0] -= Akk / 3.0;
+                                    Aij[1][1] -= Akk / 3.0;
+                                    Aij[2][2] -= Akk / 3.0;
 
-                                /// Aij eigen-decomposition
-                                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
-                                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
+                                    /// Aij eigen-decomposition
+                                    symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
+                                    sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
-                                /// Eigen-vectors Euler Rotation angles (dof #2-4)
-                                eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+                                    /// Eigen-vectors Euler Rotation angles (dof #2-4)
+                                    eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
 
-                                /// Eigen-values Barycentric coordinates (dof #5-6)
-                                eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
+                                    /// Eigen-values Barycentric coordinates (dof #5-6)
+                                    eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
 
-                                /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
-                                /// Delta_* are standarized values between 'action_bounds' RL parameter
-                                Rkk    = Rkk    * (1 + DeltaRkk);
-                                thetaZ = thetaZ * (1 + DeltaThetaZ);
-                                thetaY = thetaY * (1 + DeltaThetaY);
-                                thetaX = thetaX * (1 + DeltaThetaX);
-                                xmap1  = xmap1  * (1 + DeltaXmap1);
-                                xmap2  = xmap2  * (1 + DeltaXmap2);
+                                    /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
+                                    /// Delta_* are standarized values between 'action_bounds' RL parameter
+                                    Rkk    = Rkk    * (1 + DeltaRkk);
+                                    thetaZ = thetaZ * (1 + DeltaThetaZ);
+                                    thetaY = thetaY * (1 + DeltaThetaY);
+                                    thetaX = thetaX * (1 + DeltaThetaX);
+                                    xmap1  = xmap1  * (1 + DeltaXmap1);
+                                    xmap2  = xmap2  * (1 + DeltaXmap2);
 
-                                /// Enforce realizability to perturbed Rij d.o.f
-                                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+                                    /// Enforce realizability to perturbed Rij d.o.f
+                                    enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
 
-                                /// Calculate perturbed & realizable Rij
-                                eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
-                                barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
-                                sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
-                                Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+                                    /// Calculate perturbed & realizable Rij
+                                    eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                                    barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
+                                    sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
+                                    Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
 
-                                /// Calculate perturbed & realizable DeltaRij
-                                DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
-                                DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                                DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
-                                DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
-                                DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
-                                DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+                                    /// Calculate perturbed & realizable DeltaRij
+                                    DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
+                                    DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                                    DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                                    DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                                    DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                                    DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
 
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            MPI_Barrier(MPI_COMM_WORLD);
-            timers->stop( "rl_update_DeltaRij" );
-            
-            MPI_Barrier(MPI_COMM_WORLD);
-            timers->start( "rl_update_control_term" );
+                MPI_Barrier(MPI_COMM_WORLD);
+                timers->stop( "rl_update_DeltaRij" );
 
-            /// Initialize variables
-            double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
-            double delta_x, delta_y, delta_z;
+                MPI_Barrier(MPI_COMM_WORLD);
+                timers->start( "rl_update_control_term" );
 
-            /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                        
-                        /// Geometric stuff
-                        delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                        delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                        delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
-                        
-                        /// Calculate DeltaRij derivatives
-                        d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                        d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                        d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                        d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                        d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                        d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                        d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                        d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                        d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                /// Initialize variables
+                double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
+                double delta_x, delta_y, delta_z;
 
-                        /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                        /// Only calculate at 1st Runge-Kutta iteration
-                        rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                        rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                        rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
+                for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                    for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                        for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                            
+                            /// Geometric stuff
+                            delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                            delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                            delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                            
+                            /// Calculate DeltaRij derivatives
+                            d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                            d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                            d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                            d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                            d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                            d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                            d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                            d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                            d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+
+                            /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+                            rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                            rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                            rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                        }
                     }
                 }
-            }
 
-            MPI_Barrier(MPI_COMM_WORLD);
-            timers->stop( "rl_update_control_term" );
+                MPI_Barrier(MPI_COMM_WORLD);
+                timers->stop( "rl_update_control_term" );
+
+            }       /// end if (current_time - previous_actuation_time >= actuation_period), new action was required
 
         } else {    /// current_time <= begin_actuation_time
 
@@ -579,9 +585,8 @@ void myRHEA::calculateSourceTerms() {
             if (my_rank == 0) {
                 cout << "[myRHEA::calculateSourceTerms] RL Control is NOT applied yet, as current time (" << scientific << current_time << ") " << "< time begin control (" << scientific << begin_actuation_time << ")" << endl;
             }
-
         }
-    }
+    }               /// end if (rk_time_stage == 1)
     
 #endif
 
@@ -755,10 +760,11 @@ void myRHEA::timeAdvanceConservedVariables() {
 #endif
     if ( my_rank == 3 ) {
         cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
-             << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
-             << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
-             << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
-             << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
+             /// << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
+             /// << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
+             /// << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
+             /// << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
+             << endl << "Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio
 #if _REGULARIZE_RL_ACTION_
              << endl << "Ratio (rl_f_rhou_field_nonReg / rhou_rhs_flux_nonReg): " << rl_f_rhou_field_nonreg_ratio
              << endl << "Ratio (rl_f_rhou_field / rl_f_rhou_field_nonReg): " <<  rl_f_rhou_field_reg_factor
