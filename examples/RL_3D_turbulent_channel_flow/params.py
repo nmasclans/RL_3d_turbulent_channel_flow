@@ -5,7 +5,7 @@ import random, os, numpy as np
 dt_phys  = 1e-5         # not taken from here, defined in myRHEA.cpp
 t_action = 0.00100      # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = 0.01 + 2*t_action + dt_phys
+t_episode_train = 0.01 + t_action + dt_phys
 t_episode_eval = 1.0
 cfd_n_envs = 8          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points

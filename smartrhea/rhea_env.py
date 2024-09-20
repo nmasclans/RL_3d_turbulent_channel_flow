@@ -351,11 +351,17 @@ class RheaEnv(py_environment.PyEnvironment):
                 f.write("echo 'RHEA executable directory: ' $RHEA_EXE_DIR\n")
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
-                    if i == 0:
-                        f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step}.out 2>&1")
-                    else:
-                        f.write(f" & \\\nmpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step}.out 2>&1")
+                    stdout_stderr_filepath = f"{self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step}.out"
+                    f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {stdout_stderr_filepath} 2>&1 &\n")
+                    f.write(f"pid{i}=$!\n")   # Capture process ID for each mpirun
+                # Wait for all background processes to finish
+                f.write("wait $pid0")  # Always wait for the first process
+                if self.cfd_n_envs > 1:
+                    for i in range(1, self.cfd_n_envs):
+                        f.write(f" $pid{i}")  # Append wait for each additional process
                 f.write("\n")
+                # Print a message indicating completion
+                f.write("echo 'All MPI processes have completed.'\n")
             # Make the script executable
             os.chmod(runit_script, 0o755)
             # Set up RunSettings
@@ -579,6 +585,9 @@ class RheaEnv(py_environment.PyEnvironment):
                     self._step_type[i] = self.client.get_tensor(self.step_type_key[i])[0]
                 except Exception as exc:
                     raise Warning(f"Could not read step type from key: {self.step_type_key[i]}") from exc
+        # Logging
+        for i in range(self.cfd_n_envs):
+            logger.debug(f"[Env {i}] (Read) Status: {self._step_type[i]}")
         return self._step_type
 
 
@@ -597,7 +606,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # write action into database
         for i in range(self.cfd_n_envs):
             # self._action shape: np.zeros(self.n_action, dtype=self.rhea_dtype))
-            self.client.put_tensor(self.action_key[i], self._action[i, ...].astype(self.rhea_dtype))
+            self.client.put_tensor(self.action_key[i], self._action[i, ...].astype(self.rhea_dtype)) # "..." is a shorthand for 'all remaining directions'
             logger.debug(f"[Env {i}] (Written) Action: {self._action[i, :]}")
 
 

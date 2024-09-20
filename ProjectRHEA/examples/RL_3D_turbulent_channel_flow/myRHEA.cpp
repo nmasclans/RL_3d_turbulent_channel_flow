@@ -216,7 +216,7 @@ void myRHEA::initSmartRedis() {
     manager = new SmartRedisManager(state_local_size2, action_global_size2, n_rl_envs, tag, db_clustered);
 
     /// Write step type = 1
-    manager->writeStepType(1, "ensemble_" + tag + ".step_type");
+    manager->writeStepType(1, step_type_key);
 
 };
 
@@ -360,6 +360,10 @@ void myRHEA::calculateSourceTerms() {
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
+    if (my_rank == 0){
+        cout << "[myRHEA::calculateSourceTerms] Current time: " << current_time << ", iteration: " << current_time_iter << ", rk it: " << rk_time_stage << endl;
+    }
+
     if (rk_time_stage == 1) {    /// only execute once per Runge-Kutta loop, i.e. execute on 1st Runge-Kutta iteration
 
         /// Check if new action is needed
@@ -390,18 +394,17 @@ void myRHEA::calculateSourceTerms() {
                 previous_actuation_time = previous_actuation_time + actuation_period;
 
                 // SmartRedis communications 
+                // Writing state, reward, time
                 updateState();
                 manager->writeState(state_local, state_key);
                 calculateReward();                              /// update reward_local attribute
                 manager->writeReward(reward_local, reward_key);
                 manager->writeTime(current_time, time_key);
+                // Reading read action...
                 manager->readAction(action_key);
                 action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = n_rl_envs (currently only 1 action variable per rl env.)
-                /// Update step size (from 1) to 0 if the next time that we require actuation value is the last one
+                /// Update & Write step size (from 1) to 0 if the next time that we require actuation value is the last one
                 if (current_time + 2.0 * actuation_period > final_time) {
-                    if (my_rank == 0) {
-
-                    }
                     manager->writeStepType(0, step_type_key);
                 }
 
