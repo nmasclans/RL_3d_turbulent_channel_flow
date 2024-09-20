@@ -1,6 +1,6 @@
 /__pycache__
-/train
 /rhea_exp
+/train
 runit.sh
 timers_information_file*
 *.h5
