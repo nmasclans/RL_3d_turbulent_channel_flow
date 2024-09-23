@@ -361,7 +361,7 @@ void myRHEA::calculateSourceTerms() {
 #if _ACTIVE_CONTROL_BODY_FORCE_
 
     if (my_rank == 0){
-        cout << "[myRHEA::calculateSourceTerms] Current time: " << current_time << ", iteration: " << current_time_iter << ", rk it: " << rk_time_stage << endl;
+        cout << "[myRHEA::calculateSourceTerms] Iteration: " << current_time_iter << ", rk it: " << rk_time_stage << endl;
     }
 
     if (rk_time_stage == 1) {    /// only recalculate f_rl_rhoi_field once per Runge-Kutta loop (1st rk iter.), if new action is needed
@@ -390,8 +390,8 @@ void myRHEA::calculateSourceTerms() {
 
                 /// Save old action values and time - useful for interpolating to new action
                 /// TODO: use action_global and action_global_previous for something (output writing) or delete them
-                action_global_previous  = action_global;     // a copy is made
-                previous_actuation_time = previous_actuation_time + actuation_period;
+                action_global_previous  = action_global;     // TODO: delete 'action_global_previous' if not used, only necessary when using smooth action with 'smoothControlFunction'
+                previous_actuation_time = previous_actuation_time + actuation_period;   // TODO: delete if not used (if action smoothing is deactivated)
 
                 // SmartRedis communications 
                 // Writing state, reward, time
@@ -421,7 +421,7 @@ void myRHEA::calculateSourceTerms() {
                 /// smoothControlFunction();        /// updates 'action_global_instant' 
                 /// OPTION 2 (discrete non-smooth action implementation): if DeltaRii_field are calculated just once for each action, discrete value step
                 for (int i_act=0; i_act<action_global_size2; i_act++) {
-                   action_global_instant[i_act] = action_global_previous[i_act];
+                   action_global_instant[i_act] = action_global[i_act];
                 }
 
                 /// Initialize variables
@@ -446,9 +446,9 @@ void myRHEA::calculateSourceTerms() {
                                 /// Get perturbation values from RL agent
                                 /// TODO: implement RL action for several variables!
                                 action_idx  = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
-                                DeltaRkk    = action_global_instant[action_idx];
+                                DeltaRkk    = 0.0;
                                 DeltaThetaZ = 0.0;
-                                DeltaThetaY = 0.0;
+                                DeltaThetaY = action_global_instant[action_idx];
                                 DeltaThetaX = 0.0;
                                 DeltaXmap1  = 0.0;
                                 DeltaXmap2  = 0.0;
@@ -720,11 +720,11 @@ void myRHEA::timeAdvanceConservedVariables() {
                          + (f_rhow_field[I1D(i,j,k)] + rl_f_rhow_field[I1D(i,j,k)]) * w_field[I1D(i,j,k)];
                 
                 /// Sum right-hand-side (RHS) fluxes
-                rho_rhs_flux  = ( -1.0 )*rho_inv_flux[I1D(i,j,k)]; 
+                rho_rhs_flux  = ( -1.0 ) * rho_inv_flux[I1D(i,j,k)]; 
                 rhou_rhs_flux = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)];
                 rhov_rhs_flux = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]; 
                 rhow_rhs_flux = ( -1.0 ) * rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)] + rl_f_rhow_field[I1D(i,j,k)]; 
-                rhoE_rhs_flux = ( -1.0 )*rhoE_inv_flux[I1D(i,j,k)] + rhoE_vis_flux[I1D(i,j,k)] + f_rhoE_field[I1D(i,j,k)] + f_rhouvw;
+                rhoE_rhs_flux = ( -1.0 ) * rhoE_inv_flux[I1D(i,j,k)] + rhoE_vis_flux[I1D(i,j,k)] + f_rhoE_field[I1D(i,j,k)] + f_rhouvw;
                 
                 /// Runge-Kutta step
                 rho_field[I1D(i,j,k)]  = rk_a*rho_0_field[I1D(i,j,k)]  + rk_b*rho_field[I1D(i,j,k)]  + rk_c*delta_t*rho_rhs_flux;
@@ -758,18 +758,23 @@ void myRHEA::timeAdvanceConservedVariables() {
     rl_f_rhou_field_nonreg_ratio /= ratio_counter;
     rl_f_rhou_field_reg_factor   /= ratio_counter;
 #endif
+    /*  /// Detailed output:
     if ( my_rank == 3 ) {
         cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
-             /// << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
-             /// << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
-             /// << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
-             /// << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
-             << endl << "Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio
+             << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
+             << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
+             << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
+             << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
 #if _REGULARIZE_RL_ACTION_
              << endl << "Ratio (rl_f_rhou_field_nonReg / rhou_rhs_flux_nonReg): " << rl_f_rhou_field_nonreg_ratio
              << endl << "Ratio (rl_f_rhou_field / rl_f_rhou_field_nonReg): " <<  rl_f_rhou_field_reg_factor
 #endif
              << endl;
+    }
+    */
+    /// Summarized output
+    if ( my_rank < 4) {
+        cout << "u-RHS Ratios Rank " << my_rank << ": " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
     }
 
 #if _OPENACC_MANUAL_DATA_MOVEMENT_
