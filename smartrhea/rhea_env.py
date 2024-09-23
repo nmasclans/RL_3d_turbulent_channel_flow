@@ -249,11 +249,12 @@ class RheaEnv(py_environment.PyEnvironment):
                      f"_local_reward: {self._local_reward.shape}, _reward: {self._reward.shape}")
 
         # define variables for state & reward standarization
-        self._state_running_mean  = 0.0
-        self._state_running_var   = 1.0
-        self._reward_running_mean = 0.0
-        self._reward_running_var  = 1.0
-        self._counter_running_avg = 0
+        self._state_running_mean     = 0.0
+        self._state_running_var      = 1.0
+        self._state_running_counter  = 0
+        #self._reward_running_mean    = 0.0     # TODO: remove if not used, should reward be standarized?
+        #self._reward_running_var     = 1.0
+        #self._reward_running_counter = 0
 
         # define initial state and action array properties. Omit batch dimension (shape is per (rl) environment)
         self._observation_spec = array_spec.ArraySpec(shape=(self.n_state_rl,), dtype=self.model_dtype, name="observation")
@@ -304,13 +305,13 @@ class RheaEnv(py_environment.PyEnvironment):
                 \nRHEA n_action: {n_action} \nPython env n_action * RL_envs: {self.n_action * self.rl_n_envs}")
 
         # Get the initial state, reward and time (poll database tensors)
-        self._get_state() # updates self._state
-        self._get_reward() # updates self._reward
-        self._get_time()   # updates self._time
+        self._get_state()           # updates self._state
+        self._get_reward()          # updates self._reward
+        self._get_time()            # updates self._time
 
         # Transform state and reward: redistribute & standarize
-        self._redistribute_state()              # updates self._state_rl
-        self._standarize_state_and_reward()     # updates self._state_rl, self._reward
+        self._redistribute_state()  # updates self._state_rl
+        self._standarize_state()    # updates self._state_rl    
 
         # Write RL data into disk
         if self.dump_data_flag:
@@ -477,12 +478,6 @@ class RheaEnv(py_environment.PyEnvironment):
                     raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
 
 
-    def _standarize_state_and_reward(self):
-        self._counter_running_avg += 1
-        self._standarize_state()    # updates self._state_rl
-        self._standarize_reward()   # updates self._reward
-
-
     def _standarize_state(self):
         """
         Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
@@ -496,15 +491,16 @@ class RheaEnv(py_environment.PyEnvironment):
         self._state_running_var
         self._state_rl
         """
+        self._state_running_counter += 1
         flattened_state_rl = self._state_rl.flatten()
         # Update running mean
         current_epoch_mean = np.mean(flattened_state_rl)
         old_mean           = self._state_running_mean
-        self._state_running_mean += ( current_epoch_mean - old_mean ) / self._counter_running_avg      # equivalent to: self._state_running_mean = ( self._state_running_mean * (self._counter_running_avg - 1) + current_mean ) / self._counter_running_avg
+        self._state_running_mean += ( current_epoch_mean - old_mean ) / self._state_running_counter      # equivalent to: self._state_running_mean = ( self._state_running_mean * (self._state_running_counter - 1) + current_mean ) / self._state_running_counter
         # Update running variance (Welford's method)
-        self._state_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._counter_running_avg
+        self._state_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._state_running_counter
         # Calculate running standart deviation
-        std_dev = np.sqrt( self._state_running_var / self._counter_running_avg )
+        std_dev = np.sqrt( self._state_running_var / self._state_running_counter )
         # Standarize state
         self._state_rl = ( self._state_rl - self._state_running_mean ) / ( std_dev + EPS )
         # Logging
@@ -514,34 +510,35 @@ class RheaEnv(py_environment.PyEnvironment):
                 logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
 
 
-    def _standarize_reward(self):
-        """
-        Standarize 'self._reward' data to have mean = 0 and standard deviation = 1
-        
-        Additional info: 
-        self._reward shape: [self.n_envs], where self.n_envs = cfd_n_envs * rl_n_envs
-
-        Updated attributes:
-        self._reward_running_mean
-        self._reward_running_var
-        self._reward
-        """
-        # Update running mean
-        current_epoch_mean = np.mean(self._reward)
-        old_mean           = self._reward_running_mean
-        self._reward_running_mean += ( current_epoch_mean - old_mean ) / self._counter_running_avg
-        # Update running variance (Welford's method)
-        self._reward_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._reward_running_mean) ) / self._counter_running_avg
-        # Calculate running standart deviation
-        std_dev = np.sqrt( self._reward_running_var / self._counter_running_avg )
-        # Standarize reward
-        self._reward = ( self._reward - self._reward_running_mean ) / ( std_dev + EPS )
-        # Logging
-        logger.debug(f"[RheaEnv::_standarize_reward] Reward Standarization, updated running mean: {self._reward_running_mean}, variance: {self._reward_running_var}, std_dev: {std_dev}")
-        for i in range(self.cfd_n_envs):
-            for j in range(self.rl_n_envs):
-                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized Reward: {self._reward[i * self.rl_n_envs + j]}")
-
+# TODO: remove if not used 
+#    def _standarize_reward(self):
+#        """
+#        Standarize 'self._reward' data to have mean = 0 and standard deviation = 1
+#        
+#        Additional info: 
+#        self._reward shape: [self.n_envs], where self.n_envs = cfd_n_envs * rl_n_envs
+#
+#        Updated attributes:
+#        self._reward_running_mean
+#        self._reward_running_var
+#        self._reward
+#        """
+#        self._reward_running_counter += 1
+#        # Update running mean
+#        current_epoch_mean = np.mean(self._reward)
+#        old_mean           = self._reward_running_mean
+#        self._reward_running_mean += ( current_epoch_mean - old_mean ) / self._reward_running_counter
+#        # Update running variance (Welford's method)
+#        self._reward_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._reward_running_mean) ) / self._reward_running_counter
+#        # Calculate running standart deviation
+#        std_dev = np.sqrt( self._reward_running_var / self._reward_running_counter )
+#        # Standarize reward
+#        self._reward = ( self._reward - self._reward_running_mean ) / ( std_dev + EPS )
+#        # Logging
+#        logger.debug(f"[RheaEnv::_standarize_reward] Reward Standarization, updated running mean: {self._reward_running_mean}, variance: {self._reward_running_var}, std_dev: {std_dev}")
+#        for i in range(self.cfd_n_envs):
+#            for j in range(self.rl_n_envs):
+#                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized Reward: {self._reward[i * self.rl_n_envs + j]}")
 
 
     def _get_time(self):
@@ -719,9 +716,9 @@ class RheaEnv(py_environment.PyEnvironment):
         self._get_reward()          # updates self._reward
         self._get_time()            # updates self._time
 
-        # Transform state and reward: redistribute & standarize
-        self._redistribute_state()              # updates self._state_rl
-        self._standarize_state_and_reward()     # updates self._state_rl, self._reward
+        # Transform state: redistribute & standarize
+        self._redistribute_state()  # updates self._state_rl
+        self._standarize_state()    # updates self._state_rl    
 
         # write RL data into disk
         if self.dump_data_flag: self._dump_rl_data()
