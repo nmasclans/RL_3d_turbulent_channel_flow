@@ -464,7 +464,7 @@ class RheaEnv(py_environment.PyEnvironment):
                     self.client.poll_tensor(self.reward_key[i], self.poll_freq_ms, self.poll_n_tries)
                     reward = self.client.get_tensor(self.reward_key[i])
                     self.client.delete_tensor(self.reward_key[i])
-                    local_reward = - reward / self.reward_norm
+                    local_reward = + reward / self.reward_norm
                     self._local_reward[i, :] = local_reward
                     global_reward = np.mean(local_reward)
                     for j in range(self.rl_n_envs):
