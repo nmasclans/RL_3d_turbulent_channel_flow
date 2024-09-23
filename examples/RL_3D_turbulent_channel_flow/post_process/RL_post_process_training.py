@@ -19,15 +19,17 @@ import matplotlib.cm as cm
 
 ### Filename to postprocess
 # Check if the filename argument is provided
-if len(sys.argv) != 2:
-    print("Usage: python3 RL_post_process_plot_script.py <iteration>")
+if len(sys.argv) != 3:
+    print("Usage: python3 RL_post_process_plot_script.py <iteration> <ensemble>")
     sys.exit(1)
 # Get 'iteration' from the command line argument
-iteration    = sys.argv[1]
+iteration = sys.argv[1]
+ensemble  = sys.argv[2]
 
 ### Filenames of non-converged RL and non-RL
+### > RL filenames
 # Get 'file_details' & filename_RL
-pattern = f"../rhea_exp/output_data/RL_3d_turbulent_channel_flow_{iteration}_*.h5"
+pattern = f"../rhea_exp/output_data/RL_3d_turbulent_channel_flow_{iteration}_ensemble{ensemble}_*.h5"
 # Use glob to find all matching files
 matching_files = glob.glob(pattern)
 # List to store the extracted parts corresponding to "*"
@@ -50,6 +52,7 @@ if matching_files:
         print(f"Filename: {base_filename}, File details: {file_details}")
 else:
     print(f"No files found matching the pattern: {pattern}")
+### > non-RL filename
 # Build filename_nonRL
 filename_nonRL = f"reference_data/3d_turbulent_channel_flow_{iteration}.h5"
 # Check if files exists
@@ -64,8 +67,8 @@ if not os.path.isfile(filename_nonRL):
 ### Open data files
 # RL data
 n_RL = len(filename_RL_list)
-for i in range(n_RL):
-    filename_RL = filename_RL_list[i]
+for i_RL in range(n_RL):
+    filename_RL = filename_RL_list[i_RL]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
         y_data_RL_aux      = data_file['y'][:,:,:]
@@ -75,13 +78,13 @@ for i in range(n_RL):
         rmsf_u_data_RL_aux = data_file['rmsf_u'][:,:,:]
         rmsf_v_data_RL_aux = data_file['rmsf_v'][:,:,:]
         rmsf_w_data_RL_aux = data_file['rmsf_w'][:,:,:]
-        if i == 0:
-            num_points_x   = avg_u_data_RL[0,0,:].size
-            num_points_y   = avg_u_data_RL[0,:,0].size
-            num_points_z   = avg_u_data_RL[:,0,0].size
+        if i_RL == 0:
+            num_points_x   = avg_u_data_RL_aux[0,0,:].size
+            num_points_y   = avg_u_data_RL_aux[0,:,0].size
+            num_points_z   = avg_u_data_RL_aux[:,0,0].size
             num_points_xz  = num_points_x*num_points_z
     # Initialize allocation arrays
-    if i == 0:
+    if i_RL == 0:
         y_data_RL       = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
         avg_u_data_RL   = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
         avg_v_data_RL   = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
@@ -89,13 +92,13 @@ for i in range(n_RL):
         rmsf_u_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         rmsf_v_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         rmsf_w_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
-    y_data_RL[i,:,:,:]      = y_data_RL_aux
-    avg_u_data_RL[i,:,:,:]  = avg_u_data_RL_aux
-    avg_v_data_RL[i,:,:,:]  = avg_v_data_RL_aux
-    avg_w_data_RL[i,:,:,:]  = avg_w_data_RL_aux
-    rmsf_u_data_RL[i,:,:,:] = rmsf_u_data_RL_aux
-    rmsf_v_data_RL[i,:,:,:] = rmsf_v_data_RL_aux
-    rmsf_w_data_RL[i,:,:,:] = rmsf_w_data_RL_aux
+    y_data_RL[i_RL,:,:,:]      = y_data_RL_aux
+    avg_u_data_RL[i_RL,:,:,:]  = avg_u_data_RL_aux
+    avg_v_data_RL[i_RL,:,:,:]  = avg_v_data_RL_aux
+    avg_w_data_RL[i_RL,:,:,:]  = avg_w_data_RL_aux
+    rmsf_u_data_RL[i_RL,:,:,:] = rmsf_u_data_RL_aux
+    rmsf_v_data_RL[i_RL,:,:,:] = rmsf_v_data_RL_aux
+    rmsf_w_data_RL[i_RL,:,:,:] = rmsf_w_data_RL_aux
 # non-RL data
 with h5py.File( filename_nonRL, 'r' ) as data_file:
     y_data_nonRL      = data_file['y'][:,:,:]
@@ -145,17 +148,14 @@ for j in range( 0, num_points_y ):
                 rmsf_v_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[k,j,i]*( 1.0/u_tau )
                 rmsf_w_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[k,j,i]*( 1.0/u_tau )
 
-#### TODO: continue from here!
 ### Plot u+ vs. y+
-
 # Clear plot
 plt.clf()
-
 # Read & Plot data
 plt.plot( y_plus_ref, u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
-plt.scatter( avg_y_plus_RL,    avg_u_plus_RL,    marker = 'p', s = 50, color = 'firebrick', zorder = 1, label = 'RHEA RL' )
-plt.scatter( avg_y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue',      zorder = 1, label = 'RHEA non-RL' )
-
+for i_RL in range(n_RL):
+    plt.scatter( avg_y_plus_RL[i_RL], avg_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( avg_y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -169,25 +169,16 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u+')
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'u_plus_vs_y_plus_{iteration}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
-
-
-### Plot u_rms+, v_rms+, w-rms+ vs. y+
-
+plt.savefig( f'train_u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
+### Plot u-rmsf 
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_uu_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
-plt.plot( y_plus_ref, rmsf_vv_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
-plt.plot( y_plus_ref, rmsf_ww_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
-plt.scatter( avg_y_plus_RL,    rmsf_u_plus_RL,    marker = 'p', s = 50, color = 'firebrick', zorder = 1 )
-plt.scatter( avg_y_plus_RL,    rmsf_v_plus_RL,    marker = 'p', s = 50, color = 'firebrick', zorder = 1 )
-plt.scatter( avg_y_plus_RL,    rmsf_w_plus_RL,    marker = 'p', s = 50, color = 'firebrick', zorder = 1 )
-plt.scatter( avg_y_plus_nonRL, rmsf_u_plus_nonRL, marker = 'v', s = 50, color = 'blue',      zorder = 1 )
-plt.scatter( avg_y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue',      zorder = 1 )
-plt.scatter( avg_y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue',      zorder = 1 )
-
+for i_RL in range(n_RL):
+    plt.scatter( avg_y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( avg_y_plus_nonRL, rmsf_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -198,10 +189,61 @@ plt.ylim( 0.0, 3.0 )
 plt.yticks( np.arange( 0.0, 3.1, 0.5 ) )
 plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
 #plt.yscale( 'log' )
-plt.ylabel( 'u_rms+, v_rms+, w_rms+' )
+plt.ylabel( 'u_rms+' )
 #legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.text( 1.05, 1.0, 'u_rms+' )
-plt.text( 17.5, 0.2, 'v_rms+' )
-plt.text( 4.00, 0.9, 'w_rms+' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'uvw_rms_plus_vs_y_plus_{iteration}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'train_u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+# Clear plot
+plt.clf()
+
+### Plot v-rmsf
+# Read & Plot data
+plt.plot( y_plus_ref, rmsf_vv_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
+for i_RL in range(n_RL):
+    plt.scatter( avg_y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( avg_y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
+# Configure plot
+plt.xlim( 1.0e-1, 2.0e2 )
+plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+plt.xscale( 'log' )
+plt.xlabel( 'y+' )
+plt.ylim( 0.0, 3.0 )
+plt.yticks( np.arange( 0.0, 3.1, 0.5 ) )
+plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+#plt.yscale( 'log' )
+plt.ylabel( 'v_rms+' )
+#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.text( 17.5, 0.2, 'v_rms+' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.tick_params( axis = 'both', pad = 7.5 )
+plt.savefig( f'train_v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+# Clear plot
+plt.clf()
+
+### Plot w-rmsf
+# Read & Plot data
+plt.plot( y_plus_ref, rmsf_ww_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
+for i_RL in range(n_RL):
+    plt.scatter( avg_y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( avg_y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
+# Configure plot
+plt.xlim( 1.0e-1, 2.0e2 )
+plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+plt.xscale( 'log' )
+plt.xlabel( 'y+' )
+plt.ylim( 0.0, 3.0 )
+plt.yticks( np.arange( 0.0, 3.1, 0.5 ) )
+plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+#plt.yscale( 'log' )
+plt.ylabel( 'w_rms+' )
+#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.text( 17.5, 0.2, 'w_rms+' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.tick_params( axis = 'both', pad = 7.5 )
+plt.savefig( f'train_w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+# Clear plot
+plt.clf()
