@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/home/jofre/miniconda3/envs/smartrhea-env-v2/bin/python3
 
 import sys
 import os
@@ -31,7 +31,7 @@ ensemble  = sys.argv[2]
 # Get 'file_details' & filename_RL
 pattern = f"../rhea_exp/output_data/RL_3d_turbulent_channel_flow_{iteration}_ensemble{ensemble}_*.h5"
 # Use glob to find all matching files
-matching_files = glob.glob(pattern)
+matching_files = sorted(glob.glob(pattern))
 # List to store the extracted parts corresponding to "*"
 filename_RL_list  = []
 file_details_list = []
@@ -92,6 +92,7 @@ for i_RL in range(n_RL):
         rmsf_u_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         rmsf_v_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         rmsf_w_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
+    # Fill allocation arrays
     y_data_RL[i_RL,:,:,:]      = y_data_RL_aux
     avg_u_data_RL[i_RL,:,:,:]  = avg_u_data_RL_aux
     avg_v_data_RL[i_RL,:,:,:]  = avg_v_data_RL_aux
@@ -247,3 +248,57 @@ plt.tick_params( axis = 'both', pad = 7.5 )
 plt.savefig( f'train_w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
+
+
+############################# RL & non-RL Errors w.r.t. Reference #############################
+
+from scipy.interpolate import interp1d
+
+### Data interpolation
+
+# Interpolation functions
+interp_RL = []
+for i_RL in range(n_RL):
+    interp_RL.append(interp1d(avg_y_plus_RL[i_RL,:], avg_u_plus_RL[i_RL,:], fill_value="extrapolate"))
+interp_nonRL = interp1d(avg_y_plus_nonRL, avg_u_plus_nonRL, fill_value="extrapolate")
+
+# Interpolated values at reference y_plus coordinates
+interp_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+for i_RL in range(n_RL):
+    interp_avg_u_plus_RL[i_RL] = interp_RL[i_RL](y_plus_ref)
+interp_avg_u_plus_nonRL = interp_nonRL(y_plus_ref)
+
+### Errors Calculation
+
+# Absolute error 
+abs_error_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+for i_RL in range(n_RL):
+    abs_error_avg_u_plus_RL[i_RL,:] = np.abs( interp_avg_u_plus_RL[i_RL,:] - u_plus_ref )
+abs_error_avg_u_plus_nonRL  = np.abs( interp_avg_u_plus_nonRL - u_plus_ref )
+
+# L1 Error
+L1_error_RL = np.zeros(n_RL)
+for i_RL in range(n_RL):
+    L1_error_RL[i_RL] = np.sum(abs_error_avg_u_plus_RL[i_RL,:])
+L1_error_nonRL = np.sum(abs_error_avg_u_plus_nonRL)
+
+# L2 Error (RMS Error)
+L2_error_RL = np.zeros(n_RL)
+for i_RL in range(n_RL):
+    L2_error_RL[i_RL] = np.sqrt( np.sum( (interp_avg_u_plus_RL[i_RL,:] - u_plus_ref)**2 ) )
+L2_error_nonRL = np.sqrt( np.sum( (interp_avg_u_plus_nonRL - u_plus_ref)**2 ) )
+
+# Linf Error
+Linf_error_RL = np.zeros(n_RL)
+for i_RL in range(n_RL):
+    Linf_error_RL[i_RL] = np.max(abs_error_avg_u_plus_RL[i_RL,:])
+Linf_error_nonRL = np.max(abs_error_avg_u_plus_nonRL)
+
+### Errors logging
+
+print("\nL1 Error RL:", L1_error_RL)
+print("L1 Error nonRL:", L1_error_nonRL)
+print("\nL2 Error RL (RMS):", L2_error_RL)
+print("L2 Error nonRL (RMS):", L2_error_nonRL)
+print("\nLinf Error RL:", Linf_error_RL)
+print("Linf Error nonRL:", Linf_error_nonRL)
