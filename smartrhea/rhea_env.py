@@ -352,7 +352,7 @@ class RheaEnv(py_environment.PyEnvironment):
                 f.write("echo 'RHEA executable directory: ' $RHEA_EXE_DIR\n")
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
-                    stdout_stderr_filepath = f"{self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step}.out"
+                    stdout_stderr_filepath = f"{self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step:06}.out"
                     f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {stdout_stderr_filepath} 2>&1 &\n")
                     f.write(f"pid{i}=$!\n")   # Capture process ID for each mpirun
                 # Wait for all background processes to finish
@@ -612,19 +612,18 @@ class RheaEnv(py_environment.PyEnvironment):
         Write RL data into disk.
         """
         for i in range(self.cfd_n_envs):
-            with open(os.path.join(self.dump_data_path , "state", f"state_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+            with open(os.path.join(self.dump_data_path , "state", f"state_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._state[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
             f.close()
-            with open(os.path.join(self.dump_data_path , "reward", f"local_reward_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+            with open(os.path.join(self.dump_data_path , "reward", f"local_reward_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._local_reward[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
             f.close()
-            with open(os.path.join(self.dump_data_path , "action", f"action_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+            with open(os.path.join(self.dump_data_path , "action", f"action_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._action[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
             f.close()
-            with open(os.path.join(self.dump_data_path , "time", f"time_env{i}_eps{self._episode_global_step}.txt"),'a') as f:
+            with open(os.path.join(self.dump_data_path , "time", f"time_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._time[i][np.newaxis], fmt='%.6f', delimiter=' ')
             f.close()
-            
 
 
     def _stop_exp(self):
