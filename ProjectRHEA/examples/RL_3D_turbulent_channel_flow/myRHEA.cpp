@@ -44,7 +44,7 @@ const double u_0        = ( u_tau/kappa_vK )*( log( delta/y_0 ) + ( y_0/delta ) 
 const double alpha_u    = 1.0;                      /// Magnitude of velocity perturbations
 const double alpha_P    = 0.1;                      /// Magnitude of pressure perturbations
 
-const double fixed_time_step = 1.0e-5;				/// Fixed time step
+const double fixed_time_step = 5.0e-5;				/// Fixed time step
 const int cout_precision = 10;		                /// Output precision (fixed) 
 
 #if _FEEDBACK_LOOP_BODY_FORCE_
