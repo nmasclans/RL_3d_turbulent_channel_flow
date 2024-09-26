@@ -51,6 +51,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - t_episode: episode elapsed time
     - t_begin_control: time to start control
     - action_bounds: bounds for action values
+    - action_dim: action dimension
     - reward_norm:
     - reward_beta:
     - time_key:
@@ -95,6 +96,7 @@ class RheaEnv(py_environment.PyEnvironment):
         t_episode = 1.0,
         t_begin_control = 0.0,
         action_bounds = (-0.05, 0.05),
+        action_dim = 6,
         reward_norm = 1.0,
         reward_beta = 0.5,
         time_key = "time",
@@ -139,6 +141,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self.poll_n_tries = poll_n_tries
         self.poll_freq_ms = poll_freq_ms
         self.action_bounds = action_bounds
+        self.action_dim = action_dim
         self.reward_norm = reward_norm
         self.reward_beta = reward_beta
         self.dump_data_flag = dump_data_flag
@@ -227,12 +230,12 @@ class RheaEnv(py_environment.PyEnvironment):
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
         assert self.n_state % self.rl_n_envs == 0, f"ERROR: number of witness points ({self.n_state}) must be multiple of number of rl environments ({self.rl_n_envs}), so that each environment has the same number of witness points"
         if self.rl_n_envs > 1:
-            self.n_action = 1
+            self.n_action = 1 * self.action_dim
             num_cubes = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
             assert self.rl_n_envs == num_cubes, f"(num. rl environments = {self.rl_n_envs}) != (num. control cubes = {num_cubes})"
             # TODO: this assert is not done in SOD2D (where marl_n_envs=3 != n_control_rectangles=6), but consider doing assert of n_control_rectangles == rl_n_envs
         else:   # self.rl_n_envs == 1:
-            self.n_action = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
+            self.n_action = n_cubes(os.path.join(self.cwd, self.control_cubes_file)) * self.action_dim
 
         # create and allocate array objects
         self._state        = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
@@ -592,14 +595,23 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         Write actions for each environment to be polled by the corresponding RHEA environment.
         Action clipping must be performed within the environment: https://github.com/tensorflow/agents/issues/216
+        
+        Additional info: 
+        - action: shape [cfd_n_envs * n_rl_envs, action_dim]
+        - self._action shape [cfd_n_envs, n_rl_envs * action_dim]
+        - single_action: shape [self.action_dim]    (auxiliary vector for code clarity)
         """
         # scale actions and reshape for RHEA
         # TODO: is this scaling and clipping correct, if action_bounds[0],[1] are not +-k?
+        logger.debug(f"[RheaEnv] action shape: {action.shape}")
+        logger.debug(f"[RheaEnv] self._action shape: {self._action.shape}")
+        action_aux = np.zeros([self.cfd_n_envs, self.rl_n_envs, self.action_dim])
         action = action * self.action_bounds[1] if self.mode == "collect" else action # TODO: check! shouldn't actions be always scaled, ALSO in testing/training?
         action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
-                self._action[i, j] = action[i * self.rl_n_envs + j]
+                single_action = action[i * self.rl_n_envs + j, :]
+                self._action[i, j*self.action_dim:(j+1)*self.action_dim] = single_action
         # write action into database
         for i in range(self.cfd_n_envs):
             # self._action shape: np.zeros(self.n_action, dtype=self.rhea_dtype))

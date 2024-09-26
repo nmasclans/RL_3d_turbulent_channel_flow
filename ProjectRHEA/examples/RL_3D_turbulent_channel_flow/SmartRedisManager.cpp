@@ -5,7 +5,7 @@ SmartRedisManager::SmartRedisManager() : client(nullptr) {
 }
 
 /// Constructor
-SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
+SmartRedisManager::SmartRedisManager(int state_local_size2, int action_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered)
     : client(nullptr) 
 {
     /// Get mpi size and rank
@@ -20,6 +20,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     /// Store input arguments (input arguments of each process) to class variables
     n_pseudo_envs      = n_pseudo_envs2;
     state_local_size   = state_local_size2;
+    action_local_size  = action_local_size2;
     action_global_size = action_global_size2;
     state_global_size  = 0; // further modified in constructor 
     reward_global_size = n_pseudo_envs2;
@@ -37,6 +38,9 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     try {
         state_sizes.resize(mpi_size);                           // vector<int>
         state_displs.resize(mpi_size);                          // vector<int>
+        action_sizes.resize(mpi_size);
+        action_displs.resize(mpi_size);                         // vector<int>
+        action_local.resize(action_local_size, 0.0);
         action_global.resize(action_global_size, 0.0);          // vector<double>
         reward_global.resize(reward_global_size, 0.0);
     } catch (const std::length_error& e) {
@@ -57,14 +61,18 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         root(int) = 0 : rank of the root process that will receive the gathered data
         comm(MPI_Comm) = MPI_COMM_WORLD: communicator that defines the group of process involved in the communication, 
             which for MPI_COMM_WORLD includes all MPI process in the application */
-    MPI_Gather(&state_local_size, 1, MPI_INT, state_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD); // update state_sizes
+    MPI_Gather(&state_local_size,  1, MPI_INT, state_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);  // update state_sizes
+    MPI_Gather(&action_local_size, 1, MPI_INT, action_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD); // update action_sizes
 
     // Compute displacements - global state idxs corresponding to the local state of each MPI process
     if (my_rank == 0) {
         int state_counter = 0;
+        int action_counter = 0;
         for (int i = 0; i < mpi_size; ++i) {
-            state_displs[i] = state_counter;
-            state_counter += state_sizes[i];
+            state_displs[i]  = state_counter;
+            state_counter   += state_sizes[i];
+            action_displs[i] = action_counter;
+            action_counter  += action_sizes[i];
         }
     }
 
@@ -82,6 +90,14 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
         MPI_Abort(MPI_COMM_WORLD, 1);
     } 
 
+    /// Check action_global_size
+    int action_global_size_check;
+    MPI_Allreduce(&action_local_size, &action_global_size_check, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update action_global_size_check
+    if (action_global_size != action_global_size_check){
+        std::cerr << "Mismatch between input action_global_size (" << action_global_size << ") != action_global_size_check (" << action_global_size_check << ") calculated from local values" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
     /// Init client (only root process!), and write global state and action sizes into DB.
     if (my_rank == 0) {
         /// Initialize client, the client is initialized to utilize a SmartRedis Orchestrator in cluster configuration if db_clustered
@@ -94,7 +110,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
             return;
         }
 
-        /// Write global state and action sizes into database:
+        /// Write global state size and global action size into database:
         try {
             /* void Client::put_tensor(const std::string& name,
                                        void* data,
@@ -116,6 +132,7 @@ SmartRedisManager::SmartRedisManager(int state_local_size2, int action_global_si
     // Debugging
     std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has action global size: " << action_global_size << std::endl;
     std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has state global size: " << state_global_size << std::endl;
+    std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has action local size: " << action_local_size << std::endl;
     std::cout << "[SmartRedisManager::SmartRedisManager] Rank " << my_rank << " has state local size: " << state_local_size << std::endl;
     if (my_rank==0){std::cout << "[SmartRedisManager::SmartRedisManager] SmartRedis manager constructed" << std::endl;};
     MPI_Barrier(MPI_COMM_WORLD);
@@ -313,19 +330,14 @@ void SmartRedisManager::readAction(const std::string& key) {
                               int root) const = 0 */
     MPI_Bcast(action_global.data(), action_global_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    /// TODO: delete if not used in the future    
-    /// // Scatter action_global to corresponding action_local of each mpi process (corresponding to each RL environment)
-    /// /* void MPI_Scatter(
-    ///     const void* sendbuf : address of send buffer (choice) 
-    ///     int sendcount : number of elements sent to each process (non-negative integer) 
-    ///     const MPI::Datatype& sendtype : data type of send buffer elements (handle) 
-    ///     void* recvbuf : address of receive buffer (choice) 
-    ///     int recvcount : number of elements in receive buffer (non-negative integer) 
-    ///     const MPI::Datatype& recvtype : data type of receive buffer elements (handle) 
-    ///     int root : rank of sending process (integer) 
-    /// */
-    /// MPI_Scatter(action_global.data(), 1, MPI_DOUBLE, &action_local, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    /// std::cout << "[SmartRedisManager::readAction] Rank " << my_rank << " has local action " << action_local << std::endl << std::flush;
+    /// Scatter global action to corresponding local action for each mpi
+    MPI_Scatterv(action_global.data(), action_sizes.data(), action_displs.data(), MPI_DOUBLE,
+                 action_local.data(), action_local_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    std::cout << "[SmartRedisManager::readAction] Rank " << my_rank << " has local action: ";
+    for (int i=0; i<action_local_size; i++){
+        std::cout << action_local[i];
+    }
+    std::cout << std::endl;
 
     if (my_rank == 0) {
         std::cout << "[SmartRedisManager::readAction] Read Action (and deleted) '" << key << "': ";
@@ -391,6 +403,10 @@ std::vector<double> SmartRedisManager::getStateGlobal(){
 
 std::vector<double> SmartRedisManager::getActionGlobal(){
     return action_global;
+}
+
+std::vector<double> SmartRedisManager::getActionLocal(){
+    return action_local;
 }
 
 /// Check I: test SmartRedis, RedisAI and Redis installation and compilation

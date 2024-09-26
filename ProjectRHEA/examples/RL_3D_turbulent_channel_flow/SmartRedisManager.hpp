@@ -14,7 +14,7 @@ Code transformed to C++ class
 class SmartRedisManager {
 public:
     SmartRedisManager();
-    SmartRedisManager(int state_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered);
+    SmartRedisManager(int state_local_size2, int action_local_size2, int action_global_size2, int n_pseudo_envs2, const std::string& tag, bool db_clustered);
     ~SmartRedisManager();
     
     void writeState(const std::vector<double>& state_local, const std::string& key);
@@ -26,6 +26,7 @@ public:
 
     std::vector<double> getStateGlobal();
     std::vector<double> getActionGlobal();
+    std::vector<double> getActionLocal();
 
     void printDatabaseContent();
 
@@ -34,11 +35,15 @@ protected:
     std::unique_ptr<SmartRedis::Client> client; // Use a unique pointer for conditional initialization
     std::vector<int> state_sizes;
     std::vector<int> state_displs;
+    std::vector<int> action_sizes;
+    std::vector<int> action_displs;
     std::vector<double> state_global;
+    std::vector<double> action_local;
     std::vector<double> action_global;
     std::vector<double> reward_global;
     int state_local_size;
     int state_global_size;
+    int action_local_size;
     int action_global_size;
     int reward_global_size;
     std::vector<size_t> state_global_size_vec;

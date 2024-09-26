@@ -4,6 +4,7 @@
 #include <openacc.h>
 #endif
 #include <numeric>
+#include <algorithm>
 
 using namespace std;
 
@@ -55,8 +56,9 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 #endif
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
+int action_dim = 6;
 /// eigen-values barycentric map coordinates - corners of realizable region
-double EPS         = numeric_limits<double>::epsilon();
+double EPS     = numeric_limits<double>::epsilon();
 /* Baricentric map coordinates, source: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
  * Transform xmap -> lambda: lambda0,1 = Tinv * (xmap0,1 - t); lambda2 = 1 - lambda0 - lambda1
  * Transform lambda -> xmap: xmap0,1   = T * lambda0,1 + t   
@@ -215,7 +217,7 @@ void myRHEA::initSmartRedis() {
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     /// Create new smart redis manager
-    manager = new SmartRedisManager(state_local_size2, action_global_size2, n_rl_envs, tag, db_clustered);
+    manager = new SmartRedisManager(state_local_size2, action_dim, action_global_size2, n_rl_envs, tag, db_clustered);
 
     /// Write step type = 1
     manager->writeStepType(1, step_type_key);
@@ -382,6 +384,11 @@ void myRHEA::calculateSourceTerms() {
             /// Check if new action is needed
             if (current_time - previous_actuation_time >= actuation_period) {
 
+                if ( action_dim != 6 ) {
+                    cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 6, but action_dim = " << action_dim << endl;
+                    MPI_Abort( MPI_COMM_WORLD, 1);
+                }
+
                 if ( !first_actuation_period_done ) {
                     calculateReward();              /// initializing 'avg_u_field_local_two_previous'...
                     first_actuation_period_done = true;
@@ -414,7 +421,8 @@ void myRHEA::calculateSourceTerms() {
                     manager->writeTime(current_time, time_key);
                     // Reading read action...
                     manager->readAction(action_key);
-                    action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = n_rl_envs (currently only 1 action variable per rl env.)
+                    action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = action_dim * n_rl_envs (currently only 1 action variable per rl env.)
+                    /// action_local  = manager->getActionLocal();  /// action_local not used
                     /// Update & Write step size (from 1) to 0 if the next time that we require actuation value is the last one
                     if (current_time + 2.0 * actuation_period > final_time) {
                         manager->writeStepType(0, step_type_key);
@@ -433,7 +441,7 @@ void myRHEA::calculateSourceTerms() {
                     /// smoothControlFunction();        /// updates 'action_global_instant' 
                     /// OPTION 2 (discrete non-smooth action implementation): if DeltaRii_field are calculated just once for each action, discrete value step
                     for (int i_act=0; i_act<action_global_size2; i_act++) {
-                    action_global_instant[i_act] = action_global[i_act];
+                        action_global_instant[i_act] = action_global[i_act];
                     }
 
                     /// Initialize variables
@@ -441,7 +449,7 @@ void myRHEA::calculateSourceTerms() {
                     double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
                     double Rkk_inv, Akk;
                     bool   isNegligibleAction, isNegligibleRkk;
-                    size_t action_idx;
+                    size_t actuation_idx;
                     vector<vector<double>> Aij(3, vector<double>(3, 0.0));
                     vector<vector<double>> Dij(3, vector<double>(3, 0.0));
                     vector<vector<double>> Qij(3, vector<double>(3, 0.0));
@@ -456,15 +464,14 @@ void myRHEA::calculateSourceTerms() {
                                 if (action_mask[I1D(i,j,k)] != 0.0) {
 
                                     /// Get perturbation values from RL agent
-                                    /// TODO: implement RL action for several variables!
-                                    action_idx  = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
-                                    DeltaRkk    = 0.0;
-                                    DeltaThetaZ = 0.0;
-                                    DeltaThetaY = 0.0;
-                                    DeltaThetaX = 0.0;
-                                    DeltaXmap1  = action_global_instant[action_idx];
-                                    DeltaXmap2  = 0.0;
-
+                                    actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
+                                    DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                    DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
+                                    DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
+                                    DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
+                                    DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
+                                    DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
+          
                                     isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
                                     Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
                                     isNegligibleRkk    = (abs(Rkk) < EPS);
@@ -1363,6 +1370,7 @@ void myRHEA::getControlCubes() {
     int num_control_points_local, num_control_points_per_cube_global, num_control_points_per_cube_local;
     
     /// Set counters to 0
+    n_rl_envs = 0;
     action_global_size2 = 0;                // global attribute
     num_control_points = 0;                 // global attribute
     num_control_points_local = 0;           // local var
@@ -1435,7 +1443,7 @@ void myRHEA::getControlCubes() {
             cerr << "[myRHEA::getControlCubes] ERROR: Not found control points for cube #" << icube << endl;
             MPI_Abort( MPI_COMM_WORLD, 1);
         } else {
-            action_global_size2++;
+            n_rl_envs++;
         }
 
         /// Update number of cubes in each mpi process
@@ -1459,7 +1467,7 @@ void myRHEA::getControlCubes() {
          << "z in (" << z_field[I1D(0,0,topo->iter_common[_INNER_][_INIZ_])] << ", " << z_field[I1D(0,0,topo->iter_common[_INNER_][_ENDZ_])] << ")" << endl;
     
     /// Check 1: num. of control cubes == num. mpi processes, and mpi processes must be distributed only along y-coordinate
-    this->n_rl_envs = action_global_size2;
+    action_global_size2 = n_rl_envs * action_dim;
     if ((np_x == 1) && (np_y == n_rl_envs) && (np_z == 1) && (n_rl_envs == np_y) && (num_cubes_local == 1)) {
         /// Logging successful distribution
         if (my_rank == 0) {
@@ -1492,11 +1500,18 @@ void myRHEA::getControlCubes() {
         }
     }
 
+    /// Check 3: action_global_size2 == n_rl_envs * action_dim
+    if (action_global_size2 != n_rl_envs * action_dim){
+        cerr << "Rank " << my_rank << " has action global size (" << action_global_size2 << ") != n_rl_envs (" << n_rl_envs << ") * action_dim (" << action_dim << ")" << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
     /// Logging
     if (my_rank == 0) {
         cout << "[myRHEA::getControlCubes] Total number of control points: " << num_control_points << endl;
         cout << "[myRHEA::getControlCubes] Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
-        cout << "[myRHEA::getControlCubes] Action global size corresponds to the Number of RL Environments: " << n_rl_envs << endl; 
+        cout << "[myRHEA::getControlCubes] Number of RL pseudo-environments: " << n_rl_envs << endl; 
+        cout << "[myRHEA::getControlCubes] Action dimension: " << action_dim << endl; 
     }
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);

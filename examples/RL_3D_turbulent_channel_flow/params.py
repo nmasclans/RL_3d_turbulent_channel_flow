@@ -7,7 +7,7 @@ t_action = 0.00100      # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(0.05 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 8          # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
+cfd_n_envs = 10         # TODO: execution error (Segmentation Fault) for cfd_n_envs > 1
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -54,12 +54,13 @@ params = {
     "t_action": t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
-    "action_bounds": (-1.0, 1.0),                                                     # TODO: set custom value
+    "action_bounds": (-1.0, 1.0),
+    "action_dim": 6,
     "reward_norm": 0.000001,                                                            # another possible normalization: reward_norm = t_action
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local,  # TODO: set custom value
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 5e-4,                                                              # TODO: set custom value
+    "learning_rate": 0.0005,                                                            # TODO: set custom value
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1,                      # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]
@@ -100,6 +101,7 @@ env_params = {
     "t_episode": params["t_episode"],
     "t_begin_control": params["t_begin_control"],
     "action_bounds": params["action_bounds"],
+    "action_dim": params["action_dim"],
     "reward_norm": params["reward_norm"],
     "reward_beta": params["reward_beta"],
     "time_key": params["time_key"],
