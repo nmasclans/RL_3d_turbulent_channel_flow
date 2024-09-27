@@ -65,6 +65,7 @@ if not os.path.isfile(filename_nonRL):
     sys.exit(1)
 
 ### Open data files
+print("\nImporting data from files...")
 # RL data
 n_RL = len(filename_RL_list)
 for i_RL in range(n_RL):
@@ -109,6 +110,7 @@ with h5py.File( filename_nonRL, 'r' ) as data_file:
     rmsf_u_data_nonRL = data_file['rmsf_u'][:,:,:]
     rmsf_v_data_nonRL = data_file['rmsf_v'][:,:,:]
     rmsf_w_data_nonRL = data_file['rmsf_w'][:,:,:]
+print("Data imported successfully!")
 
 ### Open reference solution file
 y_plus_ref, u_plus_ref, rmsf_uu_plus_ref, rmsf_vv_plus_ref, rmsf_ww_plus_ref = np.loadtxt( 'reference_data/reference_solution.csv', delimiter=',', unpack = 'True' )
@@ -131,6 +133,7 @@ rmsf_w_plus_RL = np.zeros( [n_RL, int( 0.5*num_points_y )] ); rmsf_w_plus_nonRL 
 
 
 ### Average variables in space
+print("\nAveraging variables in space...")
 for j in range( 0, num_points_y ):
     for i in range( 0, num_points_x ):
         for k in range( 0, num_points_z ):
@@ -138,18 +141,22 @@ for j in range( 0, num_points_y ):
             if( j > ( int( 0.5*num_points_y ) - 1 ) ):
                 aux_j = num_points_y - j - 1
                 for i_RL in range(n_RL):
-                    avg_y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,aux_j,i]*( u_tau/nu_ref )
+                    avg_y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]*( u_tau/nu_ref )
                     avg_u_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
                     rmsf_u_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
                     rmsf_v_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
                     rmsf_w_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                avg_y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[k,aux_j,i]*( u_tau/nu_ref )
+                avg_y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[k,j,i]*( u_tau/nu_ref )
                 avg_u_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[k,j,i]*( 1.0/u_tau )
                 rmsf_u_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[k,j,i]*( 1.0/u_tau )
                 rmsf_v_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[k,j,i]*( 1.0/u_tau )
                 rmsf_w_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[k,j,i]*( 1.0/u_tau )
+print("Variables averaged successfully!")
+print(f"yplus ref: {y_plus_ref}")
+print(f"yplus non-RL: {avg_y_plus_nonRL}")
 
 ### Plot u+ vs. y+
+print("\nBuilding plots...")
 # Clear plot
 plt.clf()
 # Read & Plot data
@@ -248,6 +255,7 @@ plt.tick_params( axis = 'both', pad = 7.5 )
 plt.savefig( f'train_w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
+print("Plots built successfully!")
 
 
 ############################# RL & non-RL Errors w.r.t. Reference #############################
@@ -255,7 +263,7 @@ plt.clf()
 from scipy.interpolate import interp1d
 
 ### Data interpolation
-
+print("\nInterpolating data...")
 # Interpolation functions
 interp_RL = []
 for i_RL in range(n_RL):
@@ -267,9 +275,10 @@ interp_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
 for i_RL in range(n_RL):
     interp_avg_u_plus_RL[i_RL] = interp_RL[i_RL](y_plus_ref)
 interp_avg_u_plus_nonRL = interp_nonRL(y_plus_ref)
+print("Data interpolated successfully!")
 
 ### Errors Calculation
-
+print("\nCalculating errors...")
 # Absolute error 
 abs_error_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
 for i_RL in range(n_RL):
@@ -293,6 +302,7 @@ Linf_error_RL = np.zeros(n_RL)
 for i_RL in range(n_RL):
     Linf_error_RL[i_RL] = np.max(abs_error_avg_u_plus_RL[i_RL,:])
 Linf_error_nonRL = np.max(abs_error_avg_u_plus_nonRL)
+print("Errors calculated successfully!")
 
 ### Errors logging
 
