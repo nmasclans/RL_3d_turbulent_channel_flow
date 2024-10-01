@@ -211,7 +211,7 @@ favre_vffwff_RL = np.zeros([n_RL, num_points_y_half]);   favre_vffwff_nonRL = np
 favre_wffwff_RL = np.zeros([n_RL, num_points_y_half]);   favre_wffwff_nonRL = np.zeros(num_points_y_half);   favre_wffwff_ref = np.zeros(num_points_y_half)
 for j in range( 0, num_points_y ):
     # log progress
-    if j % int(num_points_y%10) == 0:
+    if j % (num_points_y//10 or 1) == 0:
         print(f"{j/num_points_y*100:.0f}%")
     # identify domain region
     aux_j = j
@@ -312,7 +312,7 @@ avg_u_max    = int(np.max([np.max(avg_u_RL),  np.max(avg_u_nonRL),  np.max(avg_u
 rmsf_u_max   = int(np.max([np.max(rmsf_u_RL), np.max(rmsf_u_nonRL), np.max(rmsf_u_ref)]))+1
 for i_RL in range(n_RL):
     # log progress
-    if i_RL % int(n_RL/100) == 0:
+    if i_RL % (n_RL//10 or 1) == 0:
         print(f"{i_RL/n_RL*100:.0f}%")
     # Build frames
     frames_avg_u       = visualizer.build_um_frame(   frames_avg_u,  y_delta_RL, y_delta_ref, avg_u_RL[i_RL],  avg_u_ref,  averaging_time_nonConv, ylim=[0.0, avg_u_max])
