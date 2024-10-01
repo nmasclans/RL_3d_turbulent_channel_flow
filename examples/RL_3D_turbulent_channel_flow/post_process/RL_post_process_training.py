@@ -17,6 +17,15 @@ import matplotlib.cm as cm
 #plt.rc( 'font', size = 20 )
 #plt.rcParams['text.latex.preamble'] = [ r'\usepackage{amsmath}', r'\usepackage{amssymb}', r'\usepackage{color}' ]
 
+### Reference parameters
+rho_0   = 1.0				# Reference density [kg/m3]
+u_tau   = 1.0				# Friction velocity [m/s]
+delta   = 1.0				# Channel half-height [m]
+Re_tau  = 180.0				# Friction Reynolds number [-]
+mu_ref  = rho_0*u_tau*delta/Re_tau	# Dynamic viscosity [Pa s]
+nu_ref  = mu_ref/rho_0			# Kinematic viscosity [m2/s]
+dt_phys = 5.0e-5
+
 ### Filename to postprocess
 # Check if the filename argument is provided
 if len(sys.argv) != 3:
@@ -55,7 +64,8 @@ else:
 ### > non-RL filename
 # Build filename_nonRL
 filename_nonRL = f"reference_data/3d_turbulent_channel_flow_{iteration}.h5"
-# Check if files exists
+
+# Check if RL & non-RL files exists
 for filename_RL in filename_RL_list:
     if not os.path.isfile(filename_RL):
         print(f"Error: File '{filename_RL}' not found.")
@@ -72,6 +82,7 @@ for i_RL in range(n_RL):
     filename_RL = filename_RL_list[i_RL]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
+        averaging_time_RL_aux = data_file.attrs["AveragingTime"][0] - dt_phys
         y_data_RL_aux      = data_file['y'][1:-1,1:-1,1:-1]
         avg_u_data_RL_aux  = data_file['avg_u'][1:-1,1:-1,1:-1]
         avg_v_data_RL_aux  = data_file['avg_v'][1:-1,1:-1,1:-1]
@@ -79,20 +90,23 @@ for i_RL in range(n_RL):
         rmsf_u_data_RL_aux = data_file['rmsf_u'][1:-1,1:-1,1:-1]
         rmsf_v_data_RL_aux = data_file['rmsf_v'][1:-1,1:-1,1:-1]
         rmsf_w_data_RL_aux = data_file['rmsf_w'][1:-1,1:-1,1:-1]
-        if i_RL == 0:
-            num_points_x   = avg_u_data_RL_aux[0,0,:].size
-            num_points_y   = avg_u_data_RL_aux[0,:,0].size
-            num_points_z   = avg_u_data_RL_aux[:,0,0].size
-            num_points_xz  = num_points_x*num_points_z
     # Initialize allocation arrays
     if i_RL == 0:
-        y_data_RL       = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_RL   = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        avg_v_data_RL   = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        avg_w_data_RL   = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        rmsf_u_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
-        rmsf_v_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
-        rmsf_w_data_RL  = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
+        num_points_x      = avg_u_data_RL_aux[0,0,:].size
+        num_points_y      = avg_u_data_RL_aux[0,:,0].size
+        num_points_z      = avg_u_data_RL_aux[:,0,0].size
+        num_points_xz     = num_points_x*num_points_z
+        averaging_time_RL = averaging_time_RL_aux
+        y_data_RL         = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_RL     = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
+        avg_v_data_RL     = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
+        avg_w_data_RL     = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
+        rmsf_u_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
+        rmsf_v_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
+        rmsf_w_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
+    # Check same averaging time
+    if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
+        raise ValueError("Averaging time should be equal for all RL h5 files")
     # Fill allocation arrays
     y_data_RL[i_RL,:,:,:]      = y_data_RL_aux
     avg_u_data_RL[i_RL,:,:,:]  = avg_u_data_RL_aux
@@ -103,6 +117,7 @@ for i_RL in range(n_RL):
     rmsf_w_data_RL[i_RL,:,:,:] = rmsf_w_data_RL_aux
 # non-RL data
 with h5py.File( filename_nonRL, 'r' ) as data_file:
+    averaging_time_nonRL = data_file.attrs["AveragingTime"][0]
     y_data_nonRL      = data_file['y'][1:-1,1:-1,1:-1]
     avg_u_data_nonRL  = data_file['avg_u'][1:-1,1:-1,1:-1]
     avg_v_data_nonRL  = data_file['avg_v'][1:-1,1:-1,1:-1]
@@ -110,22 +125,19 @@ with h5py.File( filename_nonRL, 'r' ) as data_file:
     rmsf_u_data_nonRL = data_file['rmsf_u'][1:-1,1:-1,1:-1]
     rmsf_v_data_nonRL = data_file['rmsf_v'][1:-1,1:-1,1:-1]
     rmsf_w_data_nonRL = data_file['rmsf_w'][1:-1,1:-1,1:-1]
+# Check same averaging time for RL & non-RL
+if not np.isclose(averaging_time_RL, averaging_time_nonRL, atol=1e-8):
+    raise ValueError(f"Averaging time should be equal for both RL & non-RL h5 files, while RL: {averaging_time_RL} != nonRL: {averaging_time_nonRL}")
+else:
+    averaging_time_nonConv = averaging_time_RL
 print("Data imported successfully!")
 
 ### Open reference solution file
 y_plus_ref, u_plus_ref, rmsf_uu_plus_ref, rmsf_vv_plus_ref, rmsf_ww_plus_ref = np.loadtxt( 'reference_data/reference_solution.csv', delimiter=',', unpack = 'True' )
 
-### Reference parameters
-rho_0  = 1.0				# Reference density [kg/m3]
-u_tau  = 1.0				# Friction velocity [m/s]
-delta  = 1.0				# Channel half-height [m]
-Re_tau = 180.0				# Friction Reynolds number [-]
-mu_ref = rho_0*u_tau*delta/Re_tau	# Dynamic viscosity [Pa s]
-nu_ref = mu_ref/rho_0			# Kinematic viscosity [m2/s]
-
 
 ### Allocate averaged variables
-avg_y_plus_RL  = np.zeros( [n_RL, int( 0.5*num_points_y )] ); avg_y_plus_nonRL  = np.zeros( int( 0.5*num_points_y ) )
+y_plus_RL      = np.zeros( [n_RL, int( 0.5*num_points_y )] ); y_plus_nonRL      = np.zeros( int( 0.5*num_points_y ) )
 avg_u_plus_RL  = np.zeros( [n_RL, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( int( 0.5*num_points_y ) )
 rmsf_u_plus_RL = np.zeros( [n_RL, int( 0.5*num_points_y )] ); rmsf_u_plus_nonRL = np.zeros( int( 0.5*num_points_y ) )
 rmsf_v_plus_RL = np.zeros( [n_RL, int( 0.5*num_points_y )] ); rmsf_v_plus_nonRL = np.zeros( int( 0.5*num_points_y ) )
@@ -143,25 +155,23 @@ for j in range( 0, num_points_y ):
             # RL data:
             for i_RL in range(n_RL):
                 if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
-                    avg_y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*( 2.0 - y_data_RL[i_RL,k,j,i] )*( u_tau/nu_ref )
+                    y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*( 2.0 - y_data_RL[i_RL,k,j,i] )*( u_tau/nu_ref )
                 else:                                       # bottom-wall
-                    avg_y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]*( u_tau/nu_ref )
+                    y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]*( u_tau/nu_ref )
                 avg_u_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
                 rmsf_u_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
                 rmsf_v_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
                 rmsf_w_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
             # non-RL data:
             if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
-                avg_y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_nonRL[k,j,i])*( u_tau/nu_ref )
+                y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_nonRL[k,j,i])*( u_tau/nu_ref )
             else:                                       # bottom-wall
-                avg_y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[k,j,i]*( u_tau/nu_ref )
+                y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[k,j,i]*( u_tau/nu_ref )
             avg_u_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[k,j,i]*( 1.0/u_tau )
             rmsf_u_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[k,j,i]*( 1.0/u_tau )
             rmsf_v_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[k,j,i]*( 1.0/u_tau )
             rmsf_w_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[k,j,i]*( 1.0/u_tau )
 print("Variables averaged successfully!")
-print(f"yplus ref: {y_plus_ref}")
-print(f"yplus non-RL: {avg_y_plus_nonRL}")
 
 ### Plot u+ vs. y+
 print("\nBuilding plots...")
@@ -170,8 +180,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
-    plt.scatter( avg_y_plus_RL[i_RL], avg_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( avg_y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
+    plt.scatter( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -193,8 +203,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_uu_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
 for i_RL in range(n_RL):
-    plt.scatter( avg_y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( avg_y_plus_nonRL, rmsf_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
+    plt.scatter( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( y_plus_nonRL, rmsf_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -218,8 +228,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_vv_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
 for i_RL in range(n_RL):
-    plt.scatter( avg_y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( avg_y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
+    plt.scatter( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -243,8 +253,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_ww_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
 for i_RL in range(n_RL):
-    plt.scatter( avg_y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( avg_y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
+    plt.scatter( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.scatter( y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -275,8 +285,8 @@ print("\nInterpolating data...")
 # Interpolation functions
 interp_RL = []
 for i_RL in range(n_RL):
-    interp_RL.append(interp1d(avg_y_plus_RL[i_RL,:], avg_u_plus_RL[i_RL,:], fill_value="extrapolate"))
-interp_nonRL = interp1d(avg_y_plus_nonRL, avg_u_plus_nonRL, fill_value="extrapolate")
+    interp_RL.append(interp1d(y_plus_RL[i_RL,:], avg_u_plus_RL[i_RL,:], fill_value="extrapolate"))
+interp_nonRL = interp1d(y_plus_nonRL, avg_u_plus_nonRL, fill_value="extrapolate")
 
 # Interpolated values at reference y_plus coordinates
 interp_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
