@@ -95,45 +95,45 @@ boundary_conditions:
 
 ##### PRINT/WRITE/READ PARAMETERS #####
 print_write_read_parameters:
-   print_frequency_iter: 1000 	             				# Print information iteration frequency
+   print_frequency_iter: 100 	             				   # Print information iteration frequency
    output_data_file_name: 'RL_3d_turbulent_channel_flow' # Name of output data file
-   output_frequency_iter: 100000        					# Data output iteration frequency
-   generate_xdmf_file: 'TRUE'          					# Generate xdmf file reader
-   #use_restart: 'FALSE'                					# Use restart to initialize problem
-   use_restart: 'TRUE'                					   # Use restart to initialize problem
-   restart_data_file: 'restart_data_file.h5'          # Restart data file
-   #time_averaging_active: 'FALSE'          				# Activate time averaging
-   time_averaging_active: 'TRUE'          				# Activate time averaging
-   reset_time_averaging: 'TRUE'            				# Reset time averaging
+   output_frequency_iter: 100000        					   # Data output iteration frequency
+   generate_xdmf_file: 'TRUE'          					   # Generate xdmf file reader
+   #use_restart: 'FALSE'                					   # Use restart to initialize problem
+   use_restart: 'TRUE'                					      # Use restart to initialize problem
+   restart_data_file: 'restart_data_file.h5'             # Restart data file
+   #time_averaging_active: 'FALSE'          				   # Activate time averaging
+   time_averaging_active: 'TRUE'          				   # Activate time averaging
+   reset_time_averaging: 'TRUE'            				   # Reset time averaging
 
 
 ##### TWO-DIMENSIONAL DATA OUTPUT SLICES #####
 two_dimensional_data_output_slices:
-   number_two_dimensional_data_output_slices: 0        			# Number of 2D data output slices
+   number_two_dimensional_data_output_slices: 0        	# Number of 2D data output slices
    ## TWO-DIMENSIONAL DATA OUTPUT SLICE 1
-   #slice_1_normal_direction: 'x_normal'				# Slice 1 normal direction: x_normal, y_normal, z_normal
-   #slice_1_x_position: 6.283185307179586				# Slice 1 x position [m]
-   #slice_1_y_position: 1.0						# Slice 1 y position [m]
-   #slice_1_z_position: 2.0943951023931953				# Slice 1 z position [m]
-   #slice_1_output_frequency_iter: 25       				# Slice 1 output iteration frequency
+   #slice_1_normal_direction: 'x_normal'				      # Slice 1 normal direction: x_normal, y_normal, z_normal
+   #slice_1_x_position: 6.283185307179586				      # Slice 1 x position [m]
+   #slice_1_y_position: 1.0						            # Slice 1 y position [m]
+   #slice_1_z_position: 2.0943951023931953				   # Slice 1 z position [m]
+   #slice_1_output_frequency_iter: 25       				   # Slice 1 output iteration frequency
    #slice_1_generate_xdmf_file: 'TRUE'          			# Slice 1 generate xdmf file reader
-   #slice_1_output_data_file_name: 'slice_1_output'			# Slice 1 name of output data file
+   #slice_1_output_data_file_name: 'slice_1_output'		# Slice 1 name of output data file
    ## TWO-DIMENSIONAL DATA OUTPUT SLICE 2
-   #slice_2_normal_direction: 'y_normal'				# Slice 2 normal direction: x_normal, y_normal, z_normal
-   #slice_2_x_position: 6.283185307179586				# Slice 2 x position [m]
-   #slice_2_y_position: 1.0						# Slice 2 y position [m]
-   #slice_2_z_position: 2.0943951023931953				# Slice 2 z position [m]
-   #slice_2_output_frequency_iter: 25       				# Slice 2 output iteration frequency
-   #slice_2_generate_xdmf_file: 'TRUE'               			# Slice 2 generate xdmf file reader
-   #slice_2_output_data_file_name: 'slice_2_output'			# Slice 2 name of output data file
+   #slice_2_normal_direction: 'y_normal'				      # Slice 2 normal direction: x_normal, y_normal, z_normal
+   #slice_2_x_position: 6.283185307179586				      # Slice 2 x position [m]
+   #slice_2_y_position: 1.0						            # Slice 2 y position [m]
+   #slice_2_z_position: 2.0943951023931953				   # Slice 2 z position [m]
+   #slice_2_output_frequency_iter: 25       				   # Slice 2 output iteration frequency
+   #slice_2_generate_xdmf_file: 'TRUE'               		# Slice 2 generate xdmf file reader
+   #slice_2_output_data_file_name: 'slice_2_output'		# Slice 2 name of output data file
    ## TWO-DIMENSIONAL DATA OUTPUT SLICE 3
-   #slice_3_normal_direction: 'z_normal'				# Slice 3 normal direction: x_normal, y_normal, z_normal
-   #slice_3_x_position: 6.283185307179586				# Slice 3 x position [m]
-   #slice_3_y_position: 1.0						# Slice 3 y position [m]
-   #slice_3_z_position: 2.0943951023931953				# Slice 3 z position [m]
-   #slice_3_output_frequency_iter: 25       				# Slice 3 output iteration frequency
-   #slice_3_generate_xdmf_file: 'TRUE'               			# Slice 3 generate xdmf file reader
-   #slice_3_output_data_file_name: 'slice_3_output'			# Slice 3 name of output data file
+   #slice_3_normal_direction: 'z_normal'				      # Slice 3 normal direction: x_normal, y_normal, z_normal
+   #slice_3_x_position: 6.283185307179586				      # Slice 3 x position [m]
+   #slice_3_y_position: 1.0						            # Slice 3 y position [m]
+   #slice_3_z_position: 2.0943951023931953				   # Slice 3 z position [m]
+   #slice_3_output_frequency_iter: 25       				   # Slice 3 output iteration frequency
+   #slice_3_generate_xdmf_file: 'TRUE'               		# Slice 3 generate xdmf file reader
+   #slice_3_output_data_file_name: 'slice_3_output'		# Slice 3 name of output data file
 
 
 ##### TEMPORAL POINT PROBES #####
@@ -143,24 +143,24 @@ temporal_point_probes:
    #probe_1_x_position: 1.0                    				# Probe 1 position in x-direction [m]
    #probe_1_y_position: 1.0                    				# Probe 1 position in y-direction [m]
    #probe_1_z_position: 1.0                    				# Probe 1 position in z-direction [m]
-   #probe_1_output_frequency_iter: 100      				# Probe 1 output iteration frequency
+   #probe_1_output_frequency_iter: 100      				   # Probe 1 output iteration frequency
    #probe_1_output_data_file_name: 'temporal_point_probe_1.csv'		# Probe 1 name of output data file
    ## TEMPORAL POINT PROBE 2
    #probe_2_x_position: 1.5                    				# Probe 2 position in x-direction [m]
    #probe_2_y_position: 1.5                    				# Probe 2 position in y-direction [m]
    #probe_2_z_position: 1.5                    				# Probe 2 position in z-direction [m]
-   #probe_2_output_frequency_iter: 100      				# Probe 2 output iteration frequency
+   #probe_2_output_frequency_iter: 100      				   # Probe 2 output iteration frequency
    #probe_2_output_data_file_name: 'temporal_point_probe_2.csv'		# Probe 2 name of output data file
 
 
 ##### TIMERS INFORMATION #####
 timers_information:
-   print_timers: 'TRUE'               					# Print timers information
+   print_timers: 'TRUE'               					      # Print timers information
    timers_information_file: 'timers_information_file.txt'		# Timers information file
 
 
 ##### PARALLELIZATION SCHEME #####
 parallelization_scheme:
-   np_x: 1                             					# Number of processes in x-direction
-   np_y: 8                             					# Number of processes in y-direction
-   np_z: 1                             					# Number of processes in z-direction
+   np_x: 1                             					   # Number of processes in x-direction
+   np_y: 8                             					   # Number of processes in y-direction
+   np_z: 1                             					   # Number of processes in z-direction
