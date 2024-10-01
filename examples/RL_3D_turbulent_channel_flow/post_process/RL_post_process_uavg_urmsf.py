@@ -26,14 +26,20 @@ mu_ref  = rho_0*u_tau*delta/Re_tau	# Dynamic viscosity [Pa s]
 nu_ref  = mu_ref/rho_0			# Kinematic viscosity [m2/s]
 dt_phys = 5.0e-5
 
-### Filename to postprocess
-# Check if the filename argument is provided
-if len(sys.argv) != 3:
-    print("Usage: python3 RL_post_process_plot_script.py <iteration> <ensemble>")
-    sys.exit(1)
-# Get 'iteration' from the command line argument
-iteration = sys.argv[1]
-ensemble  = sys.argv[2]
+# --- Get CASE parameters ---
+
+try :
+    iteration  = sys.argv[1]
+    ensemble   = sys.argv[2]
+    train_name = sys.argv[3]
+    print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name}")
+except :
+    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name>")
+
+# post-processing directory
+postDir = train_name
+if not os.path.exists(postDir):
+    os.mkdir(postDir)
 
 ### Filenames of non-converged RL and non-RL
 ### > RL filenames
@@ -195,7 +201,7 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u+')
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'train_u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -220,7 +226,7 @@ plt.ylabel( 'u_rms+' )
 plt.text( 1.05, 1.0, 'u_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'train_u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -245,7 +251,7 @@ plt.ylabel( 'v_rms+' )
 plt.text( 17.5, 0.2, 'v_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'train_v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -270,7 +276,7 @@ plt.ylabel( 'w_rms+' )
 plt.text( 17.5, 0.2, 'w_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'train_w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 print("Plots built successfully!")
@@ -324,9 +330,17 @@ print("Errors calculated successfully!")
 
 ### Errors logging
 
-print("\nL1 Error RL:", L1_error_RL)
-print("L1 Error nonRL:", L1_error_nonRL)
-print("\nL2 Error RL (RMS):", L2_error_RL)
-print("L2 Error nonRL (RMS):", L2_error_nonRL)
-print("\nLinf Error RL:", Linf_error_RL)
-print("Linf Error nonRL:", Linf_error_nonRL)
+# Store error logs in file
+error_log_filename = f"{postDir}/error_log.txt"
+with open(error_log_filename, "w") as file:
+    file.write("Convergence errors of avg_u:")
+    file.write(f"\nL1 Error RL: {L1_error_RL}")
+    file.write(f"L1 Error nonRL: {L1_error_nonRL}")
+    file.write(f"\nL2 Error RL (RMS): {L2_error_RL}")
+    file.write(f"L2 Error nonRL (RMS): {L2_error_nonRL}")
+    file.write(f"\nLinf Error RL: {Linf_error_RL}")
+    file.write(f"Linf Error nonRL: {Linf_error_nonRL}")
+# Print error logs in terminal
+with open(error_log_filename, "r") as file:
+    content = file.read()
+    print(content)
