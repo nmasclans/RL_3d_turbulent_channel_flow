@@ -58,11 +58,6 @@ except :
 postDir = train_name
 if not os.path.exists(postDir):
     os.mkdir(postDir)
-# post-processing sub-directory for single realization
-rlzStr = f"iteration_{iteration}_ensemble_{ensemble}"
-postRlzDir = os.path.join(postDir, f"post_{rlzStr}")
-if not os.path.exists(postRlzDir):
-    os.mkdir(postRlzDir)
 
 # --- Visualizer ---
 
