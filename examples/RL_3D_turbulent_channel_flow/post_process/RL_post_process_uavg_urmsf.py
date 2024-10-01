@@ -334,12 +334,12 @@ print("Errors calculated successfully!")
 error_log_filename = f"{postDir}/error_log.txt"
 with open(error_log_filename, "w") as file:
     file.write("Convergence errors of avg_u:")
-    file.write(f"\nL1 Error RL: {L1_error_RL}")
-    file.write(f"L1 Error nonRL: {L1_error_nonRL}")
-    file.write(f"\nL2 Error RL (RMS): {L2_error_RL}")
-    file.write(f"L2 Error nonRL (RMS): {L2_error_nonRL}")
-    file.write(f"\nLinf Error RL: {Linf_error_RL}")
-    file.write(f"Linf Error nonRL: {Linf_error_nonRL}")
+    file.write(f"\n\nL1 Error RL: {L1_error_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_nonRL}")
 # Print error logs in terminal
 with open(error_log_filename, "r") as file:
     content = file.read()
