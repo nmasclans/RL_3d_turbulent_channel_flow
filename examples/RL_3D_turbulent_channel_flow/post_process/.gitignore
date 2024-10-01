@@ -1,5 +1,3 @@
 /__pycache__
 /reference_data
-*.png
-*.jpg
-*.eps
+/train_*
