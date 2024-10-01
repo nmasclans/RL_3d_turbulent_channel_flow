@@ -72,13 +72,13 @@ for i_RL in range(n_RL):
     filename_RL = filename_RL_list[i_RL]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
-        y_data_RL_aux      = data_file['y'][:,:,:]
-        avg_u_data_RL_aux  = data_file['avg_u'][:,:,:]
-        avg_v_data_RL_aux  = data_file['avg_v'][:,:,:]
-        avg_w_data_RL_aux  = data_file['avg_w'][:,:,:]
-        rmsf_u_data_RL_aux = data_file['rmsf_u'][:,:,:]
-        rmsf_v_data_RL_aux = data_file['rmsf_v'][:,:,:]
-        rmsf_w_data_RL_aux = data_file['rmsf_w'][:,:,:]
+        y_data_RL_aux      = data_file['y'][1:-1,1:-1,1:-1]
+        avg_u_data_RL_aux  = data_file['avg_u'][1:-1,1:-1,1:-1]
+        avg_v_data_RL_aux  = data_file['avg_v'][1:-1,1:-1,1:-1]
+        avg_w_data_RL_aux  = data_file['avg_w'][1:-1,1:-1,1:-1]
+        rmsf_u_data_RL_aux = data_file['rmsf_u'][1:-1,1:-1,1:-1]
+        rmsf_v_data_RL_aux = data_file['rmsf_v'][1:-1,1:-1,1:-1]
+        rmsf_w_data_RL_aux = data_file['rmsf_w'][1:-1,1:-1,1:-1]
         if i_RL == 0:
             num_points_x   = avg_u_data_RL_aux[0,0,:].size
             num_points_y   = avg_u_data_RL_aux[0,:,0].size
@@ -103,13 +103,13 @@ for i_RL in range(n_RL):
     rmsf_w_data_RL[i_RL,:,:,:] = rmsf_w_data_RL_aux
 # non-RL data
 with h5py.File( filename_nonRL, 'r' ) as data_file:
-    y_data_nonRL      = data_file['y'][:,:,:]
-    avg_u_data_nonRL  = data_file['avg_u'][:,:,:]
-    avg_v_data_nonRL  = data_file['avg_v'][:,:,:]
-    avg_w_data_nonRL  = data_file['avg_w'][:,:,:]
-    rmsf_u_data_nonRL = data_file['rmsf_u'][:,:,:]
-    rmsf_v_data_nonRL = data_file['rmsf_v'][:,:,:]
-    rmsf_w_data_nonRL = data_file['rmsf_w'][:,:,:]
+    y_data_nonRL      = data_file['y'][1:-1,1:-1,1:-1]
+    avg_u_data_nonRL  = data_file['avg_u'][1:-1,1:-1,1:-1]
+    avg_v_data_nonRL  = data_file['avg_v'][1:-1,1:-1,1:-1]
+    avg_w_data_nonRL  = data_file['avg_w'][1:-1,1:-1,1:-1]
+    rmsf_u_data_nonRL = data_file['rmsf_u'][1:-1,1:-1,1:-1]
+    rmsf_v_data_nonRL = data_file['rmsf_v'][1:-1,1:-1,1:-1]
+    rmsf_w_data_nonRL = data_file['rmsf_w'][1:-1,1:-1,1:-1]
 print("Data imported successfully!")
 
 ### Open reference solution file
@@ -138,19 +138,27 @@ for j in range( 0, num_points_y ):
     for i in range( 0, num_points_x ):
         for k in range( 0, num_points_z ):
             aux_j = j
-            if( j > ( int( 0.5*num_points_y ) - 1 ) ):
+            if( j > ( int( 0.5*num_points_y ) - 1 ) ):      # top-wall
                 aux_j = num_points_y - j - 1
-                for i_RL in range(n_RL):
+            # RL data:
+            for i_RL in range(n_RL):
+                if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
+                    avg_y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*( 2.0 - y_data_RL[i_RL,k,j,i] )*( u_tau/nu_ref )
+                else:                                       # bottom-wall
                     avg_y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]*( u_tau/nu_ref )
-                    avg_u_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                    rmsf_u_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                    rmsf_v_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                    rmsf_w_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
+                avg_u_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
+                rmsf_u_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
+                rmsf_v_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
+                rmsf_w_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
+            # non-RL data:
+            if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
+                avg_y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_nonRL[k,j,i])*( u_tau/nu_ref )
+            else:                                       # bottom-wall
                 avg_y_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[k,j,i]*( u_tau/nu_ref )
-                avg_u_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[k,j,i]*( 1.0/u_tau )
-                rmsf_u_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[k,j,i]*( 1.0/u_tau )
-                rmsf_v_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[k,j,i]*( 1.0/u_tau )
-                rmsf_w_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[k,j,i]*( 1.0/u_tau )
+            avg_u_plus_nonRL[aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[k,j,i]*( 1.0/u_tau )
+            rmsf_u_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[k,j,i]*( 1.0/u_tau )
+            rmsf_v_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[k,j,i]*( 1.0/u_tau )
+            rmsf_w_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[k,j,i]*( 1.0/u_tau )
 print("Variables averaged successfully!")
 print(f"yplus ref: {y_plus_ref}")
 print(f"yplus non-RL: {avg_y_plus_nonRL}")
