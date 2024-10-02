@@ -5,6 +5,7 @@
 #endif
 #include <numeric>
 #include <algorithm>
+#include <cmath>        // std::pow
 
 using namespace std;
 
@@ -1548,6 +1549,7 @@ void myRHEA::initializeFromRestart() {
 ///////////////////////////////////////////////////////////////////////////////
 /// Calculate local state values (local to single mpi process, which corresponds to RL environment)
 /// -> updates attributes: state_local
+/// -> state values: turbulent kinetic energy
 void myRHEA::updateState() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -1562,8 +1564,10 @@ void myRHEA::updateState() {
             i_index = temporal_witness_probes[twp].getLocalIndexI(); 
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
-            /// Get state data: averaged u-velocity
-            state_local[state_local_size2_counter] = avg_u_field[I1D(i_index,j_index,k_index)];
+            /// Get state data: turbulent kinetic energy
+            state_local[state_local_size2_counter] = 0.5 * (   pow(rmsf_u_field[I1D(i_index,j_index,k_index)], 2.0) 
+                                                             + pow(rmsf_v_field[I1D(i_index,j_index,k_index)], 2.0)
+                                                             + pow(rmsf_w_field[I1D(i_index,j_index,k_index)], 2.0) );
             state_local_size2_counter += 1;
         }
     }
