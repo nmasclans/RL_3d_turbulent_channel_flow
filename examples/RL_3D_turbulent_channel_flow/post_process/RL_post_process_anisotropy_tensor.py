@@ -61,7 +61,7 @@ if not os.path.exists(postDir):
 
 # --- Visualizer ---
 
-visualizer = ChannelVisualizer(postRlzDir)
+visualizer = ChannelVisualizer(postDir)
 nbins      = 1000
 
 # ----------- Build data h5 filenames ------------
