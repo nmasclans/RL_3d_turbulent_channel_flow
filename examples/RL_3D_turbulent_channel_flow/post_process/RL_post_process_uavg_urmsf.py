@@ -121,6 +121,7 @@ for i_RL in range(n_RL):
     rmsf_u_data_RL[i_RL,:,:,:] = rmsf_u_data_RL_aux
     rmsf_v_data_RL[i_RL,:,:,:] = rmsf_v_data_RL_aux
     rmsf_w_data_RL[i_RL,:,:,:] = rmsf_w_data_RL_aux
+    print(f"RL non-converged data imported from file '{filename_RL}'")
 # non-RL data
 with h5py.File( filename_nonRL, 'r' ) as data_file:
     averaging_time_nonRL = data_file.attrs["AveragingTime"][0]
@@ -136,10 +137,13 @@ if not np.isclose(averaging_time_RL, averaging_time_nonRL, atol=1e-8):
     raise ValueError(f"Averaging time should be equal for both RL & non-RL h5 files, while RL: {averaging_time_RL} != nonRL: {averaging_time_nonRL}")
 else:
     averaging_time_nonConv = averaging_time_RL
-print("Data imported successfully!")
+print(f"Non-RL non-converged data imported from file '{filename_nonRL}'")
 
 ### Open reference solution file
-y_plus_ref, u_plus_ref, rmsf_uu_plus_ref, rmsf_vv_plus_ref, rmsf_ww_plus_ref = np.loadtxt( 'reference_data/reference_solution.csv', delimiter=',', unpack = 'True' )
+filename_ref = 'reference_data/reference_solution.csv'
+y_plus_ref, u_plus_ref, rmsf_uu_plus_ref, rmsf_vv_plus_ref, rmsf_ww_plus_ref = np.loadtxt( filename_ref, delimiter=',', unpack = 'True' )
+print(f"Non-RL converged reference data imported from file '{filename_ref}'")
+print("Data imported successfully!")
 
 
 ### Allocate averaged variables
@@ -201,13 +205,13 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u+')
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
 ### Plot u-rmsf 
 # Read & Plot data
-plt.plot( y_plus_ref, rmsf_uu_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
+plt.plot( y_plus_ref, rmsf_uu_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label='Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
     plt.scatter( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
 plt.scatter( y_plus_nonRL, rmsf_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
@@ -226,16 +230,16 @@ plt.ylabel( 'u_rms+' )
 plt.text( 1.05, 1.0, 'u_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
 ### Plot v-rmsf
 # Read & Plot data
-plt.plot( y_plus_ref, rmsf_vv_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
+plt.plot( y_plus_ref, rmsf_vv_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
     plt.scatter( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
+plt.scatter( y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -251,16 +255,16 @@ plt.ylabel( 'v_rms+' )
 plt.text( 17.5, 0.2, 'v_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
 ### Plot w-rmsf
 # Read & Plot data
-plt.plot( y_plus_ref, rmsf_ww_plus_ref, linestyle = '-', linewidth = 1, color = 'black',     zorder = 0 )
+plt.plot( y_plus_ref, rmsf_ww_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
     plt.scatter( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1 )
+plt.scatter( y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -276,7 +280,7 @@ plt.ylabel( 'w_rms+' )
 plt.text( 17.5, 0.2, 'w_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 print("Plots built successfully!")
@@ -286,60 +290,142 @@ print("Plots built successfully!")
 
 from scipy.interpolate import interp1d
 
-### Data interpolation
-print("\nInterpolating data...")
-# Interpolation functions
-interp_RL = []
-for i_RL in range(n_RL):
-    interp_RL.append(interp1d(y_plus_RL[i_RL,:], avg_u_plus_RL[i_RL,:], fill_value="extrapolate"))
-interp_nonRL = interp1d(y_plus_nonRL, avg_u_plus_nonRL, fill_value="extrapolate")
+# ------------------- Data interpolation -------------------
 
-# Interpolated values at reference y_plus coordinates
-interp_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+print("\nInterpolating data...")
+# --- Interpolation functions ---
+func_interp_avg_u_plus_RL = []; func_interp_rmsf_u_plus_RL = []; func_interp_rmsf_v_plus_RL = []; func_interp_rmsf_w_plus_RL = []; 
 for i_RL in range(n_RL):
-    interp_avg_u_plus_RL[i_RL] = interp_RL[i_RL](y_plus_ref)
-interp_avg_u_plus_nonRL = interp_nonRL(y_plus_ref)
+    func_interp_avg_u_plus_RL.append( interp1d(y_plus_RL[i_RL,:], avg_u_plus_RL[i_RL,:],  fill_value="extrapolate"))
+    func_interp_rmsf_u_plus_RL.append(interp1d(y_plus_RL[i_RL,:], rmsf_u_plus_RL[i_RL,:], fill_value="extrapolate"))
+    func_interp_rmsf_v_plus_RL.append(interp1d(y_plus_RL[i_RL,:], rmsf_v_plus_RL[i_RL,:], fill_value="extrapolate"))
+    func_interp_rmsf_w_plus_RL.append(interp1d(y_plus_RL[i_RL,:], rmsf_w_plus_RL[i_RL,:], fill_value="extrapolate"))
+func_interp_avg_u_plus_nonRL  = interp1d(y_plus_nonRL, avg_u_plus_nonRL,  fill_value="extrapolate")
+func_interp_rmsf_u_plus_nonRL = interp1d(y_plus_nonRL, rmsf_u_plus_nonRL, fill_value="extrapolate")
+func_interp_rmsf_v_plus_nonRL = interp1d(y_plus_nonRL, rmsf_v_plus_nonRL, fill_value="extrapolate")
+func_interp_rmsf_w_plus_nonRL = interp1d(y_plus_nonRL, rmsf_w_plus_nonRL, fill_value="extrapolate")
+
+# --- Interpolated values at reference y_plus coordinates ---
+interp_avg_u_plus_RL  = np.zeros( [n_RL, y_plus_ref.size ] )
+interp_rmsf_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+interp_rmsf_v_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+interp_rmsf_w_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+for i_RL in range(n_RL):
+    interp_avg_u_plus_RL[i_RL]  = func_interp_avg_u_plus_RL[i_RL](y_plus_ref)
+    interp_rmsf_u_plus_RL[i_RL] = func_interp_rmsf_u_plus_RL[i_RL](y_plus_ref)
+    interp_rmsf_v_plus_RL[i_RL] = func_interp_rmsf_v_plus_RL[i_RL](y_plus_ref)
+    interp_rmsf_w_plus_RL[i_RL] = func_interp_rmsf_w_plus_RL[i_RL](y_plus_ref)
+interp_avg_u_plus_nonRL  = func_interp_avg_u_plus_nonRL(y_plus_ref)
+interp_rmsf_u_plus_nonRL = func_interp_rmsf_u_plus_nonRL(y_plus_ref)
+interp_rmsf_v_plus_nonRL = func_interp_rmsf_v_plus_nonRL(y_plus_ref)
+interp_rmsf_w_plus_nonRL = func_interp_rmsf_w_plus_nonRL(y_plus_ref)
 print("Data interpolated successfully!")
 
-### Errors Calculation
+# --- Calculate errors ---
 print("\nCalculating errors...")
 # Absolute error 
-abs_error_avg_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size ] )
+abs_error_avg_u_plus_RL  = np.zeros( [n_RL, y_plus_ref.size] )
+abs_error_rmsf_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size] )
+abs_error_rmsf_v_plus_RL = np.zeros( [n_RL, y_plus_ref.size] )
+abs_error_rmsf_w_plus_RL = np.zeros( [n_RL, y_plus_ref.size] )
 for i_RL in range(n_RL):
-    abs_error_avg_u_plus_RL[i_RL,:] = np.abs( interp_avg_u_plus_RL[i_RL,:] - u_plus_ref )
-abs_error_avg_u_plus_nonRL  = np.abs( interp_avg_u_plus_nonRL - u_plus_ref )
+    abs_error_avg_u_plus_RL[i_RL,:]  = np.abs( interp_avg_u_plus_RL[i_RL,:]  - u_plus_ref )
+    abs_error_rmsf_u_plus_RL[i_RL,:] = np.abs( interp_rmsf_u_plus_RL[i_RL,:] - rmsf_uu_plus_ref )
+    abs_error_rmsf_v_plus_RL[i_RL,:] = np.abs( interp_rmsf_v_plus_RL[i_RL,:] - rmsf_vv_plus_ref )
+    abs_error_rmsf_w_plus_RL[i_RL,:] = np.abs( interp_rmsf_w_plus_RL[i_RL,:] - rmsf_ww_plus_ref )
+abs_error_avg_u_plus_nonRL  = np.abs( interp_avg_u_plus_nonRL  - u_plus_ref )
+abs_error_rmsf_u_plus_nonRL = np.abs( interp_rmsf_u_plus_nonRL - rmsf_uu_plus_ref )
+abs_error_rmsf_v_plus_nonRL = np.abs( interp_rmsf_v_plus_nonRL - rmsf_vv_plus_ref )
+abs_error_rmsf_w_plus_nonRL = np.abs( interp_rmsf_w_plus_nonRL - rmsf_ww_plus_ref )
 
 # L1 Error
-L1_error_RL = np.zeros(n_RL)
+L1_error_avg_u_plus_RL  = np.zeros(n_RL)
+L1_error_rmsf_u_plus_RL = np.zeros(n_RL)
+L1_error_rmsf_v_plus_RL = np.zeros(n_RL)
+L1_error_rmsf_w_plus_RL = np.zeros(n_RL)
 for i_RL in range(n_RL):
-    L1_error_RL[i_RL] = np.sum(abs_error_avg_u_plus_RL[i_RL,:])
-L1_error_nonRL = np.sum(abs_error_avg_u_plus_nonRL)
+    L1_error_avg_u_plus_RL[i_RL]  = np.sum( abs_error_avg_u_plus_RL[i_RL,:] )
+    L1_error_rmsf_u_plus_RL[i_RL] = np.sum( abs_error_rmsf_u_plus_RL[i_RL,:] )
+    L1_error_rmsf_v_plus_RL[i_RL] = np.sum( abs_error_rmsf_v_plus_RL[i_RL,:] )
+    L1_error_rmsf_w_plus_RL[i_RL] = np.sum( abs_error_rmsf_w_plus_RL[i_RL,:] )
+L1_error_avg_u_plus_nonRL  = np.sum(abs_error_avg_u_plus_nonRL)
+L1_error_rmsf_u_plus_nonRL = np.sum(abs_error_rmsf_u_plus_nonRL)
+L1_error_rmsf_v_plus_nonRL = np.sum(abs_error_rmsf_v_plus_nonRL)
+L1_error_rmsf_w_plus_nonRL = np.sum(abs_error_rmsf_w_plus_nonRL)
 
 # L2 Error (RMS Error)
-L2_error_RL = np.zeros(n_RL)
+L2_error_avg_u_plus_RL  = np.zeros(n_RL)
+L2_error_rmsf_u_plus_RL = np.zeros(n_RL)
+L2_error_rmsf_v_plus_RL = np.zeros(n_RL)
+L2_error_rmsf_w_plus_RL = np.zeros(n_RL)
 for i_RL in range(n_RL):
-    L2_error_RL[i_RL] = np.sqrt( np.sum( (interp_avg_u_plus_RL[i_RL,:] - u_plus_ref)**2 ) )
-L2_error_nonRL = np.sqrt( np.sum( (interp_avg_u_plus_nonRL - u_plus_ref)**2 ) )
+    L2_error_avg_u_plus_RL[i_RL]  = np.sqrt( np.sum( ( interp_avg_u_plus_RL[i_RL,:] - u_plus_ref )**2 ) )
+    L2_error_rmsf_u_plus_RL[i_RL] = np.sqrt( np.sum( ( interp_rmsf_u_plus_RL[i_RL,:] - rmsf_uu_plus_ref )**2 ) )
+    L2_error_rmsf_v_plus_RL[i_RL] = np.sqrt( np.sum( ( interp_rmsf_v_plus_RL[i_RL,:] - rmsf_vv_plus_ref )**2 ) )
+    L2_error_rmsf_w_plus_RL[i_RL] = np.sqrt( np.sum( ( interp_rmsf_w_plus_RL[i_RL,:] - rmsf_ww_plus_ref )**2 ) )
+L2_error_avg_u_plus_nonRL  = np.sqrt( np.sum( (interp_avg_u_plus_nonRL - u_plus_ref)**2 ) )
+L2_error_rmsf_u_plus_nonRL = np.sqrt( np.sum( (interp_rmsf_u_plus_nonRL - rmsf_uu_plus_ref)**2 ) )
+L2_error_rmsf_v_plus_nonRL = np.sqrt( np.sum( (interp_rmsf_v_plus_nonRL - rmsf_vv_plus_ref)**2 ) )
+L2_error_rmsf_w_plus_nonRL = np.sqrt( np.sum( (interp_rmsf_w_plus_nonRL - rmsf_ww_plus_ref)**2 ) )
 
 # Linf Error
-Linf_error_RL = np.zeros(n_RL)
+Linf_error_avg_u_plus_RL  = np.zeros(n_RL)
+Linf_error_rmsf_u_plus_RL = np.zeros(n_RL)
+Linf_error_rmsf_v_plus_RL = np.zeros(n_RL)
+Linf_error_rmsf_w_plus_RL = np.zeros(n_RL)
 for i_RL in range(n_RL):
-    Linf_error_RL[i_RL] = np.max(abs_error_avg_u_plus_RL[i_RL,:])
-Linf_error_nonRL = np.max(abs_error_avg_u_plus_nonRL)
+    Linf_error_avg_u_plus_RL[i_RL]  = np.max(abs_error_avg_u_plus_RL[i_RL,:])
+    Linf_error_rmsf_u_plus_RL[i_RL] = np.max(abs_error_rmsf_u_plus_RL[i_RL,:])
+    Linf_error_rmsf_v_plus_RL[i_RL] = np.max(abs_error_rmsf_v_plus_RL[i_RL,:])
+    Linf_error_rmsf_w_plus_RL[i_RL] = np.max(abs_error_rmsf_w_plus_RL[i_RL,:])
+Linf_error_avg_u_plus_nonRL  = np.max(abs_error_avg_u_plus_nonRL)
+Linf_error_rmsf_u_plus_nonRL = np.max(abs_error_rmsf_u_plus_nonRL)
+Linf_error_rmsf_v_plus_nonRL = np.max(abs_error_rmsf_v_plus_nonRL)
+Linf_error_rmsf_w_plus_nonRL = np.max(abs_error_rmsf_w_plus_nonRL)
 print("Errors calculated successfully!")
 
-### Errors logging
+# --- Errors logging ---
 
 # Store error logs in file
-error_log_filename = f"{postDir}/error_log.txt"
+error_log_filename = f"{postDir}/errors_ensemble{ensemble}_{file_details}.txt"
 with open(error_log_filename, "w") as file:
-    file.write("Convergence errors of avg_u:")
-    file.write(f"\n\nL1 Error RL: {L1_error_RL}")
-    file.write(f"\nL1 Error nonRL: {L1_error_nonRL}")
-    file.write(f"\n\nL2 Error RL (RMS): {L2_error_RL}")
-    file.write(f"\nL2 Error nonRL (RMS): {L2_error_nonRL}")
-    file.write(f"\n\nLinf Error RL: {Linf_error_RL}")
-    file.write(f"\nLinf Error nonRL: {Linf_error_nonRL}")
+    # avg_u errors:
+    file.write("\n\n------------------------------------------------")
+    file.write("\nConvergence errors of avg_u:")
+    file.write(f"\n\nL1 Error RL: {L1_error_avg_u_plus_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_avg_u_plus_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_avg_u_plus_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_avg_u_plus_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_avg_u_plus_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_avg_u_plus_nonRL}")
+    # rmsf_u errors:
+    file.write("\n\n------------------------------------------------")
+    file.write("\nConvergence errors of rmsf_u:")
+    file.write(f"\n\nL1 Error RL: {L1_error_rmsf_u_plus_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_rmsf_u_plus_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_rmsf_u_plus_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_rmsf_u_plus_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_rmsf_u_plus_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_rmsf_u_plus_nonRL}")
+    # rmsf_v errors:
+    file.write("\n\n------------------------------------------------")
+    file.write("\nConvergence errors of rmsf_v:")
+    file.write(f"\n\nL1 Error RL: {L1_error_rmsf_v_plus_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_rmsf_v_plus_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_rmsf_v_plus_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_rmsf_v_plus_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_rmsf_v_plus_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_rmsf_v_plus_nonRL}")
+    # rmsf_w errors:
+    file.write("\n\n------------------------------------------------")
+    file.write("\nConvergence errors of rmsf_w:")
+    file.write(f"\n\nL1 Error RL: {L1_error_rmsf_w_plus_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_rmsf_w_plus_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_rmsf_w_plus_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_rmsf_w_plus_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_rmsf_w_plus_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_rmsf_w_plus_nonRL}")
+    
 # Print error logs in terminal
 with open(error_log_filename, "r") as file:
     content = file.read()
