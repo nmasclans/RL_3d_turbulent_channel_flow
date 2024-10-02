@@ -186,9 +186,9 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
     ///             Actions is a global array living in all processes.
-    avg_u_field_local = 0.0;
-    avg_u_field_local_previous = 0.0;
-    avg_u_field_local_two_previous = 0.0;
+    rmsf_u_field_local = 0.0;    rmsf_u_field_local_previous = 0.0;   rmsf_u_field_local_two_previous = 0.0;
+    rmsf_v_field_local = 0.0;    rmsf_v_field_local_previous = 0.0;   rmsf_v_field_local_two_previous = 0.0;
+    rmsf_w_field_local = 0.0;    rmsf_w_field_local_previous = 0.0;   rmsf_w_field_local_two_previous = 0.0;
     action_global.resize(action_global_size2);
     action_global_previous.resize(action_global_size2);
     action_global_instant.resize(action_global_size2);
@@ -374,10 +374,10 @@ void myRHEA::calculateSourceTerms() {
         if (current_time > begin_actuation_time) {
 
             if ( !first_actuation_time_done ) {      /// executed just once
-                calculateReward();              /// initializing 'avg_u_field_local_previous'...
+                calculateReward();              /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'...
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
-                    cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'avg_u_field_local_previous'" << endl;
+                    cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'" << endl;
                 }
             } 
 
@@ -390,11 +390,11 @@ void myRHEA::calculateSourceTerms() {
                 }
 
                 if ( !first_actuation_period_done ) {
-                    calculateReward();              /// initializing 'avg_u_field_local_two_previous'...
+                    calculateReward();              /// initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'...
                     first_actuation_period_done = true;
                     previous_actuation_time = previous_actuation_time + actuation_period;
                     if (my_rank == 0) {
-                        cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'avg_u_field_local_two_previous'" << endl;
+                        cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'" << endl;
                         cout << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
                     }
                 } else {
@@ -1572,14 +1572,20 @@ void myRHEA::updateState() {
 ///////////////////////////////////////////////////////////////////////////////
 
 /// Calculate reward local value (local to single mpi process, which corresponds to RL environment)
-/// -> updates attributes: reward_local, avg_u_field_local, avg_u_field_local_previous, rel_delta_avg_u_field_local_previous
+/// -> updates attributes: reward_local, rmsf_u_field_local, rmsf_u_field_local_previous, rmsf_u_field_local_two_previous
+///                                      rmsf_v_field_local, rmsf_v_field_local_previous, rmsf_v_field_local_two_previous
+///                                      rmsf_w_field_local, rmsf_w_field_local_previous, rmsf_w_field_local_two_previous
 void myRHEA::calculateReward() {
 
     /// Initialize variables
-    avg_u_field_local = 0.0; 
+    rmsf_u_field_local = 0.0; 
+    rmsf_v_field_local = 0.0; 
+    rmsf_w_field_local = 0.0; 
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
-    double d_avg_u_field_local_previous, d_avg_u_field_local;
+    double d_rmsf_u_field_local_previous, d_rmsf_u_field_local;
+    double d_rmsf_v_field_local_previous, d_rmsf_v_field_local;
+    double d_rmsf_w_field_local_previous, d_rmsf_w_field_local;
 
     /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -1590,26 +1596,41 @@ void myRHEA::calculateReward() {
                 delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
                 delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                 delta_volume =  delta_x * delta_y * delta_z;
-                /// Calculate volume-averaged avg_u
-                avg_u_field_local  += avg_u_field[I1D(i,j,k)] * delta_volume;
+                /// Calculate volume-averaged rmsf_u, rmsf_v, rmsf_w
+                rmsf_u_field_local += rmsf_u_field[I1D(i,j,k)] * delta_volume;
+                rmsf_v_field_local += rmsf_v_field[I1D(i,j,k)] * delta_volume;
+                rmsf_w_field_local += rmsf_w_field[I1D(i,j,k)] * delta_volume;
                 total_volume_local += delta_volume;
             }
         }
     }
-    avg_u_field_local /= total_volume_local;
-    d_avg_u_field_local_previous = std::abs( avg_u_field_local_two_previous - avg_u_field_local_previous );
-    d_avg_u_field_local          = std::abs( avg_u_field_local_previous     - avg_u_field_local );
-    reward_local                 = ( d_avg_u_field_local_previous - d_avg_u_field_local ); ///  do relative adding: / std::abs( d_avg_u_field_local_previous + EPS );
+    rmsf_u_field_local /= total_volume_local;
+    rmsf_v_field_local /= total_volume_local;
+    rmsf_w_field_local /= total_volume_local;
+    d_rmsf_u_field_local_previous = std::abs( rmsf_u_field_local_two_previous - rmsf_u_field_local_previous );
+    d_rmsf_v_field_local_previous = std::abs( rmsf_v_field_local_two_previous - rmsf_v_field_local_previous );
+    d_rmsf_w_field_local_previous = std::abs( rmsf_w_field_local_two_previous - rmsf_w_field_local_previous );
+    d_rmsf_u_field_local          = std::abs( rmsf_u_field_local_previous     - rmsf_u_field_local );
+    d_rmsf_v_field_local          = std::abs( rmsf_v_field_local_previous     - rmsf_v_field_local );
+    d_rmsf_w_field_local          = std::abs( rmsf_w_field_local_previous     - rmsf_w_field_local );
+    reward_local = ( d_rmsf_u_field_local_previous - d_rmsf_u_field_local )
+                 + ( d_rmsf_v_field_local_previous - d_rmsf_v_field_local )
+                 + ( d_rmsf_w_field_local_previous - d_rmsf_w_field_local );
+    ///  TODO: maybe do relative adding: / std::abs( d_avg_u_field_local_previous + EPS );
 
     /// Debugging
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has avg_u (k-2): " << avg_u_field_local_two_previous << ", avg_u (k-1): " << avg_u_field_local_previous << ", avg_u (k): " << avg_u_field_local 
-         << ", d_avg_u (k-1): " << d_avg_u_field_local_previous << ", d_avg_u (k): " << d_avg_u_field_local << ", local reward: " << reward_local << endl;
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with rmsf_u (k-2): " << rmsf_u_field_local_two_previous << ", rmsf_u (k-1): " << rmsf_u_field_local_previous << ", rmsf_u (k): " << rmsf_u_field_local 
+         << ", d_rmsf_u (k-1): " << d_rmsf_u_field_local_previous << ", d_rmsf_u (k): " << d_rmsf_u_field_local << endl;
     
-    /// Store avg_u_field_local for next reward calculation
-    avg_u_field_local_two_previous = avg_u_field_local_previous;
-    avg_u_field_local_previous     = avg_u_field_local;
+    /// Update rmsf_u,v,w_field_local_previous & rmsf_u,v,w_field_local_two_previous for next reward calculation
+    rmsf_u_field_local_two_previous = rmsf_u_field_local_previous;
+    rmsf_v_field_local_two_previous = rmsf_v_field_local_previous;
+    rmsf_w_field_local_two_previous = rmsf_w_field_local_previous;
+    rmsf_u_field_local_previous     = rmsf_u_field_local;
+    rmsf_v_field_local_previous     = rmsf_v_field_local;
+    rmsf_w_field_local_previous     = rmsf_w_field_local;
 
 }
 

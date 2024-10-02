@@ -92,9 +92,15 @@ class myRHEA : public FlowSolverRHEA {
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
         int action_global_size2;                 /// or nRectangleControl
-        double avg_u_field_local;
-        double avg_u_field_local_previous;
-        double avg_u_field_local_two_previous;
+        double rmsf_u_field_local;
+        double rmsf_v_field_local;
+        double rmsf_w_field_local;
+        double rmsf_u_field_local_previous;
+        double rmsf_v_field_local_previous;
+        double rmsf_w_field_local_previous;
+        double rmsf_u_field_local_two_previous;
+        double rmsf_v_field_local_two_previous;
+        double rmsf_w_field_local_two_previous;
         double reward_local;
         std::vector<double> action_global;
         std::vector<double> action_global_previous;
