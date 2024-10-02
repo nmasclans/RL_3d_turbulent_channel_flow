@@ -190,8 +190,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
-    plt.scatter( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
+    plt.plot( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.plot( y_plus_nonRL, avg_u_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = 'RHEA non-RL' )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -213,8 +213,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_uu_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label='Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
-    plt.scatter( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( y_plus_nonRL, rmsf_u_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL' )
+    plt.plot( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.plot( y_plus_nonRL, rmsf_u_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = 'RHEA non-RL' )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -238,8 +238,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_vv_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
-    plt.scatter( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( y_plus_nonRL, rmsf_v_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
+    plt.plot( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.plot( y_plus_nonRL, rmsf_v_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
@@ -263,8 +263,8 @@ plt.clf()
 # Read & Plot data
 plt.plot( y_plus_ref, rmsf_ww_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
 for i_RL in range(n_RL):
-    plt.scatter( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], marker = 'p', s = 50, zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
-plt.scatter( y_plus_nonRL, rmsf_w_plus_nonRL, marker = 'v', s = 50, color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
+    plt.plot( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.plot( y_plus_nonRL, rmsf_w_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )
 plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
