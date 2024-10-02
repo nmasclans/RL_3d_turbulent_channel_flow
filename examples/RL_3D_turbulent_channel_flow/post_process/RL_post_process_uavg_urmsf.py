@@ -387,7 +387,7 @@ print("Errors calculated successfully!")
 # --- Errors logging ---
 
 # Store error logs in file
-error_log_filename = f"{postDir}/errors_ensemble{ensemble}_{file_details}.txt"
+error_log_filename = f"{postDir}/errors_{iteration}_ensemble{ensemble}_{file_details}.txt"
 with open(error_log_filename, "w") as file:
     # avg_u errors:
     file.write("\n\n------------------------------------------------")
