@@ -335,7 +335,7 @@ void SmartRedisManager::readAction(const std::string& key) {
                  action_local.data(), action_local_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     std::cout << "[SmartRedisManager::readAction] Rank " << my_rank << " has local action: ";
     for (int i=0; i<action_local_size; i++){
-        std::cout << action_local[i];
+        std::cout << action_local[i] << " ";
     }
     std::cout << std::endl;
 
