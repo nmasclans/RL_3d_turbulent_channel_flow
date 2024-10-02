@@ -14,7 +14,7 @@ using namespace std;
 #define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
-#define _REGULARIZE_RL_ACTION_ 0                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
+#define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
 
 /// AUXILIAR PARAMETERS ///
 //const double pi = 2.0*asin( 1.0 );				/// pi number (fixed)
@@ -722,13 +722,28 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
                 rhov_rhs      = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)];
                 rhow_rhs      = ( -1.0 ) * rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)];
-                rhou_rl_f     = rl_f_rhou_field[I1D(i,j,k)];  /// TODO: 1.0 may be modified, define param fEps >= 1.0
+                rhou_rl_f     = rl_f_rhou_field[I1D(i,j,k)];
                 rhov_rl_f     = rl_f_rhov_field[I1D(i,j,k)];
                 rhow_rl_f     = rl_f_rhow_field[I1D(i,j,k)];
                 /// Apply smooth regularization approach when |rl_f| < |rhs|/10.0, E = 0.1 achieves regularization to be smooth enough
-                rhou_rl_f_reg = rhou_rl_f + ( rhou_rhs / 10.0 ) * std::tanh( rhou_rl_f / ( 0.1 * ( rhou_rhs / 10.0 ) ) ); /// TODO: define param lambda, eta (see mail Lluis)
-                rhov_rl_f_reg = rhov_rl_f + ( rhov_rhs / 10.0 ) * std::tanh( rhov_rl_f / ( 0.1 * ( rhov_rhs / 10.0 ) ) );
-                rhow_rl_f_reg = rhow_rl_f + ( rhow_rhs / 10.0 ) * std::tanh( rhow_rl_f / ( 0.1 * ( rhow_rhs / 10.0 ) ) );
+                /// TODO: improve regularization, not smooth! (specially else if)
+                if ( std::abs(rhou_rl_f_reg) < std::abs(rhou_rhs) ) {
+                    rhou_rl_f_reg = rhou_rhs * std::tanh( rhou_rl_f / ( 0.6 * rhou_rhs + EPS) );
+                    rhov_rl_f_reg = rhov_rhs * std::tanh( rhov_rl_f / ( 0.6 * rhov_rhs + EPS) );
+                    rhow_rl_f_reg = rhow_rhs * std::tanh( rhow_rl_f / ( 0.6 * rhow_rhs + EPS) );
+                } else if ( std::abs(rhou_rl_f_reg) > (5.0 * std::abs(rhou_rhs) ) ) {
+                    rhou_rl_f_reg = rhou_rl_f  * int(abs(rhou_rhs / (rhou_rl_f + EPS))); 
+                    rhov_rl_f_reg = rhov_rl_f  * int(abs(rhov_rhs / (rhov_rl_f + EPS))); 
+                    rhow_rl_f_reg = rhow_rl_f  * int(abs(rhow_rhs / (rhow_rl_f + EPS))); 
+                } else { /// do not regularize
+                    rhou_rl_f_reg = rhou_rl_f;
+                    rhov_rl_f_reg = rhov_rl_f;
+                    rhow_rl_f_reg = rhow_rl_f;
+                }
+                /// TODO: improve this regularization, check commented code above!
+                ////// rhou_rl_f_reg = rhou_rl_f * int( abs( rhou_rhs / (rhou_rl_f + EPS) ) ); 
+                ////// rhov_rl_f_reg = rhov_rl_f * int( abs( rhov_rhs / (rhov_rl_f + EPS) ) ); 
+                ////// rhow_rl_f_reg = rhow_rl_f * int( abs( rhow_rhs / (rhow_rl_f + EPS) ) ); 
                 /// Update 'rl_f_rhow_field'
                 rl_f_rhou_field[I1D(i,j,k)] = rhou_rl_f_reg;
                 rl_f_rhov_field[I1D(i,j,k)] = rhov_rl_f_reg;
@@ -756,15 +771,15 @@ void myRHEA::timeAdvanceConservedVariables() {
 
                 /// Debugging information
                 if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point    
-                    rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / rhou_rhs_flux );
-                    rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / rhou_rhs_flux );
-                    f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / rhou_rhs_flux );
+                    rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
+                    rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
+                    f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / ( rhou_rhs_flux + EPS ) );
 #if _REGULARIZE_RL_ACTION_
-                    rl_f_rhou_field_ratio        += std::abs( rhou_rl_f_reg               / rhou_rhs_flux );
-                    rl_f_rhou_field_nonreg_ratio += std::abs( rhou_rl_f                   / rhou_rhs );
+                    rl_f_rhou_field_ratio        += std::abs( rhou_rl_f_reg               / ( rhou_rhs_flux + EPS ) );
+                    rl_f_rhou_field_nonreg_ratio += std::abs( rhou_rl_f                   / ( rhou_rhs + EPS ) );
                     rl_f_rhou_field_reg_factor   += std::abs( rhou_rl_f_reg               / ( rhou_rl_f + EPS) );
 #else
-                    rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / rhou_rhs_flux );
+                    rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / ( rhou_rhs_flux + EPS) );
 #endif
                     ratio_counter += 1;
                 }
@@ -779,9 +794,10 @@ void myRHEA::timeAdvanceConservedVariables() {
     rl_f_rhou_field_nonreg_ratio /= ratio_counter;
     rl_f_rhou_field_reg_factor   /= ratio_counter;
 #endif
-    /*  /// Detailed output:
+    /// Detailed output:
     if ( my_rank == 3 ) {
         cout << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
+             << endl << "rhou_rhs_flux: " <<  rhou_rhs_flux
              << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
              << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
              << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
@@ -792,7 +808,7 @@ void myRHEA::timeAdvanceConservedVariables() {
 #endif
              << endl;
     }
-    */
+    
     /// Summarized output
     if ( my_rank < 4) {
         cout << "u-RHS Ratios Rank " << my_rank << ": " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
