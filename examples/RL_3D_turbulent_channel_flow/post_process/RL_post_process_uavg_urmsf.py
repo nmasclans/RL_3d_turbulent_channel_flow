@@ -201,7 +201,7 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u+')
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -226,7 +226,7 @@ plt.ylabel( 'u_rms+' )
 plt.text( 1.05, 1.0, 'u_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -251,7 +251,7 @@ plt.ylabel( 'v_rms+' )
 plt.text( 17.5, 0.2, 'v_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -276,7 +276,7 @@ plt.ylabel( 'w_rms+' )
 plt.text( 17.5, 0.2, 'w_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.eps', format = 'eps', bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 print("Plots built successfully!")
