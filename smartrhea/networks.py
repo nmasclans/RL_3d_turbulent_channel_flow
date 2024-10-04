@@ -57,7 +57,6 @@ class CustomPPOActorNetwork:
             kernel_initializer=tf.keras.initializers.VarianceScaling(
                 scale=0.1, seed=_get_seed()
             ),
-            kernel_regularizer=regularizers.l2(l2_reg_value),       # Apply L2 regularization, added line to original PPOActorNetwork class
             name='means_projection_layer',
         )
 
@@ -78,14 +77,14 @@ class CustomPPOActorNetwork:
             tf.keras.layers.Dense,
             activation=tf.nn.tanh,                                      # Apply 'tanh' activation function
             kernel_initializer=tf.keras.initializers.Orthogonal(seed=_get_seed()),
-            kernel_regularizer=regularizers.l2(l2_reg_value),           # Apply L2 regularization, added line to original PPOActorNetwork class
+            kernel_regularizer=tf.keras.regularizers.l2(l2_reg_value),           # Apply L2 regularization, added line to original PPOActorNetwork class
         )
     elif activation_fn == 'relu':
         dense = functools.partial(
             tf.keras.layers.Dense,
             activation=tf.nn.relu,                                      # Apply 'relu' activation function
             kernel_initializer=tf.keras.initializers.Orthogonal(seed=_get_seed()),
-            kernel_regularizer=regularizers.l2(l2_reg_value),           # Apply L2 regularization, added line to original PPOActorNetwork class
+            kernel_regularizer=tf.keras.regularizers.l2(l2_reg_value),           # Apply L2 regularization, added line to original PPOActorNetwork class
         )
     else:
         raise ValueError(f"Invalid activation function '{activation_fn}'")
