@@ -7,7 +7,7 @@ t_action = 0.00050      # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(0.1 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 1          # 
+cfd_n_envs = 8          # 
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -60,8 +60,13 @@ params = {
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local,  # TODO: set custom value
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 0.0005,                                                            # TODO: set custom value
-    "replay_buffer_capacity": int(t_episode_train / t_action) + 1,                      # trajectories buffer expand a full train episode
+    "learning_rate": 0.0005,                                                            # recommended values: 0.0001 - 0.001
+    "entropy_regularization": 0.03,                                                     # recommended values: 0.01 - 0.05
+    "importance_ratio_clipping": 0.2,                                                   # recommended values: 0.2 - 0.5
+    "actor_net_activation_fn": "relu",
+    "actor_net_l2_reg": 1e-4,
+    "actor_net_std_init": 0.35,
+    "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]
     "seed": 16,

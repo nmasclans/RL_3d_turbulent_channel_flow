@@ -22,11 +22,13 @@ from tf_agents.policies import policy_saver
 from smartsim.log import get_logger
 from socket import gethostname
 
+
 from params import params, env_params
 from smartrhea.history import History
 from smartrhea.init_smartsim import init_smartsim
 from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, params_html_table, bcolors
 from smartrhea.rhea_env import RheaEnv
+from smartrhea.networks import CustomPPOActorNetwork
 
 #--------------------------- Utils ---------------------------
 
@@ -135,8 +137,19 @@ logger.debug(f'Time Spec:\n{time_step_tensor_spec}')
     ppo_actor_network.PPOActorNetwork.__init__(self, seed_stream_class=<class 'tensorflow_probability.python.util.seed_stream.SeedStream'>)
     PPOActorNetwork.create_sequential_actor_net(self, fc_layer_units, action_tensor_spec, seed=None)
 """
-actor_net_builder = ppo_actor_network.PPOActorNetwork() # TODO: Check ActorDistributionRnnNetwork otherwise
-actor_net = actor_net_builder.create_sequential_actor_net(params["net"], action_tensor_spec)
+#actor_net_builder = ppo_actor_network.PPOActorNetwork()         # TODO: Check ActorDistributionRnnNetwork otherwise
+#actor_net = actor_net_builder.create_sequential_actor_net(
+#    params["net"],
+#    action_tensor_spec,
+#)
+actor_net_builder = CustomPPOActorNetwork()
+actor_net = actor_net_builder.create_sequential_actor_net(
+    fc_layer_units=params["net"],
+    action_tensor_spec=action_tensor_spec, 
+    activation_fn=params["actor_net_activation_fn"],
+    l2_reg_value=params["actor_net_l2_reg"],
+    std_init_value=params["actor_net_std_init"],
+)
 """ Value Network:    
     value_network.ValueNetwork.__init__(self, input_tensor_spec, preprocessing_layers=None, 
         preprocessing_combiner=None, conv_layer_params=None, fc_layer_params=(75, 40), 
@@ -152,9 +165,12 @@ actor_net = actor_net_builder.create_sequential_actor_net(params["net"], action_
     - A 'Lambda' layer that creates a multivariate normal distribution from 'loc' and 'scale'.
 """
 value_net = value_network.ValueNetwork(
-    observation_tensor_spec,
+    input_tensor_spec=observation_tensor_spec,
     fc_layer_params=params["net"],
-    kernel_initializer=tf.keras.initializers.Orthogonal()
+    # kernel_initializer=tf.keras.initializers.Orthogonal(),  # -> adequate for 'tanh' activation functions
+    # kernel_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.1),
+    # kernel_initializer = tf.compat.v1.variance_scaling_initializer, by default
+    # activation_fn = tf.keras.activations.relu, by default
 )
 logger.debug("Actor & Value networks initialized")
 
@@ -210,8 +226,8 @@ with context:
                                             #   takes nested observation and returns nested action
         value_net=value_net,                # function value_net(time_steps) that returns value tensor from neural net predictions of each obesrvation.
                                             #   takes nested observation and returns batch of value_preds
-        entropy_regularization=0.0,         # coeff of entropy regularization loss term
-        importance_ratio_clipping=0.2,      # epsilon in clipped, surrogate PPO objective
+        entropy_regularization=params["entropy_regularization"],        # coeff of entropy regularization loss term
+        importance_ratio_clipping=params["importance_ratio_clipping"],  # epsilon in clipped, surrogate PPO objective
         discount_factor=0.99,               # discount factor for return computation
         normalize_observations=False,       # if true, keeps a running estimate of observations mean & variance of observations, and uses these statistics to normalize incoming observations (to have mean=0, std=1)
                                             # adv (True):  stabilizes training, improves convergence, consistent learning rate
@@ -329,16 +345,27 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
     lambda: tf.math.equal(global_step % params["summary_interval"], 0)
 ):
     # Define train step 
+    # TODO: use again 'train_step' instead of 'train_step_check_gradients', as checking gradients it's only for debugging 
     def train_step():
         trajectories = replay_buffer.gather_all()       # gather all available trajectories stored in buffer
         return agent.train(experience=trajectories)     # agent updates internal params (policy & value networks) taking the gathered trajectory of experiences as input
                                                         # returns 'LossInfo' tuple containing loss and info tensors
+    # TODO: move back to using train_step function, and remove 'train_step_check_gradients'
+    def train_step_check_gradients():
+        with tf.GradientTape() as tape:
+            trajectories = replay_buffer.gather_all()       # gather all available trajectories stored in buffer
+            loss = agent.train(experience=trajectories)
+        grads = tape.gradient(loss.loss, agent.trainable_variables)
+        for grad, var in zip(grads, agent.trainable_variables):
+            tf.summary.histogram(var.name, grad, step=global_step)
+        return loss
 
     if params["use_tf_functions"]:
         collect_driver.run = common.function(           # wrap collect_driver.run function for optimized execution as TensorFlow graph
             collect_driver.run, autograph=False)        
         agent.train = common.function(agent.train, autograph=False)     # wrap agent.train function as TensorFlow graph
         train_step = common.function(train_step, autograph=True)        # wrap train_step function (autograph=True for converting Python control flow into TensorFlow operations)
+        train_step_check_gradients = common.function(train_step_check_gradients, autograph=True)    # TODO: remove function and current line
 
     if params["mode"] == "train":                       # initialize counters
         collect_time = 0
@@ -363,13 +390,20 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
                 restart_file=params["restart_file"], # TODO: impl. sth if we want to use several restart files, i.e. if global_step_val > 0 else 1,
                 global_step=global_step_val,
             )
+            logger.debug(f"Collect environment started, with global_step: {global_step_val}")
             collect_driver.run()
+            logger.debug(f"Collect environment run, with global_step: {global_step_val}")
             collect_env.stop()
+            logger.debug(f"Collect environment stopped, with global_step: {global_step_val}")
             collect_time += time.time() - start_time
 
             start_time = time.time()
-            total_loss, _ = train_step()
+            #total_loss, _ = train_step()                       # TODO: uncomment line
+            total_loss, _ = train_step_check_gradients()        # TODO: remove line
+            logger.debug(f"Train step done, with global_step: {global_step_val}")
+            logger.debug(f"Replay buffer size before clear: {replay_buffer.num_frames()}")
             replay_buffer.clear()
+            logger.debug(f"Replay buffer size after clear: {replay_buffer.num_frames()}")       # TODO: check if replay_buffer size should be change to include all n_cfd * n_rl_envs used, or only the size of one rl_env (pseudo-env) (as currently done)
             train_time += time.time() - start_time
 
             logger.info("Writing tensorflow summary")

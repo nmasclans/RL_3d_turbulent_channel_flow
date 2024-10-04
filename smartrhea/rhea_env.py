@@ -20,6 +20,13 @@ EPS = 1e-8
 
 logger = get_logger(__name__)
 
+"""
+Important information: 
+1. Actions, State & Rewards Normalization/Standarization:
+    - actor_network uses 'tanh' activation function: actions are 0-centered, and bounded by parameter 'action_bounds' -> done automatically by 'action_bounds' as specified in 'action_tensor_spec' 
+    - value_network uses 'ReLU' activation function 
+"""
+
 class RheaEnv(py_environment.PyEnvironment):
     """
     RHEA environment(s) extending the tf_agents.environments.PyEnvironment class.
@@ -313,8 +320,9 @@ class RheaEnv(py_environment.PyEnvironment):
         self._get_time()            # updates self._time
 
         # Transform state and reward: redistribute & standarize
-        self._redistribute_state()  # updates self._state_rl
-        self._standarize_state()    # updates self._state_rl    
+        self._redistribute_state()      # updates self._state_rl
+        self._min_max_scaling_state()   # updates self._state_rl    
+        self._min_max_scaling_reward()  # updates self._reward
 
         # Write RL data into disk
         if self.dump_data_flag:
@@ -481,39 +489,52 @@ class RheaEnv(py_environment.PyEnvironment):
                     raise Warning(f"Could not read reward from key: {self.reward_key[i]}") from exc
 
 
-    def _standarize_state(self):
-        """
-        Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
-        
-        Additional info: 
-        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
-                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
+# TODO: remove if not used, and also remove only-used-here variables: self._state_running_mean, self._state_running_var, self._state_rl, self._state_running_counter
+#    def _standarize_state(self):
+#        """
+#        Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
+#        
+#        Additional info: 
+#        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
+#                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
+#
+#        Updated attributes:
+#        self._state_running_mean
+#        self._state_running_var
+#        self._state_rl
+#        """
+#        self._state_running_counter += 1
+#        flattened_state_rl = self._state_rl.flatten()
+#        # Update running mean
+#        current_epoch_mean = np.mean(flattened_state_rl)
+#        old_mean           = self._state_running_mean
+#        self._state_running_mean += ( current_epoch_mean - old_mean ) / self._state_running_counter      # equivalent to: self._state_running_mean = ( self._state_running_mean * (self._state_running_counter - 1) + current_mean ) / self._state_running_counter
+#        # Update running variance (Welford's method)
+#        self._state_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._state_running_counter
+#        # Calculate running standart deviation
+#        std_dev = np.sqrt( self._state_running_var / self._state_running_counter )
+#        # Standarize state
+#        self._state_rl = ( self._state_rl - self._state_running_mean ) / ( std_dev + EPS )
+#        # Logging
+#        logger.debug(f"[RheaEnv::_standarize_state] State Standarization, updated running mean: {self._state_running_mean}, variance: {self._state_running_var}, std_dev: {std_dev}")
+#        for i in range(self.cfd_n_envs):
+#            for j in range(self.rl_n_envs):
+#                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
 
-        Updated attributes:
-        self._state_running_mean
-        self._state_running_var
-        self._state_rl
-        """
-        self._state_running_counter += 1
+    # Min-max-scaling of state to range [0,1] 
+    def _min_max_scaling_state(self):
         flattened_state_rl = self._state_rl.flatten()
-        # Update running mean
-        current_epoch_mean = np.mean(flattened_state_rl)
-        old_mean           = self._state_running_mean
-        self._state_running_mean += ( current_epoch_mean - old_mean ) / self._state_running_counter      # equivalent to: self._state_running_mean = ( self._state_running_mean * (self._state_running_counter - 1) + current_mean ) / self._state_running_counter
-        # Update running variance (Welford's method)
-        self._state_running_var += ( ( current_epoch_mean - old_mean ) * ( current_epoch_mean - self._state_running_mean) ) / self._state_running_counter
-        # Calculate running standart deviation
-        std_dev = np.sqrt( self._state_running_var / self._state_running_counter )
-        # Standarize state
-        self._state_rl = ( self._state_rl - self._state_running_mean ) / ( std_dev + EPS )
+        min_state = np.min(flattened_state_rl)
+        max_state = np.max(flattened_state_rl)
+        self._state_rl = ( self._state_rl - min_state ) / ( max_state - min_state + EPS )
         # Logging
-        logger.debug(f"[RheaEnv::_standarize_state] State Standarization, updated running mean: {self._state_running_mean}, variance: {self._state_running_var}, std_dev: {std_dev}")
+        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with original min: {min_state}, max: {max_state}")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
-                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled State: {self._state_rl[i * self.rl_n_envs + j,:]}")
 
 
-# TODO: remove if not used 
+# TODO: remove if not used, and remove also only-used-here variables: self._reward_running_mean, self._reward_running_var, self._reward, self._reward_running_counter
 #    def _standarize_reward(self):
 #        """
 #        Standarize 'self._reward' data to have mean = 0 and standard deviation = 1
@@ -542,6 +563,17 @@ class RheaEnv(py_environment.PyEnvironment):
 #        for i in range(self.cfd_n_envs):
 #            for j in range(self.rl_n_envs):
 #                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized Reward: {self._reward[i * self.rl_n_envs + j]}")
+    
+    # Min-Max scaling reward to range [0,1]
+    def _min_max_scaling_reward(self):
+        min_reward = np.min(self._reward)
+        max_reward = np.max(self._reward)
+        self._reward = ( self._reward - min_reward ) / ( max_reward - min_reward + EPS )
+        # Logging
+        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with original min: {min_reward}, max: {max_reward}")
+        for i in range(self.cfd_n_envs):
+            for j in range(self.rl_n_envs):
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled Reward: {self._reward[i * self.rl_n_envs + j]}")
 
 
     def _get_time(self):
@@ -727,9 +759,10 @@ class RheaEnv(py_environment.PyEnvironment):
         self._get_reward()          # updates self._reward
         self._get_time()            # updates self._time
 
-        # Transform state: redistribute & standarize
-        self._redistribute_state()  # updates self._state_rl
-        self._standarize_state()    # updates self._state_rl    
+        # Pre-processing state & reward: redistribute & standarize
+        self._redistribute_state()      # updates self._state_rl
+        self._min_max_scaling_state()   # updates self._state_rl    
+        self._min_max_scaling_reward()  # updates self._reward
 
         # write RL data into disk
         if self.dump_data_flag: self._dump_rl_data()
