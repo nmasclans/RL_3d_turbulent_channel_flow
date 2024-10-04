@@ -183,6 +183,12 @@ for j in range( 0, num_points_y ):
             rmsf_w_plus_nonRL[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[k,j,i]*( 1.0/u_tau )
 print("Variables averaged successfully!")
 
+
+### Calculate TKE averaged profile from rmsf_u,v,w averaged profiles 
+TKE_RL    = 0.5 * ( rmsf_u_plus_RL**2 + rmsf_v_plus_RL**2 + rmsf_w_plus_RL**2 )
+TKE_nonRL = 0.5 * ( rmsf_u_plus_nonRL**2 + rmsf_v_plus_nonRL**2 + rmsf_w_plus_nonRL**2 )
+TKE_ref   = 0.5 * ( rmsf_uu_plus_ref**2 + rmsf_vv_plus_ref**2 + rmsf_ww_plus_ref**2 )
+
 ### Plot u+ vs. y+
 print("\nBuilding plots...")
 # Clear plot
@@ -205,7 +211,7 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u+')
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -230,7 +236,7 @@ plt.ylabel( 'u_rms+' )
 plt.text( 1.05, 1.0, 'u_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -255,7 +261,7 @@ plt.ylabel( 'v_rms+' )
 plt.text( 17.5, 0.2, 'v_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
 
@@ -280,9 +286,35 @@ plt.ylabel( 'w_rms+' )
 plt.text( 17.5, 0.2, 'w_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}_{file_details}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
 # Clear plot
 plt.clf()
+
+### Plot TKE
+# Read & Plot data
+plt.plot( y_plus_ref, TKE_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
+for i_RL in range(n_RL):
+    plt.plot( y_plus_RL[i_RL], TKE_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}' )
+plt.plot( y_plus_nonRL, TKE_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = 'RHEA non-RL'  )
+# Configure plot
+plt.xlim( 1.0e-1, 2.0e2 )
+plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+plt.xscale( 'log' )
+plt.xlabel( 'y+' )
+plt.ylim( 0.0, 3.0 )
+plt.yticks( np.arange( 0.0, 5.0, 1.0 ) )
+plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+#plt.yscale( 'log' )
+plt.ylabel( 'TKE+' )
+#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.text( 17.5, 0.2, 'TKE+' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.tick_params( axis = 'both', pad = 7.5 )
+plt.savefig( f'{postDir}/tke_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+# Clear plot
+plt.clf()
+
 print("Plots built successfully!")
 
 
@@ -387,7 +419,7 @@ print("Errors calculated successfully!")
 # --- Errors logging ---
 
 # Store error logs in file
-error_log_filename = f"{postDir}/errors_{iteration}_ensemble{ensemble}_{file_details}.txt"
+error_log_filename = f"{postDir}/errors_{iteration}_ensemble{ensemble}.txt"
 with open(error_log_filename, "w") as file:
     # avg_u errors:
     file.write("\n\n------------------------------------------------")
