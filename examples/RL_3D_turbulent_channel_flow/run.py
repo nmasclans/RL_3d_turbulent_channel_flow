@@ -353,12 +353,31 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
     # TODO: move back to using train_step function, and remove 'train_step_check_gradients'
     def train_step_check_gradients():
         with tf.GradientTape() as tape:
-            trajectories = replay_buffer.gather_all()       # gather all available trajectories stored in buffer
-            loss = agent.train(experience=trajectories)
-        grads = tape.gradient(loss.loss, agent.trainable_variables)
+            trajectories = replay_buffer.gather_all()           # gather all available trajectories stored in buffer
+            loss_info    = agent.train(experience=trajectories) # compute primary loss from the agent
+            base_loss    = loss_info.loss                       # extract base loss (original agent loss)
+            l2_reg_loss  = tf.add_n(actor_net.losses) if actor_net.losses else 0.0  # l2 regularization losses from actor_net
+            total_loss   = base_loss + l2_reg_loss              # compute total loss
+            logger.debug(f"[train_step_check_gradients] loss details: \n"
+                         f"global_step: {global_step.numpy()} \n"
+                         f"loss_info: LossInfo(loss={loss_info.loss.numpy()}, "
+                         f"extra=PPOLossInfo(policy_gradient_loss={loss_info.extra.policy_gradient_loss.numpy()}, "
+                         f"value_estimation_loss={loss_info.extra.value_estimation_loss.numpy()}, "
+                         f"l2_regularization_loss={loss_info.extra.l2_regularization_loss.numpy()}, "
+                         f"entropy_regularization_loss={loss_info.extra.entropy_regularization_loss.numpy()}, "
+                         f"kl_penalty_loss={loss_info.extra.kl_penalty_loss.numpy()}) )\n"
+                         f"base_loss: {base_loss.numpy()} \n"
+                         f"l2_reg_loss: {l2_reg_loss.numpy()} \n"
+                         f"actor_net.losses: {[loss.numpy() for loss in actor_net.losses]} \n"
+                         f"total_loss: {total_loss.numpy()}\n")
+        grads = tape.gradient(total_loss, agent.trainable_variables)
         for grad, var in zip(grads, agent.trainable_variables):
             tf.summary.histogram(var.name, grad, step=global_step)
-        return loss
+        tf.summary.scalar("LearningRate/learning_rate", optimizer.learning_rate, step=global_step)
+        tf.summary.scalar("Losses/_base_loss", base_loss, step=global_step)
+        tf.summary.scalar("Losses/_l2_regularization_loss", l2_reg_loss, step=global_step)
+        tf.summary.scalar("Losses/_total_loss", total_loss, step=global_step)
+        return total_loss, loss_info
 
     if params["use_tf_functions"]:
         collect_driver.run = common.function(           # wrap collect_driver.run function for optimized execution as TensorFlow graph
