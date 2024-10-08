@@ -259,13 +259,18 @@ class RheaEnv(py_environment.PyEnvironment):
                      f"_local_reward: {self._local_reward.shape}, _reward: {self._reward.shape}")
 
         # define variables for state & reward standarization
-        self._state_running_mean     = 0.0
-        self._state_running_var      = 1.0
-        self._state_running_counter  = 0
+        #self._state_running_mean     = 0.0     # TODO: remove if not used, should state be standarized?
+        #self._state_running_var      = 1.0
+        #self._state_running_counter  = 0
         #self._reward_running_mean    = 0.0     # TODO: remove if not used, should reward be standarized?
         #self._reward_running_var     = 1.0
         #self._reward_running_counter = 0
-
+        # define variables for state & reward min-max-scaling
+        self._state_running_min  = 1e5
+        self._state_running_max  = 0.0
+        self._reward_running_min = 1e5
+        self._reward_running_max = 0.0
+        
         # define initial state and action array properties. Omit batch dimension (shape is per (rl) environment)
         self._observation_spec = array_spec.ArraySpec(shape=(self.n_state_rl,), dtype=self.model_dtype, name="observation")
         self._action_spec = array_spec.BoundedArraySpec(shape=(self.n_action,), dtype=self.model_dtype, name="action",
@@ -524,11 +529,11 @@ class RheaEnv(py_environment.PyEnvironment):
     # Min-max-scaling of state to range [0,1] 
     def _min_max_scaling_state(self):
         flattened_state_rl = self._state_rl.flatten()
-        min_state = np.min(flattened_state_rl)
-        max_state = np.max(flattened_state_rl)
-        self._state_rl = ( self._state_rl - min_state ) / ( max_state - min_state + EPS )
+        self._state_running_min = np.min([np.min(flattened_state_rl), self._state_running_min])
+        self._state_running_max = np.max([np.max(flattened_state_rl), self._state_running_max])
+        self._state_rl = ( self._state_rl - self._state_running_min ) / ( self._state_running_max - self._state_running_min + EPS )
         # Logging
-        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with original min: {min_state}, max: {max_state}")
+        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with original (min, max) = ({np.min(flattened_state_rl)}, {np.max(flattened_state_rl)}) and scaling (min, max) = ({self._state_running_min}, {self._state_running_max})")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled State: {self._state_rl[i * self.rl_n_envs + j,:]}")
@@ -566,11 +571,11 @@ class RheaEnv(py_environment.PyEnvironment):
     
     # Min-Max scaling reward to range [0,1]
     def _min_max_scaling_reward(self):
-        min_reward = np.min(self._reward)
-        max_reward = np.max(self._reward)
-        self._reward = ( self._reward - min_reward ) / ( max_reward - min_reward + EPS )
+        self._reward_running_min = np.min([np.min(self._reward), self._reward_running_min])
+        self._reward_running_max = np.max([np.max(self._reward), self._reward_running_max])
+        self._reward = ( self._reward - self._reward_running_min ) / ( self._reward_running_max - self._reward_running_min + EPS )
         # Logging
-        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with original min: {min_reward}, max: {max_reward}")
+        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with original (min, max) = ({np.min(self._reward)}, {np.max(self._reward)}), scaling (min, max) = ({self._reward_running_min}, {self._reward_running_max})")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled Reward: {self._reward[i * self.rl_n_envs + j]}")
