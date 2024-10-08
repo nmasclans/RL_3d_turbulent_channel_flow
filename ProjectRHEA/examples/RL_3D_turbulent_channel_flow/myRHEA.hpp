@@ -58,6 +58,9 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray DeltaRyy_field;        /// 3-D field of DeltaRyy
         DistributedArray DeltaRyz_field;        /// 3-D field of DeltaRyz
         DistributedArray DeltaRzz_field;        /// 3-D field of DeltaRzz
+        DistributedArray rmsf_u_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_v_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_w_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
 
         /// Witness points
         std::string witness_file;
@@ -92,15 +95,15 @@ class myRHEA : public FlowSolverRHEA {
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
         int action_global_size2;                 /// or nRectangleControl
-        double rmsf_u_field_local;
-        double rmsf_v_field_local;
-        double rmsf_w_field_local;
-        double rmsf_u_field_local_previous;
-        double rmsf_v_field_local_previous;
-        double rmsf_w_field_local_previous;
-        double rmsf_u_field_local_two_previous;
-        double rmsf_v_field_local_two_previous;
-        double rmsf_w_field_local_two_previous;
+        double rmsf_u_field_local;               /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_v_field_local;               /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_w_field_local;               /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_u_field_local_previous;      /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_v_field_local_previous;      /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_w_field_local_previous;      /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_u_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_v_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double rmsf_w_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
         double reward_local;
         std::vector<double> action_global;
         std::vector<double> action_global_previous;

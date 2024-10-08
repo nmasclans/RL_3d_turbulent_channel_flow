@@ -15,6 +15,7 @@ using namespace std;
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
+#define _RL_CONTROL_IS_SUPERVISED_ 1
 
 /// AUXILIAR PARAMETERS ///
 //const double pi = 2.0*asin( 1.0 );				/// pi number (fixed)
@@ -85,6 +86,92 @@ vector<vector<double>> Deltaij = {
     {0.0, 1.0, 0.0},
     {0.0, 0.0, 1.0},
 };
+#if _RL_CONTROL_IS_SUPERVISED_
+// Reference profiles (_ALL_ coordinates, including boundaries)
+double rmsf_u_reference_profile[] = {   /// only inner points
+    0.03690199, 0.1431543,  0.29195798, 0.48225412, 0.71205642,
+    0.97664947, 1.26629004, 1.56505508, 1.85261352, 2.10877344, 2.31835921,
+    2.47388978, 2.57533985, 2.62801624, 2.63998813, 2.62003648, 2.57639729,
+    2.51619351, 2.44528228, 2.36829681, 2.2887528,  2.20919931, 2.13139338,
+    2.05649897, 1.98526843, 1.91813391, 1.85525897, 1.79665625, 1.74224477,
+    1.69185002, 1.64511183, 1.60155319, 1.56075297, 1.52229051, 1.48575306,
+    1.45088976, 1.41756569, 1.38558302, 1.35464851, 1.32452854, 1.29504633,
+    1.26605857, 1.23749725, 1.20930749, 1.18144407, 1.15382691, 1.1263415,
+    1.09888169, 1.07135264, 1.04376051, 1.01622561, 0.98886524, 0.961823,
+    0.93527317, 0.90938298, 0.8843933,  0.86065179, 0.83851344, 0.81831759,
+    0.80045051, 0.78534573, 0.77341852, 0.76501258, 0.76041414, 0.75986774,
+    0.76347267, 0.77113252, 0.78258477, 0.79739211, 0.81506093, 0.83519439,
+    0.85742979, 0.88134533, 0.90650513, 0.93256037, 0.95926898, 0.98645905,
+    1.0140314,  1.04189356, 1.06990284, 1.09793686, 1.12593849, 1.15387311,
+    1.18171928, 1.20952308, 1.23741252, 1.26555016, 1.29406449, 1.32301877,
+    1.35250179, 1.38268985, 1.41378505, 1.44603111, 1.47971288, 1.51521798,
+    1.55298152, 1.59335986, 1.63668176, 1.6832809,  1.73342543, 1.78737121,
+    1.84536218, 1.90761598, 1.97421662, 2.04497903, 2.11942243, 2.19678625,
+    2.27593113, 2.35511504, 2.43181083, 2.50254356, 2.56271377, 2.60648167,
+    2.62673914, 2.61527376, 2.56331886, 2.462785,   2.30831166, 2.09987094,
+    1.84491662, 1.55860558, 1.26108918, 0.9726394,  0.70912843, 0.48026814,
+    0.29075563, 0.14256579, 0.0367508,
+};
+double rmsf_v_reference_profile[] = {   /// only inner points
+    5.19263543e-05, 8.32340521e-04, 4.19425126e-03,
+    1.14944157e-02, 2.40604517e-02, 4.25900905e-02, 6.73643331e-02,
+    9.80268749e-02, 1.33979034e-01, 1.74318152e-01, 2.18174576e-01,
+    2.64602748e-01, 3.12747371e-01, 3.61713621e-01, 4.10677271e-01,
+    4.58820486e-01, 5.05426730e-01, 5.49848478e-01, 5.91562938e-01,
+    6.30141763e-01, 6.65288987e-01, 6.96815154e-01, 7.24630288e-01,
+    7.48715739e-01, 7.69137633e-01, 7.86019130e-01, 7.99533221e-01,
+    8.09886598e-01, 8.17327011e-01, 8.22119809e-01, 8.24538002e-01,
+    8.24847832e-01, 8.23299585e-01, 8.20140303e-01, 8.15605174e-01,
+    8.09902551e-01, 8.03208258e-01, 7.95676249e-01, 7.87465476e-01,
+    7.78705922e-01, 7.69489106e-01, 7.59872416e-01, 7.49905287e-01,
+    7.39651952e-01, 7.29191215e-01, 7.18613188e-01, 7.08007946e-01,
+    6.97458513e-01, 6.87040657e-01, 6.76810793e-01, 6.66815071e-01,
+    6.57104095e-01, 6.47736174e-01, 6.38785991e-01, 6.30344254e-01,
+    6.22504952e-01, 6.15352754e-01, 6.08956112e-01, 6.03365081e-01,
+    5.98613586e-01, 5.94738862e-01, 5.91790703e-01, 5.89818873e-01,
+    5.88853244e-01, 5.88893588e-01, 5.89916404e-01, 5.91887521e-01,
+    5.94768386e-01, 5.98520029e-01, 6.03104269e-01, 6.08477898e-01,
+    6.14592061e-01, 6.21396613e-01, 6.28843221e-01, 6.36881036e-01,
+    6.45452094e-01, 6.54491455e-01, 6.63929515e-01, 6.73703672e-01,
+    6.83768386e-01, 6.94079747e-01, 7.04572391e-01, 7.15151379e-01,
+    7.25712933e-01, 7.36173502e-01, 7.46471558e-01, 7.56542929e-01,
+    7.66307468e-01, 7.75675774e-01, 7.84558491e-01, 7.92845296e-01,
+    8.00407132e-01, 8.07089044e-01, 8.12716571e-01, 8.17119885e-01,
+    8.20124780e-01, 8.21535007e-01, 8.21131333e-01, 8.18668409e-01,
+    8.13888400e-01, 8.06521755e-01, 7.96304984e-01, 7.82987938e-01,
+    7.66344909e-01, 7.46185084e-01, 7.22379487e-01, 6.94856921e-01,
+    6.63616901e-01, 6.28738437e-01, 5.90408763e-01, 5.48912095e-01,
+    5.04662511e-01, 4.58181283e-01, 4.10125671e-01, 3.61228490e-01,
+    3.12324973e-01, 2.64249695e-01, 2.17896522e-01, 1.74112681e-01,
+    1.33836235e-01, 9.79337132e-02, 6.73078431e-02, 4.25588662e-02,
+    2.40452015e-02, 1.14881643e-02, 4.19231267e-03, 8.32000724e-04,
+    5.19304452e-05,
+};
+double rmsf_w_reference_profile[] = {   /// only inner points
+    0.01948791, 0.07236491, 0.14048191, 0.21854762, 0.30134447,
+    0.38422926, 0.46372599, 0.53776682, 0.60578033, 0.66813924, 0.72556149,
+    0.7784629,  0.82682753, 0.87027868, 0.90840991, 0.9410056,  0.96820929,
+    0.99047726, 1.00846791, 1.02290692, 1.03446606, 1.0436535,  1.05080021,
+    1.05610352, 1.05965133, 1.06143301, 1.06139017, 1.05945506, 1.05558825,
+    1.04986742, 1.04247338, 1.03354293, 1.02316966, 1.01149968, 0.99872216,
+    0.98504761, 0.97066364, 0.95568457, 0.94016161, 0.92414558, 0.90772899,
+    0.89102661, 0.87407916, 0.85687722, 0.83937806, 0.82155696, 0.80350285,
+    0.78535132, 0.76720944, 0.74919407, 0.73147353, 0.71422028, 0.69752028,
+    0.68140774, 0.66594259, 0.65126839, 0.63760227, 0.62515297, 0.61408656,
+    0.60457467, 0.59677854, 0.59081111, 0.5867123,  0.58446302, 0.58407969,
+    0.58564841, 0.58921523, 0.59472467, 0.6020483,  0.61103605, 0.62153503,
+    0.63340248, 0.64649235, 0.66062643, 0.6756682,  0.6915292,  0.70809044,
+    0.72519448, 0.74264529, 0.76027573, 0.77797812, 0.79566103, 0.81328445,
+    0.83091367, 0.84860092, 0.86626787, 0.88374511, 0.90091175, 0.91772015,
+    0.93409562, 0.9499468,  0.96518311, 0.97970322, 0.99338264, 1.00605326,
+    1.0176119,  1.02806158, 1.03734615, 1.04523526, 1.05145798, 1.05586077,
+    1.0583537,  1.05889038, 1.05748795, 1.05420118, 1.04903966, 1.04192644,
+    1.03265671, 1.02084506, 1.00598659, 0.98751452, 0.96483021, 0.93735162,
+    0.90464737, 0.86655389, 0.82324995, 0.77511818, 0.72252004, 0.66544938,
+    0.60346088, 0.5358123,  0.46212095, 0.38295741, 0.3003878,  0.21788092,
+    0.14006928, 0.07215958, 0.01943448,
+};
+#endif
 #endif
 
 ////////// myRHEA CLASS //////////
@@ -105,7 +192,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     timers->createTimer( "rl_smartredis_communications" );
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
-
+#if _RL_CONTROL_IS_SUPERVISED_
+    rmsf_u_reference_field.setTopology(topo, "rmsf_u_reference_field");
+    rmsf_v_reference_field.setTopology(topo, "rmsf_v_reference_field");
+    rmsf_w_reference_field.setTopology(topo, "rmsf_w_reference_field");
+#endif
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step);
     initSmartRedis();
 #endif
@@ -187,9 +278,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
     ///             Actions is a global array living in all processes.
-    rmsf_u_field_local = 0.0;    rmsf_u_field_local_previous = 0.0;   rmsf_u_field_local_two_previous = 0.0;
-    rmsf_v_field_local = 0.0;    rmsf_v_field_local_previous = 0.0;   rmsf_v_field_local_two_previous = 0.0;
-    rmsf_w_field_local = 0.0;    rmsf_w_field_local_previous = 0.0;   rmsf_w_field_local_two_previous = 0.0;
     action_global.resize(action_global_size2);
     action_global_previous.resize(action_global_size2);
     action_global_instant.resize(action_global_size2);
@@ -199,10 +287,57 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     std::fill(action_global_instant.begin(), action_global_instant.end(), 0.0);
     std::fill(state_local.begin(), state_local.end(), 0.0);
 
+    /// Auxiliary variable for reward calculation
+#if _RL_CONTROL_IS_SUPERVISED_
+    // Accessing the global domain decomposition data
+    int global_startY, global_j;
+    int globalNy    = topo->getMesh()->getGNy();    // Total number of y-cells in the global domain
+    int localNy     = topo->getlNy()-2;             // Local number of y-cells for this process (-2 for inner points only)
+    int divy        = globalNy % np_y;              // Remainder for non-uniform decomposition
+    // Calculate the rank's position in the y-dimension based on rank and grid layout
+    int plane_rank = my_rank % (np_x * np_y);
+    int rank_in_y  = plane_rank / np_x;             // Rank's position in the y-dimension (row in the global grid)
+    // Calculate the global start index for this rank's local slice in the y-dimension
+    if (rank_in_y < divy) {
+        global_startY = rank_in_y * (localNy + 1);  // Extra cell for some ranks
+    } else {
+        global_startY = rank_in_y * localNy + divy; // Regular distribution for remaining ranks
+    }
+    // Debugging
+    cout << "Rank " << my_rank << ": npx=" << np_x << ", npy=" << np_y 
+         << ", localNy=" << localNy << ", divy=" << divy 
+         << ", globalNy=" << globalNy << ", rank_in_y=" << rank_in_y 
+         << ", global_startY=" << global_startY << endl;
+    // Fill global profile data into local field data
+    for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+        global_j = global_startY + (j - topo->iter_common[_INNER_][_INIY_]);
+        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                rmsf_u_reference_field[I1D(i,j,k)] = rmsf_u_reference_profile[global_j];
+                rmsf_v_reference_field[I1D(i,j,k)] = rmsf_v_reference_profile[global_j];
+                rmsf_w_reference_field[I1D(i,j,k)] = rmsf_w_reference_profile[global_j];
+            }
+        }
+        /// Debugging
+        cout << "Rank " << my_rank << ": j=" << j << " (local), global_j=" << global_j 
+             << ", rmsf_u: " << rmsf_u_reference_profile[global_j]
+             << ", rmsf_v: " << rmsf_v_reference_profile[global_j]
+             << ", rmsf_w: " << rmsf_w_reference_profile[global_j] << endl;
+    }
+#else
+    rmsf_u_field_local = 0.0;    rmsf_u_field_local_previous = 0.0;   rmsf_u_field_local_two_previous = 0.0;
+    rmsf_v_field_local = 0.0;    rmsf_v_field_local_previous = 0.0;   rmsf_v_field_local_two_previous = 0.0;
+    rmsf_w_field_local = 0.0;    rmsf_w_field_local_previous = 0.0;   rmsf_w_field_local_two_previous = 0.0;
+#endif
+
     /// Initialize additional attribute members
+#if _RL_CONTROL_IS_SUPERVISED_
+    first_actuation_time_done   = true;
+    first_actuation_period_done = true;
+#else
     first_actuation_time_done   = false;
     first_actuation_period_done = false;
-
+#endif
 };
 
 
@@ -374,8 +509,8 @@ void myRHEA::calculateSourceTerms() {
         /// If needed, get and post-process new action
         if (current_time > begin_actuation_time) {
 
-            if ( !first_actuation_time_done ) {      /// executed just once
-                calculateReward();              /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'...
+            if ( !first_actuation_time_done ) {     /// executed just once
+                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'...
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
                     cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'" << endl;
@@ -417,7 +552,7 @@ void myRHEA::calculateSourceTerms() {
                     // Writing state, reward, time
                     updateState();
                     manager->writeState(state_local, state_key);
-                    calculateReward();                              /// update reward_local attribute
+                    calculateReward();                              /// update 'reward_local' attribute
                     manager->writeReward(reward_local, reward_key);
                     manager->writeTime(current_time, time_key);
                     // Reading read action...
@@ -612,10 +747,13 @@ void myRHEA::calculateSourceTerms() {
 #endif
 
     /// Update halo values
-    //f_rhou_field.update();
-    //f_rhov_field.update();
-    //f_rhow_field.update();
-    //f_rhoE_field.update();
+    f_rhou_field.update();
+    f_rhov_field.update();
+    f_rhow_field.update();
+    f_rhoE_field.update();
+    rl_f_rhou_field.update();
+    rl_f_rhov_field.update();
+    rl_f_rhow_field.update();
 
 };
 
@@ -670,7 +808,7 @@ void myRHEA::timeAdvanceConservedVariables() {
     double rl_f_rhou_field_ratio = 0.0;
     int ratio_counter            = 0;
 #if _REGULARIZE_RL_ACTION_
-    double lambda = 0.5;            /// TODO: choose proper value, 0.5 could be improved
+    double reg_lambda = 0.95;            /// TODO: choose proper value, 0.5 could be improved
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
     /// Apply smooth regularization when RL control term << RHS term
     double rhou_rhs, rhov_rhs, rhow_rhs;
@@ -729,14 +867,14 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rhow_rl_f     = rl_f_rhow_field[I1D(i,j,k)];
                 /// Apply smooth regularization approach when |rl_f| < |rhs|/10.0, E = 0.1 achieves regularization to be smooth enough
                 /// TODO: improve regularization, not smooth! (specially else if)
-                if ( std::abs(rhou_rl_f) < ( std::abs(rhou_rhs) * lambda ) ) {
-                    rhou_rl_f_reg = ( rhou_rhs * lambda ) * std::tanh( rhou_rl_f / ( 0.5 * ( rhou_rhs * lambda ) + EPS) );
-                    rhov_rl_f_reg = ( rhov_rhs * lambda ) * std::tanh( rhov_rl_f / ( 0.5 * ( rhov_rhs * lambda ) + EPS) );
-                    rhow_rl_f_reg = ( rhow_rhs * lambda ) * std::tanh( rhow_rl_f / ( 0.5 * ( rhow_rhs * lambda ) + EPS) );
+                if ( std::abs(rhou_rl_f) < ( std::abs(rhou_rhs) * reg_lambda ) ) {
+                    rhou_rl_f_reg = ( rhou_rhs * reg_lambda ) * std::tanh( rhou_rl_f / ( 0.5 * ( rhou_rhs * reg_lambda ) + EPS) );
+                    rhov_rl_f_reg = ( rhov_rhs * reg_lambda ) * std::tanh( rhov_rl_f / ( 0.5 * ( rhov_rhs * reg_lambda ) + EPS) );
+                    rhow_rl_f_reg = ( rhow_rhs * reg_lambda ) * std::tanh( rhow_rl_f / ( 0.5 * ( rhow_rhs * reg_lambda ) + EPS) );
                 } else { /// saturate actions
-                    rhou_rl_f_reg = rhou_rl_f  * int( abs( (rhou_rhs * lambda) / (rhou_rl_f + EPS) ) ); 
-                    rhov_rl_f_reg = rhov_rl_f  * int( abs( (rhov_rhs * lambda) / (rhov_rl_f + EPS) ) ); 
-                    rhow_rl_f_reg = rhow_rl_f  * int( abs( (rhow_rhs * lambda) / (rhow_rl_f + EPS) ) ); 
+                    rhou_rl_f_reg = rhou_rl_f  * int( abs( (rhou_rhs * reg_lambda) / (rhou_rl_f + EPS) ) ); 
+                    rhov_rl_f_reg = rhov_rl_f  * int( abs( (rhov_rhs * reg_lambda) / (rhov_rl_f + EPS) ) ); 
+                    rhow_rl_f_reg = rhow_rl_f  * int( abs( (rhow_rhs * reg_lambda) / (rhow_rl_f + EPS) ) ); 
                     saturated_actions_counter += 1;
                 }
                 /// TODO: improve this regularization, check commented code above!
@@ -817,19 +955,13 @@ void myRHEA::timeAdvanceConservedVariables() {
 #if _OPENACC_MANUAL_DATA_MOVEMENT_
     #pragma acc exit data copyout (rho_field.vector[0:local_size],rhou_field.vector[0:local_size],rhov_field.vector[0:local_size],rhow_field.vector[0:local_size],rhoE_field.vector[0:local_size])
 #endif    
-    
-    ///// Attention! Communications performed only at the last stage of the Runge-Kutta to improve computational performance
-    ///// ... temporal integration is first-order at points connecting partitions
-    //if( rk_time_stage == rk_number_stages ) {
 
-        /// Update halo values
-        rho_field.update();
-        rhou_field.update();
-        rhov_field.update();
-        rhow_field.update();
-        rhoE_field.update();
-
-    //}
+    /// Update halo values
+    rho_field.update();
+    rhou_field.update();
+    rhov_field.update();
+    rhow_field.update();
+    rhoE_field.update();
 
     if( transport_pressure_scheme ) {
         this->timeAdvancePressure();
@@ -1478,11 +1610,15 @@ void myRHEA::getControlCubes() {
     MPI_Allreduce(&num_control_points_local, &num_control_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'num_control_points'
 
     /// Debugging: boundaries of RL environments / mpi processes 
-    cout << "Rank " << my_rank << " has RL environment / mpi process domain boundaries: "  
+    cout << "Rank " << my_rank << " has RL environment / mpi process domain inner boundaries: "  
          << "x in (" << x_field[I1D(topo->iter_common[_INNER_][_INIX_],0,0)] << ", " << x_field[I1D(topo->iter_common[_INNER_][_ENDX_],0,0)] << "), "
          << "y in (" << y_field[I1D(0,topo->iter_common[_INNER_][_INIY_],0)] << ", " << y_field[I1D(0,topo->iter_common[_INNER_][_ENDY_],0)] << "), "
          << "z in (" << z_field[I1D(0,0,topo->iter_common[_INNER_][_INIZ_])] << ", " << z_field[I1D(0,0,topo->iter_common[_INNER_][_ENDZ_])] << ")" << endl;
-    
+    cout << "Rank " << my_rank << " has inner boundaries local indices: "
+         << "x-idx in (" << topo->iter_common[_INNER_][_INIX_] << ", " << topo->iter_common[_INNER_][_ENDX_] << "), "
+         << "y-idx in (" << topo->iter_common[_INNER_][_INIY_] << ", " << topo->iter_common[_INNER_][_ENDY_] << "), "
+         << "z-idx in (" << topo->iter_common[_INNER_][_INIZ_] << ", " << topo->iter_common[_INNER_][_ENDZ_] << ")" << endl;
+
     /// Check 1: num. of control cubes == num. mpi processes, and mpi processes must be distributed only along y-coordinate
     action_global_size2 = n_rl_envs * action_dim;
     if ((np_x == 1) && (np_y == n_rl_envs) && (np_z == 1) && (n_rl_envs == np_y) && (num_cubes_local == 1)) {
@@ -1596,7 +1732,31 @@ void myRHEA::updateState() {
 ///                                      rmsf_v_field_local, rmsf_v_field_local_previous, rmsf_v_field_local_two_previous
 ///                                      rmsf_w_field_local, rmsf_w_field_local_previous, rmsf_w_field_local_two_previous
 void myRHEA::calculateReward() {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
+#if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
+    double l1_err_rmsf_u  = 0.0;
+    double l1_err_rmsf_v  = 0.0;
+    double l1_err_rmsf_w  = 0.0;
+    int    l1_err_counter = 0;
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                l1_err_rmsf_u  += std::abs(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)]);
+                l1_err_rmsf_v  += std::abs(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)]);
+                l1_err_rmsf_w  += std::abs(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)]);
+                l1_err_counter += 1;
+            }
+        }
+    }
+    l1_err_rmsf_u /= l1_err_counter;
+    l1_err_rmsf_v /= l1_err_counter;
+    l1_err_rmsf_w /= l1_err_counter;
+    reward_local   = ( l1_err_rmsf_u + l1_err_rmsf_v + l1_err_rmsf_w ) / 3.0;
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << endl;
+
+#else                           /// Unsupervised Reward
     /// Initialize variables
     rmsf_u_field_local = 0.0; 
     rmsf_v_field_local = 0.0; 
@@ -1639,8 +1799,6 @@ void myRHEA::calculateReward() {
     ///  TODO: maybe do relative adding: / std::abs( d_avg_u_field_local_previous + EPS );
 
     /// Debugging
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with rmsf_u (k-2): " << rmsf_u_field_local_two_previous << ", rmsf_u (k-1): " << rmsf_u_field_local_previous << ", rmsf_u (k): " << rmsf_u_field_local 
          << ", d_rmsf_u (k-1): " << d_rmsf_u_field_local_previous << ", d_rmsf_u (k): " << d_rmsf_u_field_local << endl;
     
@@ -1651,6 +1809,7 @@ void myRHEA::calculateReward() {
     rmsf_u_field_local_previous     = rmsf_u_field_local;
     rmsf_v_field_local_previous     = rmsf_v_field_local;
     rmsf_w_field_local_previous     = rmsf_w_field_local;
+#endif
 
 }
 
