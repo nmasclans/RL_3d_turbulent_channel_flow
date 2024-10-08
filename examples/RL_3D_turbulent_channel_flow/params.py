@@ -5,9 +5,9 @@ import random, os, numpy as np
 dt_phys  = 5.0e-5       # not taken from here, defined in myRHEA.cpp
 t_action = 0.00050      # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(0.1 + t_action + dt_phys, 8)
+t_episode_train = round(0.05 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 8          # 
+cfd_n_envs = 16         # 
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -56,7 +56,7 @@ params = {
     "t_begin_control": t_begin_control,
     "action_bounds": (-2.0, 2.0),
     "action_dim": 6,
-    "reward_norm": 0.000001,                                                            # another possible normalization: reward_norm = t_action
+    "reward_norm": 1.0,                                                                 # another possible normalization: reward_norm = t_action
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local,  # TODO: set custom value
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
