@@ -808,7 +808,7 @@ void myRHEA::timeAdvanceConservedVariables() {
     double rl_f_rhou_field_ratio = 0.0;
     int ratio_counter            = 0;
 #if _REGULARIZE_RL_ACTION_
-    double reg_lambda = 0.95;            /// TODO: choose proper value, 0.5 could be improved
+    double reg_lambda = 0.60;            /// TODO: choose proper value, 0.5 could be improved
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
     /// Apply smooth regularization when RL control term << RHS term
     double rhou_rhs, rhov_rhs, rhow_rhs;
@@ -1743,9 +1743,9 @@ void myRHEA::calculateReward() {
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                l1_err_rmsf_u  += std::abs(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)]);
-                l1_err_rmsf_v  += std::abs(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)]);
-                l1_err_rmsf_w  += std::abs(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)]);
+                l1_err_rmsf_u  += std::abs( (rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)]) / (rmsf_u_reference_field[I1D(i,j,k)] + EPS) );
+                l1_err_rmsf_v  += std::abs( (rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)]) / (rmsf_v_reference_field[I1D(i,j,k)] + EPS) );
+                l1_err_rmsf_w  += std::abs( (rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)]) / (rmsf_w_reference_field[I1D(i,j,k)] + EPS) );
                 l1_err_counter += 1;
             }
         }
