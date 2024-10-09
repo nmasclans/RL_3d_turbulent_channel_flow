@@ -358,18 +358,18 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             base_loss    = loss_info.loss                       # extract base loss (original agent loss)
             l2_reg_loss  = tf.add_n(actor_net.losses) if actor_net.losses else 0.0  # l2 regularization losses from actor_net
             total_loss   = base_loss + l2_reg_loss              # compute total loss
-            logger.debug(f"[train_step_check_gradients] loss details: \n"
-                         f"global_step: {global_step.numpy()} \n"
-                         f"loss_info: LossInfo(loss={loss_info.loss.numpy()}, "
-                         f"extra=PPOLossInfo(policy_gradient_loss={loss_info.extra.policy_gradient_loss.numpy()}, "
-                         f"value_estimation_loss={loss_info.extra.value_estimation_loss.numpy()}, "
-                         f"l2_regularization_loss={loss_info.extra.l2_regularization_loss.numpy()}, "
-                         f"entropy_regularization_loss={loss_info.extra.entropy_regularization_loss.numpy()}, "
-                         f"kl_penalty_loss={loss_info.extra.kl_penalty_loss.numpy()}) )\n"
-                         f"base_loss: {base_loss.numpy()} \n"
-                         f"l2_reg_loss: {l2_reg_loss.numpy()} \n"
-                         f"actor_net.losses: {[loss.numpy() for loss in actor_net.losses]} \n"
-                         f"total_loss: {total_loss.numpy()}\n")
+            #logger.debug(f"[train_step_check_gradients] loss details: \n"
+            #             f"global_step: {global_step.numpy()} \n"
+            #             f"loss_info: LossInfo(loss={loss_info.loss.numpy()}, "
+            #             f"extra=PPOLossInfo(policy_gradient_loss={loss_info.extra.policy_gradient_loss.numpy()}, "
+            #             f"value_estimation_loss={loss_info.extra.value_estimation_loss.numpy()}, "
+            #             f"l2_regularization_loss={loss_info.extra.l2_regularization_loss.numpy()}, "
+            #             f"entropy_regularization_loss={loss_info.extra.entropy_regularization_loss.numpy()}, "
+            #             f"kl_penalty_loss={loss_info.extra.kl_penalty_loss.numpy()}) )\n"
+            #             f"base_loss: {base_loss.numpy()} \n"
+            #             f"l2_reg_loss: {l2_reg_loss.numpy()} \n"
+            #             f"actor_net.losses: {[loss.numpy() for loss in actor_net.losses]} \n"
+            #             f"total_loss: {total_loss.numpy()}\n")
         grads = tape.gradient(total_loss, agent.trainable_variables)
         for grad, var in zip(grads, agent.trainable_variables):
             tf.summary.histogram(var.name, grad, step=global_step)
