@@ -1,0 +1,9 @@
+/__pycache__
+/rhea_exp
+/train
+runit.sh
+timers_information_file*
+*.h5
+*.xdmf
+*.out
+*.err
