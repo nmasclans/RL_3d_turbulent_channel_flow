@@ -1,17 +1,17 @@
-# Environment paths
-RHEA_PATH    = /home/jofre/Nuria/flowsolverrhea
-
+# Environment variables
 EXECUTABLE   = RHEA.exe
 MAIN         = myRHEA.cpp
 PROJECT_PATH = $(RHEA_PATH)
 SRC_DIR      = $(PROJECT_PATH)/src
 CXX          = mpicxx
+
 # CPU FLAGS
 #CXXFLAGS     = -O3 -Wall -std=c++0x -Wno-unknown-pragmas -Wno-unused-variable -I$(PROJECT_PATH)
-CXXFLAGS     = -Ofast -Wall -std=c++17 -Wno-unknown-pragmas -Wno-unused-variable -I$(PROJECT_PATH) # -std=c++17 required for redisai compilation
+CXXFLAGS     = -Ofast -Wall -std=c++17 -Wno-unknown-pragmas -Wno-unused-variable -I$(PROJECT_PATH) -DRL_CASE_PATH=\"$(RL_CASE_PATH)\" # -std=c++17 required for redisai compilation
 # CPU-GPU FLAGS
 #CXXFLAGS     = -fast -acc -ta=tesla:managed -Minfo=accel -O3 -Wall -std=c++0x -I$(PROJECT_PATH)
 #CXXFLAGS     = -fast -acc -ta=tesla,pinned -Minfo=accel -O3 -Wall -std=c++0x -I$(PROJECT_PATH)
+
 # UBUNTU - LINUX
 INC_LIB_YAML        =
 INC_DIR_YAML        =

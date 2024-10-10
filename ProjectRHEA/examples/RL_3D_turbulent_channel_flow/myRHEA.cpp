@@ -58,6 +58,12 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 #endif
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
+
+#ifndef RL_CASE_PATH
+    #error "RL_CASE_PATH is not defined! Please define it during compilation."
+#endif
+const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
+
 int action_dim = 6;
 /// eigen-values barycentric map coordinates - corners of realizable region
 double EPS     = numeric_limits<double>::epsilon();
@@ -86,6 +92,7 @@ vector<vector<double>> Deltaij = {
     {0.0, 1.0, 0.0},
     {0.0, 0.0, 1.0},
 };
+
 #if _RL_CONTROL_IS_SUPERVISED_
 // Reference profiles (_ALL_ coordinates, including boundaries)
 double rmsf_u_reference_profile[] = {   /// only inner points
@@ -172,6 +179,7 @@ double rmsf_w_reference_profile[] = {   /// only inner points
     0.14006928, 0.07215958, 0.01943448,
 };
 #endif
+
 #endif
 
 ////////// myRHEA CLASS //////////
@@ -259,8 +267,8 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// Additional arguments, defined here /// TODO: include this in some configuration file
-    this->witness_file = "config_control_witness/witness8.txt";
-    this->control_cubes_file = "config_control_witness/cubeControl8.txt";
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witness8.txt";
+    this->control_cubes_file = string(rl_case_path) + "/config_control_witness/cubeControl8.txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
     this->state_key     = "ensemble_" + tag + ".state";
@@ -320,7 +328,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         }
         /// Debugging
         cout << "Rank " << my_rank << ": j=" << j << " (local), global_j=" << global_j 
-             << ", rmsf_u: " << rmsf_u_reference_profile[global_j]
+             << ", Reference value of rmsf_u: " << rmsf_u_reference_profile[global_j]
              << ", rmsf_v: " << rmsf_v_reference_profile[global_j]
              << ", rmsf_w: " << rmsf_w_reference_profile[global_j] << endl;
     }
@@ -499,10 +507,6 @@ void myRHEA::calculateSourceTerms() {
     }
 
 #if _ACTIVE_CONTROL_BODY_FORCE_
-
-    if (my_rank == 0){
-        cout << "[myRHEA::calculateSourceTerms] Iteration: " << current_time_iter << ", rk it: " << rk_time_stage << endl;
-    }
 
     if (rk_time_stage == 1) {    /// only recalculate f_rl_rhoi_field once per Runge-Kutta loop (1st rk iter.), if new action is needed
 
@@ -761,12 +765,18 @@ void myRHEA::calculateSourceTerms() {
 void myRHEA::temporalHookFunction() {
 
     if ( ( print_timers ) && (current_time_iter%print_frequency_iter == 0) ) {
-        /// Print timers information
-        char filename_timers[256];
-        sprintf( filename_timers, "rhea_exp/timers_info/timers_information_file_%d_ensemble%s_step%s.txt", current_time_iter, tag.c_str(), global_step.c_str() );
-        timers->printTimers( filename_timers );
-        /// Output current state in RL dedicated directory 'rhea_exp/output_data/'
-        this->outputCurrentStateDataRL();
+        /// Save data only for ensemble #0 due to memory limitations
+        if (tag == "0") {
+            /// Print timers information
+            char filename_timers[256];
+            sprintf( filename_timers, "%s/rhea_exp/timers_info/timers_information_file_%d_ensemble%s_step%s.txt", 
+                     rl_case_path, current_time_iter, tag.c_str(), global_step.c_str() );
+            timers->printTimers( filename_timers );
+            /// Output current state in RL dedicated directory
+            char data_path[256];
+            sprintf( data_path, "%s/rhea_exp/output_data", rl_case_path );
+            this->outputCurrentStateDataRL(data_path);
+        }
     }
 
 };
@@ -784,13 +794,13 @@ void myRHEA::calculateTimeStep() {
 };
 
 
-void myRHEA::outputCurrentStateDataRL() {
+void myRHEA::outputCurrentStateDataRL( string path ) {
 
     /// Write to file current solver state, time, time iteration and averaging time
     writer_reader->setAttribute( "Time", current_time );
     writer_reader->setAttribute( "Iteration", current_time_iter );
     writer_reader->setAttribute( "AveragingTime", averaging_time );
-    writer_reader->writeRL( current_time_iter, tag, global_step, "rhea_exp/output_data" );
+    writer_reader->writeRL( current_time_iter, tag, global_step, path );
 
 };
 
@@ -815,7 +825,6 @@ void myRHEA::timeAdvanceConservedVariables() {
     double rhou_rl_f, rhov_rl_f, rhow_rl_f;
     double rhou_rl_f_reg, rhov_rl_f_reg, rhow_rl_f_reg;
     /// Debugging additional variables
-    double rl_f_rhou_field_nonreg_ratio = 0.0;
     double rl_f_rhou_field_reg_factor   = 0.0;
     int saturated_actions_counter = 0;
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
@@ -878,9 +887,6 @@ void myRHEA::timeAdvanceConservedVariables() {
                     saturated_actions_counter += 1;
                 }
                 /// TODO: improve this regularization, check commented code above!
-                ////// rhou_rl_f_reg = rhou_rl_f * int( abs( rhou_rhs / (rhou_rl_f + EPS) ) ); 
-                ////// rhov_rl_f_reg = rhov_rl_f * int( abs( rhov_rhs / (rhov_rl_f + EPS) ) ); 
-                ////// rhow_rl_f_reg = rhow_rl_f * int( abs( rhow_rhs / (rhow_rl_f + EPS) ) ); 
                 /// Update 'rl_f_rhow_field'
                 rl_f_rhou_field[I1D(i,j,k)] = rhou_rl_f_reg;
                 rl_f_rhov_field[I1D(i,j,k)] = rhov_rl_f_reg;
@@ -913,7 +919,6 @@ void myRHEA::timeAdvanceConservedVariables() {
                     f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / ( rhou_rhs_flux + EPS ) );
                     rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / ( rhou_rhs_flux + EPS) );
 #if _REGULARIZE_RL_ACTION_
-                    rl_f_rhou_field_nonreg_ratio += std::abs( rhou_rl_f                   / ( rhou_rhs + EPS ) );
                     rl_f_rhou_field_reg_factor   += std::abs( rhou_rl_f_reg               / ( rhou_rl_f + EPS) );
 #endif
                     ratio_counter += 1;
@@ -926,29 +931,14 @@ void myRHEA::timeAdvanceConservedVariables() {
     f_rhou_field_ratio           /= ratio_counter;
     rl_f_rhou_field_ratio        /= ratio_counter;
 #if _REGULARIZE_RL_ACTION_
-    rl_f_rhou_field_nonreg_ratio /= ratio_counter;
     rl_f_rhou_field_reg_factor   /= ratio_counter;
 #endif
-    /// Detailed output:
-    if ( my_rank == 3 ) {
-        cout << endl << "[myRHEA::timeAdvanceConservedVariables] Rank " << my_rank << ", with " << ratio_counter << " action points, has flux terms averaged ratios: "
-             << endl << "rhou_rhs_flux: " <<  rhou_rhs_flux
-             << endl << "Ratio (rhou_inv_flux   / rhou_rhs_flux): " <<  rhou_inv_flux_ratio
-             << endl << "Ratio (rhou_vis_flux   / rhou_rhs_flux): " <<  rhou_vis_flux_ratio
-             << endl << "Ratio (f_rhou_field    / rhou_rhs_flux): " <<  f_rhou_field_ratio
-             << endl << "Ratio (rl_f_rhou_field / rhou_rhs_flux): " <<  rl_f_rhou_field_ratio
-#if _REGULARIZE_RL_ACTION_
-             << endl << "Ratio (rl_f_rhou_field_nonReg / rhou_rhs_flux_nonReg): " << rl_f_rhou_field_nonreg_ratio
-             << endl << "Ratio (rl_f_rhou_field / rl_f_rhou_field_nonReg): " <<  rl_f_rhou_field_reg_factor
-#endif
-             << endl;
-    }
     
     /// Summarized output
     if ( my_rank < 4) {
-        cout << "Rank " << my_rank << " u-RHS Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
+        cout << endl << "Rank " << my_rank << " u-RHS Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
 #if _REGULARIZE_RL_ACTION_
-        cout << "Rank " << my_rank << " saturaded actions: " << saturated_actions_counter << endl;
+        cout << "Rank " << my_rank << " u-RHS Ratio f_rl / f_rl_nonReg: " << rl_f_rhou_field_reg_factor << ", # saturated: " << saturated_actions_counter << endl;
 #endif
     }
 

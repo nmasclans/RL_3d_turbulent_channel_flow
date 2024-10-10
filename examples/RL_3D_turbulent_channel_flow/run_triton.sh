@@ -11,15 +11,18 @@ cleanup() {
 # Trap SIGINT (Ctrl+C) and SIGTSTP (Ctrl+Z) to execute the cleanup function
 trap cleanup SIGINT SIGTERM
 
-# RHEA variables
+# Environmental variables
+CURRENT_DIR=$(pwd)
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
-export RHEA_EXE_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/ProjectRHEA/examples/RL_3D_turbulent_channel_flow
+export RHEA_CASE_PATH=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/ProjectRHEA/examples/RL_3D_turbulent_channel_flow
+export RL_CASE_PATH=$CURRENT_DIR
+export SMARTRHEA_PATH=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/smartrhea
 
 # add shared dynamic libraries
-export SMARTREDIS_DIR=/apps/smartredis/0.4.0
+export SMARTREDIS_PATH=/apps/smartredis/0.4.0
 export RAI_PATH=/apps/redisai/1.2.5/redisai.so
 export SMARTSIM_REDISAI=1.2.5
-export LD_LIBRARY_PATH=$SMARTREDIS_DIR/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$SMARTREDIS_PATH/lib:$LD_LIBRARY_PATH
 
 # Set RedisAi required environment variables
 #export REDIS_PORT=$(( RANDOM % 1001 + 6000 )) # random int. btw 6000 and 7000
@@ -33,10 +36,9 @@ rm -f ensemble.out ensemble.err
 
 # Compile ProjectRHEA code
 echo ">>> Compiling ProjectRHEA..."
-CURRENT_DIR=$(pwd)
-cd "$RHEA_EXE_DIR"
+cd "$RHEA_CASE_PATH"
 make clean
-make
+make RL_CASE_PATH=$RL_CASE_PATH RHEA_PATH=$RHEA_PATH
 cd "$CURRENT_DIR"
 echo ">>> ProjectRHEA compiled!"
 
@@ -47,7 +49,7 @@ echo ">>> Conda environment 'smartrhea-env-v2' activated"
 
 # Run training
 echo ">>> Running training 'run.py'..."
-python3 run.py
+python3 "$SMARTRHEA_PATH"/run.py
 
 # Wait for the command to finish
 wait $pid

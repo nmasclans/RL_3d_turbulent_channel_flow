@@ -7,6 +7,7 @@ import tensorflow as tf
 import time
 import datetime
 import uuid
+import sys
 
 from tf_agents.drivers import dynamic_episode_driver
 from tf_agents.environments import tf_py_environment
@@ -22,8 +23,8 @@ from tf_agents.policies import policy_saver
 from smartsim.log import get_logger
 from socket import gethostname
 
-
-from params import params, env_params
+sys.path.append(os.environ['RL_CASE_PATH'])
+from params import params, env_params  # params.py in directory $RL_CASE_DIR
 from smartrhea.history import History
 from smartrhea.init_smartsim import init_smartsim
 from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, params_html_table, bcolors
@@ -34,7 +35,6 @@ from smartrhea.networks import CustomPPOActorNetwork
 
 absl.logging.set_verbosity(os.environ.get("SMARTSIM_LOG_LEVEL"))
 logger = get_logger(__name__)
-cwd = os.path.dirname(os.path.realpath(__file__))
 deactivate_tf_gpus()    # deactivate TF for GPUs
 if params["use_XLA"]:   # activate XLA (Accelerated Linear Algebra) for performance improvement
     os.environ['TF_XLA_FLAGS'] = "--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit"  # Enable TF to use XLA JIT (Just-In-Time) compilation more aggressively
@@ -55,7 +55,7 @@ if params["run_id"] == "":
 else:
     run_id = params["run_id"]
     logger.info(f"Continue training from '{run_id}' past training")
-train_parent_dir    = os.path.join(cwd, "train")
+train_parent_dir    = os.path.join(params["rl_case_path"], "train")
 train_dir           = os.path.join(train_parent_dir, f"train_{run_id}")
 summary_writter_dir = os.path.join(train_parent_dir, "summary", run_id)
 summary_writer      = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
@@ -80,8 +80,6 @@ collect_py_env = RheaEnv(
     exp,
     db,
     hosts,
-    params["rhea_exe"],
-    cwd,
     dump_data_path = train_dir,
     mode = "collect",
     db_is_clustered = db_is_clustered,

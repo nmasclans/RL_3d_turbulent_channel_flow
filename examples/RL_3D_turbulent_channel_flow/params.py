@@ -15,6 +15,8 @@ params = {
     # smartsim params
     "run_id": "",
     "rhea_exe": "RHEA.exe",
+    "rhea_case_path": os.environ["RHEA_CASE_PATH"],
+    "rl_case_path": os.environ["RL_CASE_PATH"],
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
@@ -30,8 +32,9 @@ params = {
     "cfd_n_envs": cfd_n_envs,
     "rl_n_envs": rl_n_envs,
     ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
-    "control_cubes_file": f"config_control_witness/cubeControl{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
-    "witness_file": f"config_control_witness/witness{rl_n_envs}.txt",
+    "config_dir": "config_control_witness",
+    "control_cubes_filename": f"cubeControl{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
+    "witness_filename": f"witness{rl_n_envs}.txt",
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
@@ -84,6 +87,9 @@ params = {
 
 # Params groups
 env_params = {
+    "rhea_exe": params["rhea_exe"],
+    "rhea_case_path": params["rhea_case_path"],
+    "rl_case_path": params["rl_case_path"],
     "launcher": params["launcher"],
     "run_command": params["run_command"],
     "mpirun_mca": params["mpirun_mca"],
@@ -95,8 +101,9 @@ env_params = {
     "cfd_n_envs": params["cfd_n_envs"],
     "rl_n_envs": params["rl_n_envs"],
     ###"n_tasks_per_env": params["n_tasks_per_env"],
-    "control_cubes_file": params["control_cubes_file"],
-    "witness_file": params["witness_file"],
+    "config_dir": params["config_dir"],
+    "control_cubes_filename": params["control_cubes_filename"],
+    "witness_filename": params["witness_filename"],
     "rl_neighbors": params["rl_neighbors"],
     "model_dtype": params["model_dtype"],
     "rhea_dtype": params["rhea_dtype"],

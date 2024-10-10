@@ -40,8 +40,8 @@ class myRHEA : public FlowSolverRHEA {
  	    /// Calculate fixed time step
         void calculateTimeStep();
 
-        /// Output current solver state data, in dedicated RL directory 'rhea_exp/output_data'
-        void outputCurrentStateDataRL();
+        /// Output current solver state data, in dedicated RL directory '$RL_CASE_PATH/rhea_exp/output_data'
+        void outputCurrentStateDataRL( std::string path);
 
         /// Advance conserved variables in time
         void timeAdvanceConservedVariables();

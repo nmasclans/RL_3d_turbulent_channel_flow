@@ -34,8 +34,6 @@ class RheaEnv(py_environment.PyEnvironment):
     - exp: SmartSim experiment class instance
     - db: SmartSim orchestrator class instance
     - hosts: list of host nodes
-    - rhea_exe: RHEA executable filename
-    - cwd: working directory
     ### **env_params
     - launcher: "local", other
     - run_command: "mpirun" ("srun" still not working)
@@ -47,8 +45,9 @@ class RheaEnv(py_environment.PyEnvironment):
     - episode_walltime: environment walltime, if required for specific launcher
     - cfd_n_envs: number of cdf simulations
     - rl_n_envs: number of rl environments inside a cfd simulation
-    - control_cubes_file: actuators cubes file
-    - witness_file: witness points file
+    - config_dir: configuration files dir
+    - control_cubes_filename: actuators cubes filename
+    - witness_filename: witness points filename
     - rl_neighbors: number of witness blocks selected to compose the state
     - model_dtype: data type for the model
     - rhea_dtype: data type for arrays to be sent to RHEA (actions)
@@ -79,9 +78,10 @@ class RheaEnv(py_environment.PyEnvironment):
         exp,
         db,
         hosts,
-        rhea_exe,
-        cwd,
         ### **env_params:
+        rhea_exe = "RHEA.exe",
+        rhea_case_path = "",
+        rl_case_path = "",
         launcher = "local",
         run_command = "mpirun",
         mpirun_mca = "btl_base_warn_component_unused",
@@ -92,8 +92,9 @@ class RheaEnv(py_environment.PyEnvironment):
         episode_walltime = None,
         cfd_n_envs = 2,
         rl_n_envs = 5,
-        control_cubes_file = "cubeControl.txt",
-        witness_file = "witness.txt",
+        config_dir = "",
+        control_cubes_filename = "cubeControl.txt",
+        witness_filename = "witness.txt",
         rl_neighbors = 1,
         model_dtype = np.float32,
         rhea_dtype = np.float64,
@@ -125,11 +126,10 @@ class RheaEnv(py_environment.PyEnvironment):
         self.exp = exp
         self.db = db
         self.hosts = hosts
-        self.rhea_exe_dir   = os.environ["RHEA_EXE_DIR"]
-        self.rhea_exe_fname = rhea_exe
-        self.rhea_exe_path  = os.path.join(self.rhea_exe_dir, self.rhea_exe_fname)
-        self.cwd = cwd
         # **env_params:
+        self.rhea_exe_fname = rhea_exe
+        self.rhea_case_path = rhea_case_path
+        self.rl_case_path = rl_case_path
         self.launcher = launcher
         self.run_command = run_command
         self.mpirun_mca = mpirun_mca
@@ -140,8 +140,9 @@ class RheaEnv(py_environment.PyEnvironment):
         self.episode_walltime = episode_walltime
         self.cfd_n_envs = cfd_n_envs
         self.rl_n_envs = rl_n_envs
-        self.control_cubes_file = control_cubes_file
-        self.witness_file = witness_file
+        self.config_dir = config_dir
+        self.control_cubes_filename = control_cubes_filename
+        self.witness_filename = witness_filename
         self.rl_neighbors = rl_neighbors
         self.model_dtype = model_dtype
         self.rhea_dtype = rhea_dtype
@@ -187,10 +188,10 @@ class RheaEnv(py_environment.PyEnvironment):
             if not os.path.exists(os.path.join(self.dump_data_path, "mpi_output")):
                 os.makedirs(os.path.join(self.dump_data_path, "mpi_output"))
 
-        # manage directory 'rhea_exp/output' & 'rhea_exp/timers_info'
+        # manage directories 'rhea_exp/output' & 'rhea_exp/timers_info' in 'rl_case_path'
         rhea_exp_dir = "rhea_exp"
-        timers_info_dir = os.path.join(rhea_exp_dir, "timers_info")
-        output_data_dir = os.path.join(rhea_exp_dir, "output_data")
+        timers_info_dir = os.path.join(self.rl_case_path, rhea_exp_dir, "timers_info")
+        output_data_dir = os.path.join(self.rl_case_path, rhea_exp_dir, "output_data")
         if not os.path.exists(rhea_exp_dir):    # create directory 'rhea_exp'
             os.makedirs(rhea_exp_dir)
         if not os.path.exists(timers_info_dir):
@@ -218,7 +219,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # create RHEA executable arguments
         self.tag                = [str(i) for i in range(self.cfd_n_envs)] # environment tags [0, 1, ..., cfd_n_envs - 1]
-        self.configuration_file = ["$RHEA_EXE_DIR/configuration_file.yaml" for _ in range(self.cfd_n_envs)]
+        self.configuration_file = [f"{self.rhea_case_path}/configuration_file.yaml" for _ in range(self.cfd_n_envs)]
         self.t_action           = [str(t_action) for _ in range(self.cfd_n_envs)]
         self.t_episode          = [str(t_episode) for _ in range(self.cfd_n_envs)]
         self.t_begin_control    = [str(t_begin_control) for _ in range(self.cfd_n_envs)]
@@ -230,19 +231,21 @@ class RheaEnv(py_environment.PyEnvironment):
         self.envs_initialised = False
 
         # witness points information (to obtain dimensions of state arrays)
-        self.witness_xyz = get_witness_xyz(self.witness_file)
-        num_witness_points = n_witness_points(self.witness_file)
+        witness_filepath = os.path.join(self.rl_case_path, self.config_dir, self.witness_filename)
+        control_cubes_filepath = os.path.join(os.path.join(self.rl_case_path, self.config_dir, self.control_cubes_filename))
+        self.witness_xyz = get_witness_xyz(witness_filepath)
+        num_witness_points = n_witness_points(witness_filepath)
         assert np.prod(self.witness_xyz) == num_witness_points
         self.n_state = num_witness_points
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
         assert self.n_state % self.rl_n_envs == 0, f"ERROR: number of witness points ({self.n_state}) must be multiple of number of rl environments ({self.rl_n_envs}), so that each environment has the same number of witness points"
         if self.rl_n_envs > 1:
             self.n_action = 1 * self.action_dim
-            num_cubes = n_cubes(os.path.join(self.cwd, self.control_cubes_file))
+            num_cubes = n_cubes(control_cubes_filepath)
             assert self.rl_n_envs == num_cubes, f"(num. rl environments = {self.rl_n_envs}) != (num. control cubes = {num_cubes})"
             # TODO: this assert is not done in SOD2D (where marl_n_envs=3 != n_control_rectangles=6), but consider doing assert of n_control_rectangles == rl_n_envs
         else:   # self.rl_n_envs == 1:
-            self.n_action = n_cubes(os.path.join(self.cwd, self.control_cubes_file)) * self.action_dim
+            self.n_action = n_cubes(control_cubes_filepath) * self.action_dim
 
         # create and allocate array objects
         self._state        = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
@@ -343,7 +346,7 @@ class RheaEnv(py_environment.PyEnvironment):
         else:
             restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
         """
-        restart_step = ["$RHEA_EXE_DIR/" + str(restart_file) for _ in range(self.cfd_n_envs)]
+        restart_step = [ f"{self.rhea_case_path}/{restart_file}" for _ in range(self.cfd_n_envs)]
 
         # set RHEA exe arguments
         rhea_args = {"configuration_file": self.configuration_file, 
@@ -357,19 +360,21 @@ class RheaEnv(py_environment.PyEnvironment):
         }
         
         # Edit my-hostfile
-        write_hosts(self.hosts, self.mpirun_np, os.path.join(self.rhea_exe_dir, self.mpirun_hostfile))
+        hostfilepath = os.path.join(self.rhea_case_path, self.mpirun_hostfile)
+        logger.warning(f"RHEA_CASE_PATH: {self.rhea_case_path}")
+        write_hosts(self.hosts, self.mpirun_np, hostfile=hostfilepath)
 
         if self.run_command=="bash":
             # Generate the runit.sh script
-            # TODO: currently taking restart_data_file from current directory, but it should be taken the one from $RHEA_EXE_DIR (execution working because restart_data_file input arg is not used in RHEA yet)
-            runit_script = 'runit.sh'
-            with open(runit_script, 'w') as f:
+            # TODO: currently taking restart_data_file from current directory, but it should be taken the one from $RHEA_CASE_PATH (execution working because restart_data_file input arg is not used in RHEA yet)
+            runit_filepath = os.path.join(self.rl_case_path, 'runit.sh')
+            with open(runit_filepath, 'w') as f:
                 f.write("#!/bin/bash\n")
-                f.write("echo 'RHEA executable directory: ' $RHEA_EXE_DIR\n")
+                f.write(f"echo 'RHEA executable directory: {self.rhea_case_path}'\n")
                 for i in range(self.cfd_n_envs):
                     exe_args = " ".join([f"{v[i]}" for v in rhea_args.values()])
                     stdout_stderr_filepath = f"{self.dump_data_path}/mpi_output/mpi_output_ensemble{i}_step{global_step:06}.out"
-                    f.write(f"mpirun -np {self.mpirun_np} --hostfile $RHEA_EXE_DIR/{self.mpirun_hostfile} --mca {self.mpirun_mca} $RHEA_EXE_DIR/{self.rhea_exe_fname} {exe_args} > {stdout_stderr_filepath} 2>&1 &\n")
+                    f.write(f"mpirun -np {self.mpirun_np} --hostfile {self.rhea_case_path}/{self.mpirun_hostfile} --mca {self.mpirun_mca} {self.rhea_case_path}/{self.rhea_exe_fname} {exe_args} > {stdout_stderr_filepath} 2>&1 &\n")
                     f.write(f"pid{i}=$!\n")   # Capture process ID for each mpirun
                 # Wait for all background processes to finish
                 f.write("wait $pid0")  # Always wait for the first process
@@ -380,12 +385,12 @@ class RheaEnv(py_environment.PyEnvironment):
                 # Print a message indicating completion
                 f.write("echo 'All MPI processes have completed.'\n")
             # Make the script executable
-            os.chmod(runit_script, 0o755)
+            os.chmod(runit_filepath, 0o755)
             # Set up RunSettings
-            f_mpmd = RunSettings(exe=runit_script, run_command=self.run_command)
+            f_mpmd = RunSettings(exe=runit_filepath, run_command=self.run_command)
             # Debug logging
-            with open(runit_script, 'r') as f:
-                logger.debug(f"Edited {runit_script} as: \n{f.read()}")
+            with open(runit_filepath, 'r') as f:
+                logger.debug(f"Edited {runit_filepath} as: \n{f.read()}")
             # Batch settings
             batch_settings = None
         else:
