@@ -7,7 +7,7 @@ t_action = 0.00050      # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(0.20 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 8          # 
+cfd_n_envs = 16         # 
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
