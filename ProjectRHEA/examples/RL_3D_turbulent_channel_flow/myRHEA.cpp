@@ -15,6 +15,7 @@ using namespace std;
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
+#define _SPACE_AVERAGE_RL_ACTION_ 1
 #define _RL_CONTROL_IS_SUPERVISED_ 1
 
 /// AUXILIAR PARAMETERS ///
@@ -200,6 +201,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     timers->createTimer( "rl_smartredis_communications" );
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
+#if _SPACE_AVERAGE_RL_ACTION_
+    rl_f_rhou_field_aux.setTopology(topo, "rl_f_rhou_field_aux");
+    rl_f_rhov_field_aux.setTopology(topo, "rl_f_rhov_field_aux");
+    rl_f_rhow_field_aux.setTopology(topo, "rl_f_rhow_field_aux");
+#endif
 #if _RL_CONTROL_IS_SUPERVISED_
     rmsf_u_reference_field.setTopology(topo, "rmsf_u_reference_field");
     rmsf_v_reference_field.setTopology(topo, "rmsf_v_reference_field");
@@ -718,12 +724,30 @@ void myRHEA::calculateSourceTerms() {
                                 d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
 
                                 /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+#if _SPACE_AVERAGE_RL_ACTION_
+                                rl_f_rhou_field_aux[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                                rl_f_rhov_field_aux[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                                rl_f_rhow_field_aux[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+#else 
                                 rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
                                 rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
                                 rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+#endif
                             }
                         }
                     }
+
+#if _SPACE_AVERAGE_RL_ACTION_
+                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                        for(int j = topo->iter_common[_INNER_][_INIY_] + 3; j <= topo->iter_common[_INNER_][_ENDY_] - 3; j++) {
+                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                                rl_f_rhou_field[I1D(i,j,k)] = ( rl_f_rhou_field_aux[I1D(i,j-3,k)] + rl_f_rhou_field_aux[I1D(i,j-2,k)] + rl_f_rhou_field_aux[I1D(i,j-1,k)] + rl_f_rhou_field_aux[I1D(i,j,k)] + rl_f_rhou_field_aux[I1D(i,j+1,k)] + rl_f_rhou_field_aux[I1D(i,j+2,k)] + rl_f_rhou_field_aux[I1D(i,j+3,k)] ) / ( 7.0);
+                                rl_f_rhov_field[I1D(i,j,k)] = ( rl_f_rhov_field_aux[I1D(i,j-3,k)] + rl_f_rhov_field_aux[I1D(i,j-2,k)] + rl_f_rhov_field_aux[I1D(i,j-1,k)] + rl_f_rhov_field_aux[I1D(i,j,k)] + rl_f_rhov_field_aux[I1D(i,j+1,k)] + rl_f_rhov_field_aux[I1D(i,j+2,k)] + rl_f_rhov_field_aux[I1D(i,j+3,k)] ) / ( 7.0);
+                                rl_f_rhow_field[I1D(i,j,k)] = ( rl_f_rhow_field_aux[I1D(i,j-3,k)] + rl_f_rhow_field_aux[I1D(i,j-2,k)] + rl_f_rhow_field_aux[I1D(i,j-1,k)] + rl_f_rhow_field_aux[I1D(i,j,k)] + rl_f_rhow_field_aux[I1D(i,j+1,k)] + rl_f_rhow_field_aux[I1D(i,j+2,k)] + rl_f_rhow_field_aux[I1D(i,j+3,k)] ) / ( 7.0);
+                            }
+                        }
+                    }
+#endif
 
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_control_term" );
@@ -768,12 +792,12 @@ void myRHEA::temporalHookFunction() {
         /// Save data only for ensemble #0 due to memory limitations
         if (tag == "0") {
             /// Print timers information
-            char filename_timers[256];
+            char filename_timers[1024];
             sprintf( filename_timers, "%s/rhea_exp/timers_info/timers_information_file_%d_ensemble%s_step%s.txt", 
                      rl_case_path, current_time_iter, tag.c_str(), global_step.c_str() );
             timers->printTimers( filename_timers );
             /// Output current state in RL dedicated directory
-            char data_path[256];
+            char data_path[1024];
             sprintf( data_path, "%s/rhea_exp/output_data", rl_case_path );
             this->outputCurrentStateDataRL(data_path);
         }
