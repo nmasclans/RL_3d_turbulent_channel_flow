@@ -219,7 +219,7 @@ for i_RL in range(n_RL):
 plt.plot( y_plus_nonRL, avg_u_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
 # Configure plot
 plt.xlim( 1.0, 2.0e2 )
-plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
 plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
 plt.xscale( 'log' )
 plt.xlabel( 'y+' )
@@ -242,7 +242,7 @@ for i_RL in range(n_RL):
 plt.plot( y_plus_nonRL, rmsf_u_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
 # Configure plot
 plt.xlim( 1.0, 2.0e2 )
-plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
 plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
 plt.xscale( 'log' )
 plt.xlabel( 'y+' )
@@ -267,7 +267,7 @@ for i_RL in range(n_RL):
 plt.plot( y_plus_nonRL, rmsf_v_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
 # Configure plot
 plt.xlim( 1.0, 2.0e2 )
-plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
 plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
 plt.xscale( 'log' )
 plt.xlabel( 'y+' )
@@ -292,7 +292,7 @@ for i_RL in range(n_RL):
 plt.plot( y_plus_nonRL, rmsf_w_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
 # Configure plot
 plt.xlim( 1.0, 2.0e2 )
-plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
 plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
 plt.xscale( 'log' )
 plt.xlabel( 'y+' )
@@ -317,7 +317,7 @@ for i_RL in range(n_RL):
 plt.plot( y_plus_nonRL, TKE_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
 # Configure plot
 plt.xlim( 1.0, 2.0e2 )
-plt.xticks( np.arange( 1.0e-1, 2.01e2, 1.0 ) )
+plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
 plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
 plt.xscale( 'log' )
 plt.xlabel( 'y+' )
