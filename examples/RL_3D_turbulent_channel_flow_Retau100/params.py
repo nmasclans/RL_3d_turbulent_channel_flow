@@ -3,7 +3,7 @@ import random, os, numpy as np
 # TODO: set custom values
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.00050      # action period
+t_action = 0.0050       # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
