@@ -842,7 +842,7 @@ void myRHEA::timeAdvanceConservedVariables() {
     double rl_f_rhou_field_ratio = 0.0;
     int ratio_counter            = 0;
 #if _REGULARIZE_RL_ACTION_
-    double reg_lambda = 0.60;            /// TODO: choose proper value, 0.5 could be improved
+    double reg_lambda = 0.50;            /// TODO: choose proper value, 0.5 could be improved
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
     /// Apply smooth regularization when RL control term << RHS term
     double rhou_rhs, rhov_rhs, rhow_rhs;
