@@ -1,6 +1,5 @@
 import random, os, numpy as np
 
-# TODO: set custom values
 # t_phys  = delta / u_tau = 1
 dt_phys  = 5.0e-5       # not taken from here, defined in myRHEA.cpp
 t_action = 0.00050      # action period
