@@ -52,9 +52,6 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field;
         DistributedArray rl_f_rhov_field;
         DistributedArray rl_f_rhow_field;
-        DistributedArray rl_f_rhou_field_aux;
-        DistributedArray rl_f_rhov_field_aux;
-        DistributedArray rl_f_rhow_field_aux;
         DistributedArray DeltaRxx_field;        /// 3-D field of DeltaRxx
         DistributedArray DeltaRxy_field;        /// 3-D field of DeltaRxy
         DistributedArray DeltaRxz_field;        /// 3-D field of DeltaRxz

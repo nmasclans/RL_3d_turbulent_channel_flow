@@ -69,6 +69,10 @@ const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 const double reg_lambda = 0.5;
 #endif
 
+#if _SPACE_AVERAGE_RL_ACTION_
+const double dy_space_averaging = 0.05;
+#endif
+
 int action_dim = 6;
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -205,11 +209,6 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     timers->createTimer( "rl_smartredis_communications" );
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
-#if _SPACE_AVERAGE_RL_ACTION_
-    rl_f_rhou_field_aux.setTopology(topo, "rl_f_rhou_field_aux");
-    rl_f_rhov_field_aux.setTopology(topo, "rl_f_rhov_field_aux");
-    rl_f_rhow_field_aux.setTopology(topo, "rl_f_rhow_field_aux");
-#endif
 #if _RL_CONTROL_IS_SUPERVISED_
     rmsf_u_reference_field.setTopology(topo, "rmsf_u_reference_field");
     rmsf_v_reference_field.setTopology(topo, "rmsf_v_reference_field");
@@ -604,7 +603,19 @@ void myRHEA::calculateSourceTerms() {
                     vector<vector<double>> Dij(3, vector<double>(3, 0.0));
                     vector<vector<double>> Qij(3, vector<double>(3, 0.0));
                     vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
-
+#if _SPACE_AVERAGE_RL_ACTION_
+                    size_t actuation_idx_max = static_cast<size_t>(num_control_cubes) - 1;
+                    double y_local_top_wall, y_local_bottom_wall;
+                    double y_dist_to_local_top_wall, y_dist_to_local_bottom_wall;
+                    double DeltaRkk_current, DeltaRkk_prev, DeltaRkk_next;
+                    double y_ratio_aux;
+                    double DeltaThetaZ_current, DeltaThetaZ_prev, DeltaThetaZ_next;          
+                    double DeltaThetaY_current, DeltaThetaY_prev, DeltaThetaY_next;          
+                    double DeltaThetaX_current, DeltaThetaX_prev, DeltaThetaX_next;          
+                    double DeltaXmap1_current,  DeltaXmap1_prev,  DeltaXmap1_next;      
+                    double DeltaXmap2_current,  DeltaXmap2_prev,  DeltaXmap2_next;      
+#endif
+                    
                     /// Calculate DeltaRij = Rij_perturbated - Rij_original
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
@@ -614,14 +625,58 @@ void myRHEA::calculateSourceTerms() {
                                 if (action_mask[I1D(i,j,k)] != 0.0) {
 
                                     /// Get perturbation values from RL agent
-                                    actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;
+                                    actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
+#if _SPACE_AVERAGE_RL_ACTION_
+                                    /// Apply action space-averaging if needed
+                                    y_local_top_wall            = ( y_field[I1D(i,topo->iter_common[_INNER_][_INIY_],k)]   - y_field[I1D(i,topo->iter_common[_INNER_][_INIY_]-1,k)] ) / 2.0;
+                                    y_local_bottom_wall         = ( y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_]+1,k)] - y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_],k)] ) / 2.0;
+                                    y_dist_to_local_top_wall    = abs(y_local_top_wall    - y_field[I1D(i,j,k)]);
+                                    y_dist_to_local_bottom_wall = abs(y_local_bottom_wall - y_field[I1D(i,j,k)]);
+                                    /// -> action averaging with previous action if close to local bottom wall (& not in global bottom wall, act_idx != 0)
+                                    if ( ( y_dist_to_local_bottom_wall < dy_space_averaging ) && ( actuation_idx > 0) ) {
+                                        /// define current (my_rank) and previous action (my_rank - 1)
+                                        DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_prev    = action_global_instant[(actuation_idx-1) * action_dim + 0];
+                                        DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_prev = action_global_instant[(actuation_idx-1) * action_dim + 1];
+                                        DeltaThetaY_current = action_global_instant[actuation_idx * action_dim + 2]; DeltaThetaY_prev = action_global_instant[(actuation_idx-1) * action_dim + 2];
+                                        DeltaThetaX_current = action_global_instant[actuation_idx * action_dim + 3]; DeltaThetaX_prev = action_global_instant[(actuation_idx-1) * action_dim + 3];
+                                        DeltaXmap1_current  = action_global_instant[actuation_idx * action_dim + 4]; DeltaXmap1_prev  = action_global_instant[(actuation_idx-1) * action_dim + 4];
+                                        DeltaXmap2_current  = action_global_instant[actuation_idx * action_dim + 5]; DeltaXmap2_prev  = action_global_instant[(actuation_idx-1) * action_dim + 5];
+                                        /// calculate space-averaged action
+                                        y_ratio_aux = y_dist_to_local_bottom_wall / dy_space_averaging;     // <= 1, only = 1 when y_dist_to_local_bottom_wall == dy_space_averaging
+                                        DeltaRkk    = ( ( DeltaRkk_current    + DeltaRkk_prev    ) / 2.0 ) + y_ratio_aux * ( ( DeltaRkk_current    - DeltaRkk_prev    ) / 2.0 );
+                                        DeltaThetaZ = ( ( DeltaThetaZ_current + DeltaThetaZ_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaZ_current - DeltaThetaZ_prev ) / 2.0 );
+                                        DeltaThetaY = ( ( DeltaThetaY_current + DeltaThetaY_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaY_current - DeltaThetaY_prev ) / 2.0 );
+                                        DeltaThetaX = ( ( DeltaThetaX_current + DeltaThetaX_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaX_current - DeltaThetaX_prev ) / 2.0 );
+                                        DeltaXmap1  = ( ( DeltaXmap1_current  + DeltaXmap1_prev  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap1_current  - DeltaXmap1_prev  ) / 2.0 );
+                                        DeltaXmap2  = ( ( DeltaXmap2_current  + DeltaXmap2_prev  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap2_current  - DeltaXmap2_prev  ) / 2.0 );
+                                    }
+                                    /// -> action averaging with next action if close to local top wall (& not in global top wall, act_idx != )
+                                    if ( ( y_dist_to_local_top_wall < dy_space_averaging ) && ( actuation_idx < actuation_idx_max ) ) {
+                                        /// define current (my_rank) and next action (my_rank + 1)
+                                        DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_next    = action_global_instant[(actuation_idx+1) * action_dim + 0];
+                                        DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_next = action_global_instant[(actuation_idx+1) * action_dim + 1];
+                                        DeltaThetaY_current = action_global_instant[actuation_idx * action_dim + 2]; DeltaThetaY_next = action_global_instant[(actuation_idx+1) * action_dim + 2];
+                                        DeltaThetaX_current = action_global_instant[actuation_idx * action_dim + 3]; DeltaThetaX_next = action_global_instant[(actuation_idx+1) * action_dim + 3];
+                                        DeltaXmap1_current  = action_global_instant[actuation_idx * action_dim + 4]; DeltaXmap1_next  = action_global_instant[(actuation_idx+1) * action_dim + 4];
+                                        DeltaXmap2_current  = action_global_instant[actuation_idx * action_dim + 5]; DeltaXmap2_next  = action_global_instant[(actuation_idx+1) * action_dim + 5];
+                                        /// calculate space-averaged action
+                                        y_ratio_aux = y_dist_to_local_top_wall / dy_space_averaging;     // <= 1, only = 1 when y_dist_to_local_top_wall == dy_space_averaging
+                                        DeltaRkk    = ( ( DeltaRkk_current    + DeltaRkk_next    ) / 2.0 ) + y_ratio_aux * ( ( DeltaRkk_current    - DeltaRkk_next    ) / 2.0 );
+                                        DeltaThetaZ = ( ( DeltaThetaZ_current + DeltaThetaZ_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaZ_current - DeltaThetaZ_next ) / 2.0 );
+                                        DeltaThetaY = ( ( DeltaThetaY_current + DeltaThetaY_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaY_current - DeltaThetaY_next ) / 2.0 );
+                                        DeltaThetaX = ( ( DeltaThetaX_current + DeltaThetaX_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaX_current - DeltaThetaX_next ) / 2.0 );
+                                        DeltaXmap1  = ( ( DeltaXmap1_current  + DeltaXmap1_next  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap1_current  - DeltaXmap1_next  ) / 2.0 );
+                                        DeltaXmap2  = ( ( DeltaXmap2_current  + DeltaXmap2_next  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap2_current  - DeltaXmap2_next  ) / 2.0 );                                 
+                                    }
+#else                               /// Do not apply action space-averaging 
                                     DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
                                     DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
                                     DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
                                     DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
                                     DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
                                     DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-          
+#endif
+                                    /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
                                     isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
                                     Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
                                     isNegligibleRkk    = (abs(Rkk) < EPS);
@@ -728,30 +783,12 @@ void myRHEA::calculateSourceTerms() {
                                 d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
 
                                 /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-#if _SPACE_AVERAGE_RL_ACTION_
-                                rl_f_rhou_field_aux[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                                rl_f_rhov_field_aux[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                                rl_f_rhow_field_aux[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
-#else 
                                 rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
                                 rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
                                 rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
-#endif
                             }
                         }
                     }
-
-#if _SPACE_AVERAGE_RL_ACTION_
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_] + 3; j <= topo->iter_common[_INNER_][_ENDY_] - 3; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                rl_f_rhou_field[I1D(i,j,k)] = ( rl_f_rhou_field_aux[I1D(i,j-3,k)] + rl_f_rhou_field_aux[I1D(i,j-2,k)] + rl_f_rhou_field_aux[I1D(i,j-1,k)] + rl_f_rhou_field_aux[I1D(i,j,k)] + rl_f_rhou_field_aux[I1D(i,j+1,k)] + rl_f_rhou_field_aux[I1D(i,j+2,k)] + rl_f_rhou_field_aux[I1D(i,j+3,k)] ) / ( 7.0);
-                                rl_f_rhov_field[I1D(i,j,k)] = ( rl_f_rhov_field_aux[I1D(i,j-3,k)] + rl_f_rhov_field_aux[I1D(i,j-2,k)] + rl_f_rhov_field_aux[I1D(i,j-1,k)] + rl_f_rhov_field_aux[I1D(i,j,k)] + rl_f_rhov_field_aux[I1D(i,j+1,k)] + rl_f_rhov_field_aux[I1D(i,j+2,k)] + rl_f_rhov_field_aux[I1D(i,j+3,k)] ) / ( 7.0);
-                                rl_f_rhow_field[I1D(i,j,k)] = ( rl_f_rhow_field_aux[I1D(i,j-3,k)] + rl_f_rhow_field_aux[I1D(i,j-2,k)] + rl_f_rhow_field_aux[I1D(i,j-1,k)] + rl_f_rhow_field_aux[I1D(i,j,k)] + rl_f_rhow_field_aux[I1D(i,j+1,k)] + rl_f_rhow_field_aux[I1D(i,j+2,k)] + rl_f_rhow_field_aux[I1D(i,j+3,k)] ) / ( 7.0);
-                            }
-                        }
-                    }
-#endif
 
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_control_term" );

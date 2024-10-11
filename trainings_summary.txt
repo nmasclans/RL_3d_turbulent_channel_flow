@@ -9,3 +9,14 @@
 
 - OCT 11 15:50h: 
     - Retau100: reduce reg_lambda=0.75 -> 0.5 to avoid solver divergence (nan results)
+
+TODO: fix space averaging! no està ben implementat, fer-lo a les accions (domini global) en comptes de a la f_rl (només dades locals de cada cpu)
+fer smoothing quan les j locals de cada cpu siguin properes als boundaries en j de cada cpu, knowing:
+    //INNER
+    iter_common[_INNER_][_INIX_] =   1;
+    iter_common[_INNER_][_ENDX_] = lNx-2;
+    iter_common[_INNER_][_INIY_] =   1;
+    iter_common[_INNER_][_ENDY_] = lNy-2;
+    iter_common[_INNER_][_INIZ_] =   1;
+    iter_common[_INNER_][_ENDZ_] = lNz-2;
+    -> done! TODO: check!
