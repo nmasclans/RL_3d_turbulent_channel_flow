@@ -66,7 +66,7 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 #if _REGULARIZE_RL_ACTION_
-const double reg_lambda = 0.75;
+const double reg_lambda = 0.5;
 #endif
 
 int action_dim = 6;
