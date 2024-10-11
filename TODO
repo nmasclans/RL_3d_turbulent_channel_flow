@@ -1,4 +1,2 @@
-- apply spatial smoothing in rl_f loads for u,v,w 
-- change dir names 'RL_3D_turbulent_channel_flow' to 'RL_3D_turbulent_channel_flow_Retau180' in both 'repo/examples' and 'repo/ProjectRHEA/examples'  
 - build rl case for Retau100 by creating new files run_triton.sh and params.py (and maybe others) and rhea case Retau100 with corresponding myRHEA.cpp file (with unique parameters != Retau180)
 - check run.py execution, not sure RHEA mpiruns are being run, try doing a quick epoch
