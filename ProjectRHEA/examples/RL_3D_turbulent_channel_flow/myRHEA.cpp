@@ -65,30 +65,34 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 #endif
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
+#if _REGULARIZE_RL_ACTION_
+const double reg_lambda = 0.50;
+#endif
+
 int action_dim = 6;
 /// eigen-values barycentric map coordinates - corners of realizable region
-double EPS     = numeric_limits<double>::epsilon();
+const double EPS     = numeric_limits<double>::epsilon();
 /* Baricentric map coordinates, source: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
  * Transform xmap -> lambda: lambda0,1 = Tinv * (xmap0,1 - t); lambda2 = 1 - lambda0 - lambda1
  * Transform lambda -> xmap: xmap0,1   = T * lambda0,1 + t   
  *                                     = lambda0 * x1c + lambda1 * x2c + lambda2 * x3c
  * Realizability Condition (lambda): 0<=lambda_i<=1, sum(lambda_i)=1
  * Realizability Condition (xmap):   xmap coord inside barycentric map triangle, defined by x1c, x2c, x3c */
-vector<double> x1c = {1.0, 0.0};                // corner x1c
-vector<double> x2c = {0.0, 0.0};                // corner x2c
-vector<double> x3c = {0.5, sqrt(3.0) / 2.0};    // corner x3c
-vector<double> t   = {x3c[0], x3c[1]};
-vector<vector<double>> T = {
+const vector<double> x1c = {1.0, 0.0};                // corner x1c
+const vector<double> x2c = {0.0, 0.0};                // corner x2c
+const vector<double> x3c = {0.5, sqrt(3.0) / 2.0};    // corner x3c
+const vector<double> t   = {x3c[0], x3c[1]};
+const vector<vector<double>> T = {
     {x1c[0] - x3c[0], x2c[0] - x3c[0] },        // row 1, T[0][:]
     {x1c[1] - x3c[1], x2c[1] - x3c[1]},         // row 2, T[1][:]
 };
-double Tdet = T[0][0] * T[1][1] - T[0][1] * T[1][0];
-vector<vector<double>> Tinv = {
+const double Tdet = T[0][0] * T[1][1] - T[0][1] * T[1][0];
+const vector<vector<double>> Tinv = {
     {  T[1][1] / Tdet, - T[0][1] / Tdet},       // row 1, Tinv[0][:]
     {- T[1][0] / Tdet,   T[0][0] / Tdet},       // row 2, Tinv[1][:]
 };
 /// Kronecker delta
-vector<vector<double>> Deltaij = {
+const vector<vector<double>> Deltaij = {
     {1.0, 0.0, 0.0},
     {0.0, 1.0, 0.0},
     {0.0, 0.0, 1.0},
@@ -96,7 +100,7 @@ vector<vector<double>> Deltaij = {
 
 #if _RL_CONTROL_IS_SUPERVISED_
 // Reference profiles (_ALL_ coordinates, including boundaries)
-double rmsf_u_reference_profile[] = {   /// only inner points
+const double rmsf_u_reference_profile[] = {   /// only inner points
     0.03690199, 0.1431543,  0.29195798, 0.48225412, 0.71205642,
     0.97664947, 1.26629004, 1.56505508, 1.85261352, 2.10877344, 2.31835921,
     2.47388978, 2.57533985, 2.62801624, 2.63998813, 2.62003648, 2.57639729,
@@ -120,7 +124,7 @@ double rmsf_u_reference_profile[] = {   /// only inner points
     1.84491662, 1.55860558, 1.26108918, 0.9726394,  0.70912843, 0.48026814,
     0.29075563, 0.14256579, 0.0367508,
 };
-double rmsf_v_reference_profile[] = {   /// only inner points
+const double rmsf_v_reference_profile[] = {   /// only inner points
     5.19263543e-05, 8.32340521e-04, 4.19425126e-03,
     1.14944157e-02, 2.40604517e-02, 4.25900905e-02, 6.73643331e-02,
     9.80268749e-02, 1.33979034e-01, 1.74318152e-01, 2.18174576e-01,
@@ -155,7 +159,7 @@ double rmsf_v_reference_profile[] = {   /// only inner points
     2.40452015e-02, 1.14881643e-02, 4.19231267e-03, 8.32000724e-04,
     5.19304452e-05,
 };
-double rmsf_w_reference_profile[] = {   /// only inner points
+const double rmsf_w_reference_profile[] = {   /// only inner points
     0.01948791, 0.07236491, 0.14048191, 0.21854762, 0.30134447,
     0.38422926, 0.46372599, 0.53776682, 0.60578033, 0.66813924, 0.72556149,
     0.7784629,  0.82682753, 0.87027868, 0.90840991, 0.9410056,  0.96820929,
@@ -842,14 +846,13 @@ void myRHEA::timeAdvanceConservedVariables() {
     double rl_f_rhou_field_ratio = 0.0;
     int ratio_counter            = 0;
 #if _REGULARIZE_RL_ACTION_
-    double reg_lambda = 0.50;            /// TODO: choose proper value, 0.5 could be improved
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
     /// Apply smooth regularization when RL control term << RHS term
     double rhou_rhs, rhov_rhs, rhow_rhs;
     double rhou_rl_f, rhov_rl_f, rhow_rl_f;
     double rhou_rl_f_reg, rhov_rl_f_reg, rhow_rl_f_reg;
     /// Debugging additional variables
-    double rl_f_rhou_field_reg_factor   = 0.0;
+    double rl_f_rhou_field_reg_factor = 0.0;
     int saturated_actions_counter = 0;
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
 #endif
