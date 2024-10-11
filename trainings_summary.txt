@@ -1,0 +1,5 @@
+- OCT 11 15h: trainings with Retau100,180 with: 
+    - Retau100,180: 4 cfds each
+    - Retau100 less regularizaton (reg_lambda=1.0), Retau100 same reg (reg_lambda=0.5)
+    - Retau100,180: rl_f in all domain (modified cubeControl8.txt for both cases)
+    - Retau100: training time = 1FTT, Retau180: training time = 0.2FTT

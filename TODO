@@ -1,2 +1,0 @@
-- build rl case for Retau100 by creating new files run_triton.sh and params.py (and maybe others) and rhea case Retau100 with corresponding myRHEA.cpp file (with unique parameters != Retau180)
-- check run.py execution, not sure RHEA mpiruns are being run, try doing a quick epoch
