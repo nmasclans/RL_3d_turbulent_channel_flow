@@ -614,6 +614,9 @@ void myRHEA::calculateSourceTerms() {
                     double DeltaThetaX_current, DeltaThetaX_prev, DeltaThetaX_next;          
                     double DeltaXmap1_current,  DeltaXmap1_prev,  DeltaXmap1_next;      
                     double DeltaXmap2_current,  DeltaXmap2_prev,  DeltaXmap2_next;      
+                    int space_avg_bottom_counter = 0;
+                    int space_avg_top_counter = 0;
+                    int applied_action_counter = 0;
 #endif
                     
                     /// Calculate DeltaRij = Rij_perturbated - Rij_original
@@ -627,11 +630,16 @@ void myRHEA::calculateSourceTerms() {
                                     /// Get perturbation values from RL agent
                                     actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
 #if _SPACE_AVERAGE_RL_ACTION_
+                                    applied_action_counter += 1;
                                     /// Apply action space-averaging if needed
-                                    y_local_top_wall            = ( y_field[I1D(i,topo->iter_common[_INNER_][_INIY_],k)]   - y_field[I1D(i,topo->iter_common[_INNER_][_INIY_]-1,k)] ) / 2.0;
-                                    y_local_bottom_wall         = ( y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_]+1,k)] - y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_],k)] ) / 2.0;
-                                    y_dist_to_local_top_wall    = abs(y_local_top_wall    - y_field[I1D(i,j,k)]);
+                                    y_local_bottom_wall         = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_INIY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_INIY_]-1,k)] );
+                                    y_local_top_wall            = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_]+1,k)] );
                                     y_dist_to_local_bottom_wall = abs(y_local_bottom_wall - y_field[I1D(i,j,k)]);
+                                    y_dist_to_local_top_wall    = abs(y_local_top_wall    - y_field[I1D(i,j,k)]);
+                                    /// Debugging
+                                    if ( (i==1) && (k==1)){
+                                        cout << "Rank " << my_rank << ", j " << j << " has y_local_bottom_wall:" << y_local_bottom_wall << ", y_local_top_wall: " << y_local_top_wall << ", y_dist_to_local_bottom_wall: " << y_dist_to_local_bottom_wall << ", y_dist_to_local_top_wall: " << y_dist_to_local_top_wall << endl;
+                                    }
                                     /// -> action averaging with previous action if close to local bottom wall (& not in global bottom wall, act_idx != 0)
                                     if ( ( y_dist_to_local_bottom_wall < dy_space_averaging ) && ( actuation_idx > 0) ) {
                                         /// define current (my_rank) and previous action (my_rank - 1)
@@ -649,9 +657,11 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaThetaX = ( ( DeltaThetaX_current + DeltaThetaX_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaX_current - DeltaThetaX_prev ) / 2.0 );
                                         DeltaXmap1  = ( ( DeltaXmap1_current  + DeltaXmap1_prev  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap1_current  - DeltaXmap1_prev  ) / 2.0 );
                                         DeltaXmap2  = ( ( DeltaXmap2_current  + DeltaXmap2_prev  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap2_current  - DeltaXmap2_prev  ) / 2.0 );
+                                        /// Update counter for debugging
+                                        space_avg_bottom_counter += 1;
                                     }
                                     /// -> action averaging with next action if close to local top wall (& not in global top wall, act_idx != )
-                                    if ( ( y_dist_to_local_top_wall < dy_space_averaging ) && ( actuation_idx < actuation_idx_max ) ) {
+                                    else if ( ( y_dist_to_local_top_wall < dy_space_averaging ) && ( actuation_idx < actuation_idx_max ) ) {
                                         /// define current (my_rank) and next action (my_rank + 1)
                                         DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_next    = action_global_instant[(actuation_idx+1) * action_dim + 0];
                                         DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_next = action_global_instant[(actuation_idx+1) * action_dim + 1];
@@ -667,6 +677,17 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaThetaX = ( ( DeltaThetaX_current + DeltaThetaX_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaX_current - DeltaThetaX_next ) / 2.0 );
                                         DeltaXmap1  = ( ( DeltaXmap1_current  + DeltaXmap1_next  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap1_current  - DeltaXmap1_next  ) / 2.0 );
                                         DeltaXmap2  = ( ( DeltaXmap2_current  + DeltaXmap2_next  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap2_current  - DeltaXmap2_next  ) / 2.0 );                                 
+                                        /// Update counter for debugging
+                                        space_avg_top_counter += 1;
+                                    }
+                                    /// -> action not space averaged, far from the pseudo-environment boundaries
+                                    else {
+                                        DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
+                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
+                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
+                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
+                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
                                     }
 #else                               /// Do not apply action space-averaging 
                                     DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
@@ -750,7 +771,11 @@ void myRHEA::calculateSourceTerms() {
                             }
                         }
                     }
-
+#if _SPACE_AVERAGE_RL_ACTION_
+                    /// Debugging
+                    cout << "Rank " << my_rank << " has applied accion in " << applied_action_counter << " points, with " 
+                         << " space averaging in " << space_avg_bottom_counter << " (bottom) and " << space_avg_top_counter << " (top) points" << endl; 
+#endif
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_DeltaRij" );
 
