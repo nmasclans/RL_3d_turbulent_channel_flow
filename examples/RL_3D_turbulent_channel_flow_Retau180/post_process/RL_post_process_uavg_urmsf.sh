@@ -15,5 +15,6 @@ ensemble=0          # fixed
 for iter in {2821000..2824000..1000}
 do
     # Run the Python post-processing script with the current iteration and the training name
+    echo -e "\n--------------------------------------------------------------------------------"
     python3 RL_post_process_uavg_urmsf.py $iter $ensemble $training_name
 done

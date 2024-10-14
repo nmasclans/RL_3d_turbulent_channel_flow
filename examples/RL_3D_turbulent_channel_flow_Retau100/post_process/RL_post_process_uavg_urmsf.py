@@ -32,7 +32,7 @@ try :
     iteration  = sys.argv[1]
     ensemble   = sys.argv[2]
     train_name = sys.argv[3]
-    print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name}")
+    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name}")
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name>")
 
@@ -50,6 +50,7 @@ matching_files = sorted(glob.glob(pattern))
 # List to store the extracted parts corresponding to "*"
 filename_RL_list  = []
 file_details_list = []
+step_num_list     = []
 # Check if files were found
 if matching_files:
     print("Found files:")
@@ -63,8 +64,11 @@ if matching_files:
         file_details = base_filename.split('_')[-1].replace('.h5', '')
         # Add the extracted part to the list
         file_details_list.append(file_details)
+        # Step number
+        step_num = int(file_details[4:])
+        step_num_list.append(step_num)
         # Print the file and the extracted part
-        print(f"Filename: {base_filename}, File details: {file_details}")
+        print(f"Filename: {base_filename}, File details: {file_details}, Step number: {step_num}")
 else:
     print(f"No files found matching the pattern: {pattern}")
 ### > non-RL filename
@@ -470,3 +474,62 @@ print("Errors written successfully!")
 with open(error_log_filename, "r") as file:
     content = file.read()
     print(content)
+
+# --- Errors Plots ---
+print("\nBuilding error plots...")
+
+# L1-Error plot
+plt.semilogy( step_num_list, L1_error_avg_u_plus_nonRL*np.ones(n_RL), linestyle = '-',             linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA non-RL' )
+plt.semilogy( step_num_list, L1_error_avg_u_plus_RL, linestyle=':', marker = '^', markersize = 2,  linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA RL' )
+plt.semilogy( step_num_list, L1_error_rmsf_u_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, L1_error_rmsf_u_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA RL' )
+plt.semilogy( step_num_list, L1_error_rmsf_v_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, L1_error_rmsf_v_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA RL' )
+plt.semilogy( step_num_list, L1_error_rmsf_w_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, L1_error_rmsf_w_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA RL' )
+plt.xlabel( 'Training step' )
+plt.ylabel( 'L1 Error' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.tick_params( axis = 'both', pad = 7.5 )
+filename = f'{postDir}/L1_error_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.clf()
+print(f"Build plot: '{filename}'")
+
+# L2-Error plot
+plt.semilogy( step_num_list, L2_error_avg_u_plus_nonRL*np.ones(n_RL), linestyle = '-',             linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA non-RL' )
+plt.semilogy( step_num_list, L2_error_avg_u_plus_RL, linestyle=':', marker = '^', markersize = 2,  linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA RL' )
+plt.semilogy( step_num_list, L2_error_rmsf_u_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, L2_error_rmsf_u_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA RL' )
+plt.semilogy( step_num_list, L2_error_rmsf_v_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, L2_error_rmsf_v_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA RL' )
+plt.semilogy( step_num_list, L2_error_rmsf_w_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, L2_error_rmsf_w_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA RL' )
+plt.xlabel( 'Training step' )
+plt.ylabel( 'L2 Error' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.tick_params( axis = 'both', pad = 7.5 )
+filename = f'{postDir}/L2_error_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.clf()
+print(f"Build plot: '{filename}'")
+
+# L1-Error plot
+plt.semilogy( step_num_list, Linf_error_avg_u_plus_nonRL*np.ones(n_RL), linestyle = '-',             linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA non-RL' )
+plt.semilogy( step_num_list, Linf_error_avg_u_plus_RL, linestyle=':', marker = '^', markersize = 2,  linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA RL' )
+plt.semilogy( step_num_list, Linf_error_rmsf_u_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, Linf_error_rmsf_u_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA RL' )
+plt.semilogy( step_num_list, Linf_error_rmsf_v_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, Linf_error_rmsf_v_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA RL' )
+plt.semilogy( step_num_list, Linf_error_rmsf_w_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA non-RL' )
+plt.semilogy( step_num_list, Linf_error_rmsf_w_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA RL' )
+plt.xlabel( 'Training step' )
+plt.ylabel( 'Linf Error' )
+legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+plt.tick_params( axis = 'both', pad = 7.5 )
+filename = f'{postDir}/Linf_error_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.clf()
+print(f"Build plot: '{filename}'")
+
+print("Error plots built successfully!")
