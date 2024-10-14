@@ -6,7 +6,7 @@ t_action = 0.00050      # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(0.20 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 4          # 
+cfd_n_envs = 8          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -51,14 +51,14 @@ params = {
 
     # RL params
     "mode": mode,
-    "num_episodes": 2000,
+    "num_episodes": 100000,
     "num_epochs": cfd_n_envs * rl_n_envs, # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-2.0, 2.0),
     "action_dim": 6,
-    "reward_norm": 1.0,                                                                 # another possible normalization: reward_norm = t_action
+    "reward_norm": 0.01,
     "reward_beta": 0.5, # reward = beta * reward_global + (1.0 - beta) * reward_local,  # TODO: set custom value
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
