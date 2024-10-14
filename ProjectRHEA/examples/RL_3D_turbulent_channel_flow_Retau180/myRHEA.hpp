@@ -104,6 +104,8 @@ class myRHEA : public FlowSolverRHEA {
         double rmsf_u_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
         double rmsf_v_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
         double rmsf_w_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
+        double l1_error_current;                 /// only used if _RL_CONTROL_IS_SUPERVISED_ 1
+        double l1_error_previous;                /// only used if _RL_CONTROL_IS_SUPERVISED_ 1
         double reward_local;
         std::vector<double> action_global;
         std::vector<double> action_global_previous;

@@ -188,7 +188,6 @@ const double rmsf_w_reference_profile[] = {   /// only inner points
     0.14006928, 0.07215958, 0.01943448,
 };
 #endif
-
 #endif
 
 ////////// myRHEA CLASS //////////
@@ -306,6 +305,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Auxiliary variable for reward calculation
 #if _RL_CONTROL_IS_SUPERVISED_
+    /// -------------- Build rmsf_u,v,w_reference_field --------------
     // Accessing the global domain decomposition data
     int global_startY, global_j;
     int globalNy    = topo->getMesh()->getGNy();    // Total number of y-cells in the global domain
@@ -341,6 +341,9 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
              << ", rmsf_v: " << rmsf_v_reference_profile[global_j]
              << ", rmsf_w: " << rmsf_w_reference_profile[global_j] << endl;
     }
+    /// -------------- Define control variables --------------
+    l1_error_current  = 1.0;
+    l1_error_previous = 1.0;
 #else
     rmsf_u_field_local = 0.0;    rmsf_u_field_local_previous = 0.0;   rmsf_u_field_local_two_previous = 0.0;
     rmsf_v_field_local = 0.0;    rmsf_v_field_local_previous = 0.0;   rmsf_v_field_local_two_previous = 0.0;
@@ -349,7 +352,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Initialize additional attribute members
 #if _RL_CONTROL_IS_SUPERVISED_
-    first_actuation_time_done   = true;
+    first_actuation_time_done   = false;
     first_actuation_period_done = true;
 #else
     first_actuation_time_done   = false;
@@ -523,7 +526,7 @@ void myRHEA::calculateSourceTerms() {
         if (current_time > begin_actuation_time) {
 
             if ( !first_actuation_time_done ) {     /// executed just once
-                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'...
+                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (unsupervised) or 'l1_error_prevoius' (supervised)...
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
                     cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'" << endl;
@@ -539,7 +542,7 @@ void myRHEA::calculateSourceTerms() {
                 }
 
                 if ( !first_actuation_period_done ) {
-                    calculateReward();              /// initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'...
+                    calculateReward();              /// initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'
                     first_actuation_period_done = true;
                     previous_actuation_time = previous_actuation_time + actuation_period;
                     if (my_rank == 0) {
@@ -636,10 +639,6 @@ void myRHEA::calculateSourceTerms() {
                                     y_local_top_wall            = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_]+1,k)] );
                                     y_dist_to_local_bottom_wall = abs(y_local_bottom_wall - y_field[I1D(i,j,k)]);
                                     y_dist_to_local_top_wall    = abs(y_local_top_wall    - y_field[I1D(i,j,k)]);
-                                    /// Debugging
-                                    if ( (i==1) && (k==1)){
-                                        cout << "Rank " << my_rank << ", j " << j << " has y_local_bottom_wall:" << y_local_bottom_wall << ", y_local_top_wall: " << y_local_top_wall << ", y_dist_to_local_bottom_wall: " << y_dist_to_local_bottom_wall << ", y_dist_to_local_top_wall: " << y_dist_to_local_top_wall << endl;
-                                    }
                                     /// -> action averaging with previous action if close to local bottom wall (& not in global bottom wall, act_idx != 0)
                                     if ( ( y_dist_to_local_bottom_wall < dy_space_averaging ) && ( actuation_idx > 0) ) {
                                         /// define current (my_rank) and previous action (my_rank - 1)
@@ -1807,6 +1806,9 @@ void myRHEA::updateState() {
 ///////////////////////////////////////////////////////////////////////////////
 
 /// Calculate reward local value (local to single mpi process, which corresponds to RL environment)
+/// If _RL_CONTROL_IS_SUPERVISED_ 1:
+/// -> updates attributes: reward_local, l1_error_current, l1_error_previous
+/// else _RL_CONTROL_IS_SUPERVISED_ 0:
 /// -> updates attributes: reward_local, rmsf_u_field_local, rmsf_u_field_local_previous, rmsf_u_field_local_two_previous
 ///                                      rmsf_v_field_local, rmsf_v_field_local_previous, rmsf_v_field_local_two_previous
 ///                                      rmsf_w_field_local, rmsf_w_field_local_previous, rmsf_w_field_local_two_previous
@@ -1822,9 +1824,9 @@ void myRHEA::calculateReward() {
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                l1_err_rmsf_u  += std::abs( (rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)]) / (rmsf_u_reference_field[I1D(i,j,k)] + EPS) );
-                l1_err_rmsf_v  += std::abs( (rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)]) / (rmsf_v_reference_field[I1D(i,j,k)] + EPS) );
-                l1_err_rmsf_w  += std::abs( (rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)]) / (rmsf_w_reference_field[I1D(i,j,k)] + EPS) );
+                l1_err_rmsf_u  += std::abs( (rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)]) );
+                l1_err_rmsf_v  += std::abs( (rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)]) );
+                l1_err_rmsf_w  += std::abs( (rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)]) );
                 l1_err_counter += 1;
             }
         }
@@ -1832,8 +1834,12 @@ void myRHEA::calculateReward() {
     l1_err_rmsf_u /= l1_err_counter;
     l1_err_rmsf_v /= l1_err_counter;
     l1_err_rmsf_w /= l1_err_counter;
-    reward_local   = ( l1_err_rmsf_u + l1_err_rmsf_v + l1_err_rmsf_w ) / 3.0;
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << endl;
+    l1_error_current = ( l1_err_rmsf_u + l1_err_rmsf_v + l1_err_rmsf_w ) / 3.0;
+    reward_local = ( l1_error_previous - l1_error_current ) / ( l1_error_previous + EPS );
+    /// Debugging
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", L1 error: " << l1_error_current << ", L1 error previous: " << l1_error_previous << endl;
+    /// Update 'l1_error_previous'
+    l1_error_previous = l1_error_current;
 
 #else                           /// Unsupervised Reward
     /// Initialize variables

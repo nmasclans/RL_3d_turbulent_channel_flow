@@ -179,6 +179,8 @@ class RheaEnv(py_environment.PyEnvironment):
         if self.dump_data_flag:
             if not os.path.exists(os.path.join(self.dump_data_path, "state")):
                 os.makedirs(os.path.join(self.dump_data_path, "state"))
+            if not os.path.exists(os.path.join(self.dump_data_path, "local_reward")):
+                os.makedirs(os.path.join(self.dump_data_path, "local_reward"))
             if not os.path.exists(os.path.join(self.dump_data_path, "reward")):
                 os.makedirs(os.path.join(self.dump_data_path, "reward"))
             if not os.path.exists(os.path.join(self.dump_data_path, "action")):
@@ -330,7 +332,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # Transform state and reward: redistribute & standarize
         self._redistribute_state()      # updates self._state_rl
         self._min_max_scaling_state()   # updates self._state_rl    
-        self._min_max_scaling_reward()  # updates self._reward
+        #self._min_max_scaling_reward()  # updates self._reward
 
         # Write RL data into disk
         if self.dump_data_flag:
@@ -534,11 +536,13 @@ class RheaEnv(py_environment.PyEnvironment):
     # Min-max-scaling of state to range [0,1] 
     def _min_max_scaling_state(self):
         flattened_state_rl = self._state_rl.flatten()
-        self._state_running_min = np.min([np.min(flattened_state_rl), self._state_running_min])
-        self._state_running_max = np.max([np.max(flattened_state_rl), self._state_running_max])
+        min_value = np.min(flattened_state_rl)
+        max_value = np.max(flattened_state_rl)
+        self._state_running_min = np.min([min_value, self._state_running_min])
+        self._state_running_max = np.max([max_value, self._state_running_max])
         self._state_rl = ( self._state_rl - self._state_running_min ) / ( self._state_running_max - self._state_running_min + EPS )
         # Logging
-        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with original (min, max) = ({np.min(flattened_state_rl)}, {np.max(flattened_state_rl)}) and scaling (min, max) = ({self._state_running_min}, {self._state_running_max})")
+        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with input data (min, max) = ({min_value}, {max_value}) and running (min, max) = ({self._state_running_min}, {self._state_running_max})")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled State: {self._state_rl[i * self.rl_n_envs + j,:]}")
@@ -576,14 +580,16 @@ class RheaEnv(py_environment.PyEnvironment):
     
     # Min-Max scaling reward to range [0,1]
     def _min_max_scaling_reward(self):
-        self._reward_running_min = np.min([np.min(self._reward), self._reward_running_min])
-        self._reward_running_max = np.max([np.max(self._reward), self._reward_running_max])
+        min_value = np.min(self._reward)
+        max_value = np.max(self._reward)
+        self._reward_running_min = np.min([min_value, self._reward_running_min])
+        self._reward_running_max = np.max([max_value, self._reward_running_max])
         self._reward = ( self._reward - self._reward_running_min ) / ( self._reward_running_max - self._reward_running_min + EPS )
         # Logging
-        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with original (min, max) = ({np.min(self._reward)}, {np.max(self._reward)}), scaling (min, max) = ({self._reward_running_min}, {self._reward_running_max})")
+        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with input data (min, max) = ({min_value}, {max_value}), running (min, max) = ({self._reward_running_min}, {self._reward_running_max})")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
-                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled Reward: {self._reward[i * self.rl_n_envs + j]}")
+                logger.debug(f"[Cfd Env {i}] Scaled Reward: {self._reward[i*self.rl_n_envs:(i+1)*self.rl_n_envs]}")
 
 
     def _get_time(self):
@@ -669,8 +675,11 @@ class RheaEnv(py_environment.PyEnvironment):
             with open(os.path.join(self.dump_data_path , "state", f"state_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._state[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
             f.close()
-            with open(os.path.join(self.dump_data_path , "reward", f"local_reward_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
+            with open(os.path.join(self.dump_data_path , "local_reward", f"local_reward_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._local_reward[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
+            f.close()
+            with open(os.path.join(self.dump_data_path , "reward", f"reward_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
+                np.savetxt(f, self._reward[i*self.rl_n_envs:(i+1)*self.rl_n_envs][np.newaxis], fmt='%.4f', delimiter=' ')
             f.close()
             with open(os.path.join(self.dump_data_path , "action", f"action_ensemble{i}_step{self._episode_global_step:06}.txt"),'a') as f:
                 np.savetxt(f, self._action[i, :][np.newaxis], fmt='%.4f', delimiter=' ')
@@ -772,9 +781,9 @@ class RheaEnv(py_environment.PyEnvironment):
         # Pre-processing state & reward: redistribute & standarize
         self._redistribute_state()      # updates self._state_rl
         self._min_max_scaling_state()   # updates self._state_rl    
-        self._min_max_scaling_reward()  # updates self._reward
+        #self._min_max_scaling_reward()  # updates self._reward
 
-        # write RL data into disk
+        # Write RL data into disk
         if self.dump_data_flag: self._dump_rl_data()
 
         # determine if simulation finished
