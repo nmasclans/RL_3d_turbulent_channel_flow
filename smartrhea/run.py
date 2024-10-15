@@ -29,7 +29,7 @@ from smartrhea.history import History
 from smartrhea.init_smartsim import init_smartsim
 from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, params_html_table, bcolors
 from smartrhea.rhea_env import RheaEnv
-from smartrhea.networks import CustomPPOActorNetwork
+#from smartrhea.networks import CustomPPOActorNetwork #TODO: remove if not used
 
 #--------------------------- Utils ---------------------------
 
@@ -135,19 +135,20 @@ logger.debug(f'Time Spec:\n{time_step_tensor_spec}')
     ppo_actor_network.PPOActorNetwork.__init__(self, seed_stream_class=<class 'tensorflow_probability.python.util.seed_stream.SeedStream'>)
     PPOActorNetwork.create_sequential_actor_net(self, fc_layer_units, action_tensor_spec, seed=None)
 """
-#actor_net_builder = ppo_actor_network.PPOActorNetwork()         # TODO: Check ActorDistributionRnnNetwork otherwise
-#actor_net = actor_net_builder.create_sequential_actor_net(
-#    params["net"],
-#    action_tensor_spec,
-#)
-actor_net_builder = CustomPPOActorNetwork()
+actor_net_builder = ppo_actor_network.PPOActorNetwork()         # TODO: Check ActorDistributionRnnNetwork otherwise
 actor_net = actor_net_builder.create_sequential_actor_net(
-    fc_layer_units=params["net"],
-    action_tensor_spec=action_tensor_spec, 
-    activation_fn=params["actor_net_activation_fn"],
-    l2_reg_value=params["actor_net_l2_reg"],
-    std_init_value=params["actor_net_std_init"],
+    params["net"],
+    action_tensor_spec,
 )
+# TODO: remove if not used
+# actor_net_builder = CustomPPOActorNetwork()
+# actor_net = actor_net_builder.create_sequential_actor_net(
+#     fc_layer_units=params["net"],
+#     action_tensor_spec=action_tensor_spec, 
+#     activation_fn=params["actor_net_activation_fn"],
+#     l2_reg_value=params["actor_net_l2_reg"],
+#     std_init_value=params["actor_net_std_init"],
+#)
 """ Value Network:    
     value_network.ValueNetwork.__init__(self, input_tensor_spec, preprocessing_layers=None, 
         preprocessing_combiner=None, conv_layer_params=None, fc_layer_params=(75, 40), 
@@ -224,20 +225,31 @@ with context:
                                             #   takes nested observation and returns nested action
         value_net=value_net,                # function value_net(time_steps) that returns value tensor from neural net predictions of each obesrvation.
                                             #   takes nested observation and returns batch of value_preds
-        entropy_regularization=params["entropy_regularization"],        # coeff of entropy regularization loss term
+        greedy_eval=True,
         importance_ratio_clipping=params["importance_ratio_clipping"],  # epsilon in clipped, surrogate PPO objective
-        discount_factor=0.99,               # discount factor for return computation
+        lambda_value=0.95,                  # lambda parameter for TD-lambda computation (used in TD-lambda GAE, if use_gae=True & use_td_lambda_return=True)
+        discount_factor=0.99,               # discount factor for return computation (used in GAE return calculation, if use_gae=True)
+        entropy_regularization=params["entropy_regularization"],        # coeff for l2 regularization of entropy, default 0.0
+        policy_l2_reg=params["policy_l2_reg"],                          # coeff for l2 regularization of policy, default 0.0
+        value_function_l2_reg=params["value_function_l2_reg"],          # coeff for l2 regularization of value function, default 0.0
+        shared_vars_l2_reg=params["shared_vars_l2_reg"],                # coeff for l2 regularization of weights shared btw policy and value functions, default 0.0
+        value_pred_loss_coef=params["value_pred_loss_coef"],            # multiplier for value prediction loss to balance with policy gradient loss, default 0.5
+        num_epochs=params["num_epochs"],    # num. epochs for computing policy updates
+        use_gae=True,                       # if true, use generalized advantage estimation for computing per-timestep advantage
+                                            # else, just subtracts value predictions from empirical return.
+        use_td_lambda_return=False,         # If True (default False), uses td_lambda_return for training value function. (td_lambda_return = gae_advantage + value_predictions) 
+        normalize_rewards=False,            # if true, keeps moving (mean and) variance of rewards, and normalizes incoming rewards
         normalize_observations=False,       # if true, keeps a running estimate of observations mean & variance of observations, and uses these statistics to normalize incoming observations (to have mean=0, std=1)
                                             # adv (True):  stabilizes training, improves convergence, consistent learning rate
                                             # cons (True): additional computation, observation spec compatibility (obs. must be tf.float32), sensitivity to distribution change (when non-stationary env)
-                                            # TODO: set normalize_observations = True?
-        normalize_rewards=False,            # if true, keeps moving (mean and) variance of rewards, and normalizes incoming rewards
-        use_gae=True,                       # if true, use generalized advantage estimation for computing per-timestep advantage
-                                            # else, just subtracts value predictions from empirical return.
-        num_epochs=params["num_epochs"],    # num. epochs for computing policy updates
+        log_prob_clipping=0.0,              # +/- value for clipping log probs to prevent inf / NaN values. Default: no clipping. 
+        gradient_clipping=None,             # Norm length to clip gradients. Default: no clipping. 
+        value_clipping=None,                # Difference between new and old value predictions are clipped to this threshold. Value clipping could be helpful when training very deep networks. Default: no clipping. 
+        check_numerics=False,               # If true, adds tf.debugging.check_numerics to help find NaN / Inf values. For debugging only. 
+        compute_value_and_advantage_in_train=True,  # A bool to indicate where value prediction and advantage calculation happen. If True, both happen in agent.train(). If False, value prediction is computed during data collection. This argument must be set to False if mini batch learning is enabled. 
         debug_summaries=True,               # if true, gather debug summaries
-        summarize_grads_and_vars=False,     # if true, gradient summaries will be written
-        train_step_counter=global_step      # optional counter to increment every time the train operation is run
+        summarize_grads_and_vars=True,      # if true, gradient summaries will be written
+        train_step_counter=global_step,     # optional counter to increment every time the train operation is run
     )
     agent.initialize()
     logger.debug(f"Agent created & initialized")
@@ -348,7 +360,8 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
         trajectories = replay_buffer.gather_all()       # gather all available trajectories stored in buffer
         return agent.train(experience=trajectories)     # agent updates internal params (policy & value networks) taking the gathered trajectory of experiences as input
                                                         # returns 'LossInfo' tuple containing loss and info tensors
-    # TODO: move back to using train_step function, and remove 'train_step_check_gradients'
+    
+    # TODO: remove function if not used for debugging
     def train_step_check_gradients():
         with tf.GradientTape() as tape:
             trajectories = replay_buffer.gather_all()           # gather all available trajectories stored in buffer
@@ -356,18 +369,6 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             base_loss    = loss_info.loss                       # extract base loss (original agent loss)
             l2_reg_loss  = tf.add_n(actor_net.losses) if actor_net.losses else 0.0  # l2 regularization losses from actor_net
             total_loss   = base_loss + l2_reg_loss              # compute total loss
-            #logger.debug(f"[train_step_check_gradients] loss details: \n"
-            #             f"global_step: {global_step.numpy()} \n"
-            #             f"loss_info: LossInfo(loss={loss_info.loss.numpy()}, "
-            #             f"extra=PPOLossInfo(policy_gradient_loss={loss_info.extra.policy_gradient_loss.numpy()}, "
-            #             f"value_estimation_loss={loss_info.extra.value_estimation_loss.numpy()}, "
-            #             f"l2_regularization_loss={loss_info.extra.l2_regularization_loss.numpy()}, "
-            #             f"entropy_regularization_loss={loss_info.extra.entropy_regularization_loss.numpy()}, "
-            #             f"kl_penalty_loss={loss_info.extra.kl_penalty_loss.numpy()}) )\n"
-            #             f"base_loss: {base_loss.numpy()} \n"
-            #             f"l2_reg_loss: {l2_reg_loss.numpy()} \n"
-            #             f"actor_net.losses: {[loss.numpy() for loss in actor_net.losses]} \n"
-            #             f"total_loss: {total_loss.numpy()}\n")
         grads = tape.gradient(total_loss, agent.trainable_variables)
         for grad, var in zip(grads, agent.trainable_variables):
             tf.summary.histogram(var.name, grad, step=global_step)
@@ -415,12 +416,12 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             collect_time += time.time() - start_time
 
             start_time = time.time()
-            #total_loss, _ = train_step()                       # TODO: uncomment line
-            total_loss, _ = train_step_check_gradients()        # TODO: remove line
+            total_loss, _ = train_step()
+            #total_loss, _ = train_step_check_gradients()        # TODO: remove if not used
             logger.debug(f"Train step done, with global_step: {global_step_val}")
             logger.debug(f"Replay buffer size before clear: {replay_buffer.num_frames()}")
             replay_buffer.clear()
-            logger.debug(f"Replay buffer size after clear: {replay_buffer.num_frames()}")       # TODO: check if replay_buffer size should be change to include all n_cfd * n_rl_envs used, or only the size of one rl_env (pseudo-env) (as currently done)
+            logger.debug(f"Replay buffer size after clear: {replay_buffer.num_frames()}")
             train_time += time.time() - start_time
 
             logger.info("Writing tensorflow summary")
