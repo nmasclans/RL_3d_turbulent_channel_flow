@@ -2,7 +2,7 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.1          # action period
+t_action = 0.01         # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
@@ -12,7 +12,7 @@ mode = "train"          # "train" or "eval"
 
 params = {
     # smartsim params
-    "run_id": "",50
+    "run_id": "",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "rl_case_path": os.environ["RL_CASE_PATH"],
