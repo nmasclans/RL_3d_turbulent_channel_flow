@@ -331,7 +331,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # Transform state and reward: redistribute & standarize
         self._redistribute_state()      # updates self._state_rl
-        self._min_max_scaling_state()   # updates self._state_rl    
+        #self._min_max_scaling_state()   # updates self._state_rl    
         #self._min_max_scaling_reward()  # updates self._reward
 
         # Write RL data into disk
@@ -780,7 +780,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # Pre-processing state & reward: redistribute & standarize
         self._redistribute_state()      # updates self._state_rl
-        self._min_max_scaling_state()   # updates self._state_rl    
+        #self._min_max_scaling_state()   # updates self._state_rl    
         #self._min_max_scaling_reward()  # updates self._reward
 
         # Write RL data into disk

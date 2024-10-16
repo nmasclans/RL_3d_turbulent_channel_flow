@@ -238,8 +238,8 @@ with context:
         use_gae=True,                       # if true, use generalized advantage estimation for computing per-timestep advantage
                                             # else, just subtracts value predictions from empirical return.
         use_td_lambda_return=False,         # If True (default False), uses td_lambda_return for training value function. (td_lambda_return = gae_advantage + value_predictions) 
-        normalize_rewards=False,            # if true, keeps moving (mean and) variance of rewards, and normalizes incoming rewards
-        normalize_observations=False,       # if true, keeps a running estimate of observations mean & variance of observations, and uses these statistics to normalize incoming observations (to have mean=0, std=1)
+        normalize_rewards=True,             # if true, keeps moving (mean and) variance of rewards, and normalizes incoming rewards
+        normalize_observations=True,        # if true, keeps a running estimate of observations mean & variance of observations, and uses these statistics to normalize incoming observations (to have mean=0, std=1)
                                             # adv (True):  stabilizes training, improves convergence, consistent learning rate
                                             # cons (True): additional computation, observation spec compatibility (obs. must be tf.float32), sensitivity to distribution change (when non-stationary env)
         log_prob_clipping=0.0,              # +/- value for clipping log probs to prevent inf / NaN values. Default: no clipping. 
