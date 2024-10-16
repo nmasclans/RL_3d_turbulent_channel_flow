@@ -70,7 +70,7 @@ const double reg_lambda = 0.5;
 #endif
 
 #if _SPACE_AVERAGE_RL_ACTION_
-const double dy_space_averaging = 0.05;
+const double dy_space_averaging = 0.1;
 #endif
 
 int action_dim = 6;
