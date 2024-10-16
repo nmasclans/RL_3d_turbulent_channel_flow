@@ -12,7 +12,7 @@ mode = "train"          # "train" or "eval"
 
 params = {
     # smartsim params
-    "run_id": "",50
+    "run_id": "",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "rl_case_path": os.environ["RL_CASE_PATH"],
