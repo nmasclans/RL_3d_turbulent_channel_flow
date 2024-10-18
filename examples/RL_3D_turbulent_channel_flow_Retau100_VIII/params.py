@@ -2,11 +2,11 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.01         # action period
+t_action = 0.5          # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(0.5 + t_action + dt_phys, 8)
+t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 1          # num. cfd simulations run in parallel
+cfd_n_envs = 8          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 

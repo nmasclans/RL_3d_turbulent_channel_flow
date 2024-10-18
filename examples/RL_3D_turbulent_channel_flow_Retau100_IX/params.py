@@ -2,9 +2,9 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.01         # action period
+t_action = 0.25         # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(0.5 + t_action + dt_phys, 8)
+t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
 cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
@@ -90,8 +90,8 @@ params = {
     #"actor_net_activation_fn": "relu", # TODO: remove if not used
     #"actor_net_l2_reg": 1e-4,          # TODO: remove if not used
     #"actor_net_std_init": 0.35,        # TODO: remove if not used
-    "normalize_rewards": False,
-    "normalize_observations": False,
+    "normalize_rewards": True,
+    "normalize_observations": True,
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]

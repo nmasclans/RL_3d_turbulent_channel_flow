@@ -68,7 +68,7 @@ params = {
     # Clipping parameter controls how much the new policy can deviate from the old policy
     # Recommended: 0.2 - 0.5, 0.2 used in most implementations
     # If updates are too volatile, you can decrease to 0.1
-    "entropy_regularization": 0.05,                       
+    "entropy_regularization": 0.001,                       
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence

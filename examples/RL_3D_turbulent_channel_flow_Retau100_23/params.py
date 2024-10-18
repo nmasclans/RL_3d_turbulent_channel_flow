@@ -4,9 +4,9 @@ import random, os, numpy as np
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
 t_action = 0.01         # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(0.5 + t_action + dt_phys, 8)
+t_episode_train = round(5.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 1          # num. cfd simulations run in parallel
+cfd_n_envs = 2          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -64,11 +64,11 @@ params = {
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
     "learning_rate": 0.002,                                                            
     # Recommended: 1e-4 - 1e-3
-    "importance_ratio_clipping": 0.3,                                                   
+    "importance_ratio_clipping": 0.2,                                                   
     # Clipping parameter controls how much the new policy can deviate from the old policy
     # Recommended: 0.2 - 0.5, 0.2 used in most implementations
     # If updates are too volatile, you can decrease to 0.1
-    "entropy_regularization": 0.05,                       
+    "entropy_regularization": 1e-4,                       
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence
@@ -82,7 +82,7 @@ params = {
     "shared_vars_l2_reg": 1e-5,
     # Regularization for any shared parameters between the policy and value networks
     # Recommended: 1e-4 - 1e-3, or set the same as the policy/value L2 regularization values
-    "value_pred_loss_coef": 1e-3,
+    "value_pred_loss_coef": 1e-4,
     # This coefficient balances the weight of the value prediction loss in the overall loss function
     # Recommended: 0.5
     # If the value function is underperforming, you can increase it to give more weight to value function learning 

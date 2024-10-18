@@ -2,11 +2,11 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.1          # action period
+t_action = 0.01         # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(1.0 + t_action + dt_phys, 8)
+t_episode_train = round(0.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 8          # num. cfd simulations run in parallel
+cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
@@ -62,16 +62,21 @@ params = {
     "reward_beta": 0.5,                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 0.001,                                                            
+    "learning_rate": 0.002,                                                            
     # Recommended: 1e-4 - 1e-3
-    "importance_ratio_clipping": 0.2,                                                   
+    "importance_ratio_clipping": 0.3,                                                   
     # Clipping parameter controls how much the new policy can deviate from the old policy
     # Recommended: 0.2 - 0.5, 0.2 used in most implementations
     # If updates are too volatile, you can decrease to 0.1
-    "entropy_regularization": 0.02,                       
+    "entropy_regularization": 0.05,                       
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence
+    # The entropy regularization term in the loss function is used to encourage exploration. It's added to the overall loss with a negative sign so that higher entropy (which means more random actions) results in a smaller loss. Essentially, the more random or uncertain the agent is in its actions, the more it's rewarded through this term.
+    # When you increase the entropy regularization coefficient, you're increasing the influence of this term in the total loss, therefore
+    # increasing 'entropy_regularization' coefficient will lead to more exploratory actions (with higher entropy)
+    # If the entropy regularization coefficient is small, the policy will prioritize minimizing the primary loss (e.g., policy gradient loss), which can lead to more deterministic (less exploratory) actions.
+    # But as the entropy regularization coefficient increases, the agent is incentivized to keep its action distribution more random, and thus explore more.
     # Recommended: 0.01 - 0.05, or 0.01 - 0.02
     "policy_l2_reg": 1e-5,
     # Regularization coefficient for the policy network to prevent overfitting
@@ -82,7 +87,7 @@ params = {
     "shared_vars_l2_reg": 1e-5,
     # Regularization for any shared parameters between the policy and value networks
     # Recommended: 1e-4 - 1e-3, or set the same as the policy/value L2 regularization values
-    "value_pred_loss_coef": 1e-5,
+    "value_pred_loss_coef": 1e-3,
     # This coefficient balances the weight of the value prediction loss in the overall loss function
     # Recommended: 0.5
     # If the value function is underperforming, you can increase it to give more weight to value function learning 
@@ -90,6 +95,8 @@ params = {
     #"actor_net_activation_fn": "relu", # TODO: remove if not used
     #"actor_net_l2_reg": 1e-4,          # TODO: remove if not used
     #"actor_net_std_init": 0.35,        # TODO: remove if not used
+    "normalize_rewards": True,
+    "normalize_observations": True,
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]
