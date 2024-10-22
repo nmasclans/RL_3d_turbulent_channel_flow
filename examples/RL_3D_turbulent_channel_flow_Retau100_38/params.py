@@ -62,7 +62,7 @@ params = {
     "reward_beta": 0.5,                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
     "net": (128, 128),                                                                  # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 0.001,                                                            
+    "learning_rate": 0.0001,                                                            
     # Recommended: 1e-4 - 1e-3
     "importance_ratio_clipping": 0.2,                                                   
     # Clipping parameter controls how much the new policy can deviate from the old policy
