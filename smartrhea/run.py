@@ -355,35 +355,15 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
     lambda: tf.math.equal(global_step % params["summary_interval"], 0)
 ):
     # Define train step 
-    # TODO: use again 'train_step' instead of 'train_step_check_gradients', as checking gradients it's only for debugging 
     def train_step():
         trajectories = replay_buffer.gather_all()       # gather all available trajectories stored in buffer
         return agent.train(experience=trajectories)     # agent updates internal params (policy & value networks) taking the gathered trajectory of experiences as input
                                                         # returns 'LossInfo' tuple containing loss and info tensors
-    
-    # TODO: remove function if not used for debugging
-    def train_step_check_gradients():
-        with tf.GradientTape() as tape:
-            trajectories = replay_buffer.gather_all()           # gather all available trajectories stored in buffer
-            loss_info    = agent.train(experience=trajectories) # compute primary loss from the agent
-            base_loss    = loss_info.loss                       # extract base loss (original agent loss)
-            l2_reg_loss  = tf.add_n(actor_net.losses) if actor_net.losses else 0.0  # l2 regularization losses from actor_net
-            total_loss   = base_loss + l2_reg_loss              # compute total loss
-        grads = tape.gradient(total_loss, agent.trainable_variables)
-        for grad, var in zip(grads, agent.trainable_variables):
-            tf.summary.histogram(var.name, grad, step=global_step)
-        tf.summary.scalar("LearningRate/learning_rate", optimizer.learning_rate, step=global_step)
-        tf.summary.scalar("Losses/_base_loss", base_loss, step=global_step)
-        tf.summary.scalar("Losses/_l2_regularization_loss", l2_reg_loss, step=global_step)
-        tf.summary.scalar("Losses/_total_loss", total_loss, step=global_step)
-        return total_loss, loss_info
-
     if params["use_tf_functions"]:
         collect_driver.run = common.function(           # wrap collect_driver.run function for optimized execution as TensorFlow graph
             collect_driver.run, autograph=False)        
         agent.train = common.function(agent.train, autograph=False)     # wrap agent.train function as TensorFlow graph
         train_step = common.function(train_step, autograph=True)        # wrap train_step function (autograph=True for converting Python control flow into TensorFlow operations)
-        train_step_check_gradients = common.function(train_step_check_gradients, autograph=True)    # TODO: remove function and current line
 
     if params["mode"] == "train":                       # initialize counters
         collect_time = 0
@@ -417,7 +397,6 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
 
             start_time = time.time()
             total_loss, _ = train_step()
-            #total_loss, _ = train_step_check_gradients()        # TODO: remove if not used
             logger.debug(f"Train step done, with global_step: {global_step_val}")
             logger.debug(f"Replay buffer size before clear: {replay_buffer.num_frames()}")
             replay_buffer.clear()
