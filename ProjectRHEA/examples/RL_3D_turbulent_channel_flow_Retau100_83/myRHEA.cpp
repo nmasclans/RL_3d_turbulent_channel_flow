@@ -1595,6 +1595,10 @@ void myRHEA::getControlCubes() {
             dir2[icoord] = cube_vertices[2][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 2
             dir3[icoord] = cube_vertices[3][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 3
         }
+
+        /// y-coordinade of cube central point
+        control_cubes_y_central[icube] = cube_origin[1] + 0.5 * ( dir1[1] + dir2[1] + dir3[1] );
+        
         /// Transform director vectors to unitary vectors for further calculations of dot product
         size1 = myNorm(dir1);
         size2 = myNorm(dir2);
@@ -1604,9 +1608,6 @@ void myRHEA::getControlCubes() {
             dir2[icoord] = dir2[icoord] / size2;
             dir3[icoord] = dir3[icoord] / size3;
         }
-
-        /// y-coordinade of cube central point
-        control_cubes_y_central[icube] = cube_origin[1] + 0.5 * ( dir1[1] + dir2[1] + dir3[1] );
 
         /// Inner points: locate grid points located inside the cube & update action_mask
         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
