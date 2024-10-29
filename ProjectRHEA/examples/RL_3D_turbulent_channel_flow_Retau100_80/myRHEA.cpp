@@ -1903,6 +1903,10 @@ void myRHEA::smoothControlFunction() {
 /// MAIN
 int main(int argc, char** argv) {
 
+    cout << "Begggining MAIN" << endl;
+    cout.flush();
+
+
     /// Initialize MPI
     MPI_Init(&argc, &argv);
 

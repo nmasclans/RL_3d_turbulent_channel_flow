@@ -308,6 +308,13 @@ collect_driver = dynamic_episode_driver.DynamicEpisodeDriver(
     num_episodes=collect_env.n_envs # the number of episodes to take in the environment before each update. This is the total across all parallel RL environments.
 )
 
+
+### # Additional data to log in tensorboard
+### def log_action_distributions(action, global_step):
+###     with tf.summary.record_if(True):
+###         for dim in range(collect_py_env.action_dim):
+###             tf.summary.histogram(f"actions/dim_{dim}", action, step=global_step)
+
 ### Checkpointers to save policy
 ckpt_dir = os.path.join(train_dir, "ckpt")
 saved_model_dir = os.path.join(train_dir, "policy_saved_model")
