@@ -794,6 +794,7 @@ void myRHEA::calculateSourceTerms() {
                                 rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
                                 rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
 #if _SPACE_AVERAGE_RL_ACTION_
+                                /// TODO: not necessary if averaging window size 3
                                 rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
                                 rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
                                 rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
@@ -803,22 +804,24 @@ void myRHEA::calculateSourceTerms() {
                     }
 
 #if _SPACE_AVERAGE_RL_ACTION_
-                    //// Calculate rl_f_rhou_field from rl_f_rhou_field_aux (idem. for v, w) + perform f_rl space averaging on bottom/top y boundaries of each mpi process 
-                    // Allocate memory for sending/receiving boundary data slices
+                    /// Calculate rl_f_rhou_field from rl_f_rhou_field_aux (idem. for v, w) + perform f_rl space averaging on bottom/top y boundaries of each mpi process 
+                    /// Allocate memory for sending/receiving boundary data slices
                     int idx;
                     int i_start = topo->iter_common[_INNER_][_INIX_]; int i_end = topo->iter_common[_INNER_][_ENDX_];
                     int j_start = topo->iter_common[_INNER_][_INIY_]; int j_end = topo->iter_common[_INNER_][_ENDY_];
                     int k_start = topo->iter_common[_INNER_][_INIZ_]; int k_end = topo->iter_common[_INNER_][_ENDZ_];
                     int xz_slice_size = (i_end - i_start + 1) * (k_end - k_start + 1);
+                    /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
                     vector<double> send_xz_slice_ymin_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
                     vector<double> send_xz_slice_ymax_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
                     vector<double> recv_xz_slice_ymin_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
                     vector<double> recv_xz_slice_ymax_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
 
-                    // Populate send_xz_slice_min and send_xz_slice_max with boundary data
+                    /// Populate send_xz_slice_min and send_xz_slice_max with boundary data
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                         for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                             idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                            /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
                             send_xz_slice_ymin_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start, k)]; 
                             send_xz_slice_ymin_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start, k)]; 
                             send_xz_slice_ymin_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start, k)];     
@@ -828,12 +831,14 @@ void myRHEA::calculateSourceTerms() {
                         }
                     }
 
-                    // Exchange boundary data with neighboring processes
-                    // Info: np_y == n_rl_envs == number of MPI processes (only distributed along y-coord)
-                    // Arrays to hold MPI request handles
+                    /// Exchange boundary data with neighboring processes
+                    /// Info: np_y == n_rl_envs == number of MPI processes (only distributed along y-coord)
+                    /// Arrays to hold MPI request handles
                     MPI_Request requests[12];
                     int req_count = 0;
+                    /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
                     if (my_rank > 0) {
+                        /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
                         MPI_Isend(send_xz_slice_ymin_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
                         MPI_Irecv(recv_xz_slice_ymin_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
                         MPI_Isend(send_xz_slice_ymin_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 2, MPI_COMM_WORLD, &requests[req_count++]);
@@ -841,7 +846,9 @@ void myRHEA::calculateSourceTerms() {
                         MPI_Isend(send_xz_slice_ymin_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 4, MPI_COMM_WORLD, &requests[req_count++]);
                         MPI_Irecv(recv_xz_slice_ymin_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 5, MPI_COMM_WORLD, &requests[req_count++]);
                     }
+                    /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
                     if (my_rank < (n_rl_envs - 1)) {
+                        /// >> 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
                         MPI_Isend(send_xz_slice_ymax_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
                         MPI_Irecv(recv_xz_slice_ymax_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
                         MPI_Isend(send_xz_slice_ymax_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 3, MPI_COMM_WORLD, &requests[req_count++]);
@@ -850,34 +857,30 @@ void myRHEA::calculateSourceTerms() {
                         MPI_Irecv(recv_xz_slice_ymax_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 4, MPI_COMM_WORLD, &requests[req_count++]);
                     }
 
-                    // Wait for all non-blocking communication to complete
+                    /// Wait for all non-blocking communication to complete
                     MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
                     cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " performed all data exchange for space-averaging rl action along y-coord on pseudo-environments (mpi processes) boundaries" << endl; 
 
-                    // Apply action averaging in y-coord at the bottom/top y-coord boundaries of each mpi process
+                    /// Apply action averaging in y-coord at the bottom/top y-coord boundaries of each mpi process
+                    /// > Averaging in pseudo-envioronments / mpi processes bottom boundary 
                     if (my_rank > 0) {
                         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                                 idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                rl_f_rhou_field[I1D(i,j_start,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)]   + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhov_field[I1D(i,j_start,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)]   + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhow_field[I1D(i,j_start,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)]   + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhou_field[I1D(i,j_start+1,k)] = (1.0 / 3.0) * ( rl_f_rhou_field[I1D(i,j_start,k)] + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] + rl_f_rhou_field_aux[I1D(i,j_start+2,k)] );
-                                rl_f_rhov_field[I1D(i,j_start+1,k)] = (1.0 / 3.0) * ( rl_f_rhov_field[I1D(i,j_start,k)] + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] + rl_f_rhov_field_aux[I1D(i,j_start+2,k)] );
-                                rl_f_rhow_field[I1D(i,j_start+1,k)] = (1.0 / 3.0) * ( rl_f_rhow_field[I1D(i,j_start,k)] + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] + rl_f_rhow_field_aux[I1D(i,j_start+2,k)] );
+                                rl_f_rhou_field[I1D(i,j_start,k)] = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + 2.0 * rl_f_rhou_field_aux[I1D(i,j_start,k)] );
+                                rl_f_rhov_field[I1D(i,j_start,k)] = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + 2.0 * rl_f_rhov_field_aux[I1D(i,j_start,k)] );
+                                rl_f_rhow_field[I1D(i,j_start,k)] = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + 2.0 * rl_f_rhow_field_aux[I1D(i,j_start,k)] );
                             }
                         }
                     } 
+                    /// > Averaging in pseudo-envioronments / mpi processes top boundary 
                     if (my_rank < (n_rl_envs - 1)) {
                         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                                 idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                rl_f_rhou_field[I1D(i,j_end,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)]   + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhov_field[I1D(i,j_end,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)]   + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhow_field[I1D(i,j_end,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)]   + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhou_field[I1D(i,j_end-1,k)] = (1.0 / 3.0) * ( rl_f_rhou_field[I1D(i,j_end,k)]   + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] + rl_f_rhou_field_aux[I1D(i,j_end-2,k)] );
-                                rl_f_rhov_field[I1D(i,j_end-1,k)] = (1.0 / 3.0) * ( rl_f_rhov_field[I1D(i,j_end,k)]   + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] + rl_f_rhov_field_aux[I1D(i,j_end-2,k)] );
-                                rl_f_rhow_field[I1D(i,j_end-1,k)] = (1.0 / 3.0) * ( rl_f_rhow_field[I1D(i,j_end,k)]   + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] + rl_f_rhow_field_aux[I1D(i,j_end-2,k)] );
+                                rl_f_rhou_field[I1D(i,j_end,k)] = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + 2.0 * rl_f_rhou_field_aux[I1D(i,j_end,k)] );
+                                rl_f_rhov_field[I1D(i,j_end,k)] = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + 2.0 * rl_f_rhov_field_aux[I1D(i,j_end,k)] );
+                                rl_f_rhow_field[I1D(i,j_end,k)] = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + 2.0 * rl_f_rhow_field_aux[I1D(i,j_end,k)] );
                             }
                         }
                     }
