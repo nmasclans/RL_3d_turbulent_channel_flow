@@ -164,6 +164,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhou_field.setTopology(topo, "rl_f_rhou_field");
     rl_f_rhov_field.setTopology(topo, "rl_f_rhov_field");
     rl_f_rhow_field.setTopology(topo, "rl_f_rhow_field");
+#if _SPACE_AVERAGE_RL_ACTION_
+    rl_f_rhou_field_aux.setTopology(topo, "rl_f_rhou_field_aux");
+    rl_f_rhov_field_aux.setTopology(topo, "rl_f_rhov_field_aux");
+    rl_f_rhow_field_aux.setTopology(topo, "rl_f_rhow_field_aux");
+#endif
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -788,6 +793,11 @@ void myRHEA::calculateSourceTerms() {
                                 rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
                                 rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
                                 rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+#if _SPACE_AVERAGE_RL_ACTION_
+                                rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
+                                rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
+                                rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
+#endif
                             }
                         }
                     }
@@ -849,9 +859,12 @@ void myRHEA::calculateSourceTerms() {
                         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                                 idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                rl_f_rhou_field[I1D(i,j_start,k)] = 0.33 * recv_xz_slice_ymin_rl_f_rhou[idx] + 0.67 * rl_f_rhou_field[I1D(i,j_start,k)];
-                                rl_f_rhov_field[I1D(i,j_start,k)] = 0.33 * recv_xz_slice_ymin_rl_f_rhov[idx] + 0.67 * rl_f_rhov_field[I1D(i,j_start,k)];
-                                rl_f_rhow_field[I1D(i,j_start,k)] = 0.33 * recv_xz_slice_ymin_rl_f_rhow[idx] + 0.67 * rl_f_rhow_field[I1D(i,j_start,k)];
+                                rl_f_rhou_field[I1D(i,j_start,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)]   + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] );
+                                rl_f_rhov_field[I1D(i,j_start,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)]   + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] );
+                                rl_f_rhow_field[I1D(i,j_start,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)]   + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] );
+                                rl_f_rhou_field[I1D(i,j_start+1,k)] = (1.0 / 3.0) * ( rl_f_rhou_field[I1D(i,j_start,k)] + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] + rl_f_rhou_field_aux[I1D(i,j_start+2,k)] );
+                                rl_f_rhov_field[I1D(i,j_start+1,k)] = (1.0 / 3.0) * ( rl_f_rhov_field[I1D(i,j_start,k)] + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] + rl_f_rhov_field_aux[I1D(i,j_start+2,k)] );
+                                rl_f_rhow_field[I1D(i,j_start+1,k)] = (1.0 / 3.0) * ( rl_f_rhow_field[I1D(i,j_start,k)] + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] + rl_f_rhow_field_aux[I1D(i,j_start+2,k)] );
                             }
                         }
                     } 
@@ -859,9 +872,12 @@ void myRHEA::calculateSourceTerms() {
                         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                                 idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                rl_f_rhou_field[I1D(i,j_end,k)] = 0.33 * recv_xz_slice_ymax_rl_f_rhou[idx] + 0.67 * rl_f_rhou_field[I1D(i,j_end,k)];
-                                rl_f_rhov_field[I1D(i,j_end,k)] = 0.33 * recv_xz_slice_ymax_rl_f_rhov[idx] + 0.67 * rl_f_rhov_field[I1D(i,j_end,k)];
-                                rl_f_rhow_field[I1D(i,j_end,k)] = 0.33 * recv_xz_slice_ymax_rl_f_rhow[idx] + 0.67 * rl_f_rhow_field[I1D(i,j_end,k)];
+                                rl_f_rhou_field[I1D(i,j_end,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)]   + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] );
+                                rl_f_rhov_field[I1D(i,j_end,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)]   + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] );
+                                rl_f_rhow_field[I1D(i,j_end,k)]   = (1.0 / 3.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)]   + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] );
+                                rl_f_rhou_field[I1D(i,j_end-1,k)] = (1.0 / 3.0) * ( rl_f_rhou_field[I1D(i,j_end,k)]   + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] + rl_f_rhou_field_aux[I1D(i,j_end-2,k)] );
+                                rl_f_rhov_field[I1D(i,j_end-1,k)] = (1.0 / 3.0) * ( rl_f_rhov_field[I1D(i,j_end,k)]   + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] + rl_f_rhov_field_aux[I1D(i,j_end-2,k)] );
+                                rl_f_rhow_field[I1D(i,j_end-1,k)] = (1.0 / 3.0) * ( rl_f_rhow_field[I1D(i,j_end,k)]   + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] + rl_f_rhow_field_aux[I1D(i,j_end-2,k)] );
                             }
                         }
                     }
