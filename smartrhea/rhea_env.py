@@ -105,6 +105,7 @@ class RheaEnv(py_environment.PyEnvironment):
         t_begin_control = 0.0,
         action_bounds = (-0.05, 0.05),
         action_dim = 6,
+        state_dim = 1,
         reward_norm = 1.0,
         reward_beta = 0.5,
         time_key = "time",
@@ -150,6 +151,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self.poll_freq_ms = poll_freq_ms
         self.action_bounds = action_bounds
         self.action_dim = action_dim
+        self.state_dim = state_dim
         self.reward_norm = reward_norm
         self.reward_beta = reward_beta
         self.dump_data_flag = dump_data_flag
@@ -232,15 +234,17 @@ class RheaEnv(py_environment.PyEnvironment):
         self._episode_ended = False
         self.envs_initialised = False
 
-        # witness points information (to obtain dimensions of state arrays)
+        # State: witness points information (to obtain dimensions of state arrays)
         witness_filepath = os.path.join(self.rl_case_path, self.config_dir, self.witness_filename)
         control_cubes_filepath = os.path.join(os.path.join(self.rl_case_path, self.config_dir, self.control_cubes_filename))
         self.witness_xyz = get_witness_xyz(witness_filepath)
         num_witness_points = n_witness_points(witness_filepath)
         assert np.prod(self.witness_xyz) == num_witness_points
-        self.n_state = num_witness_points
+        self.n_state = num_witness_points * self.state_dim
         self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
         assert self.n_state % self.rl_n_envs == 0, f"ERROR: number of witness points ({self.n_state}) must be multiple of number of rl environments ({self.rl_n_envs}), so that each environment has the same number of witness points"
+        
+        # Actions
         if self.rl_n_envs > 1:
             self.n_action = 1 * self.action_dim
             num_cubes = n_cubes(control_cubes_filepath)
