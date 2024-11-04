@@ -91,7 +91,7 @@ params = {
     #"actor_net_activation_fn": "relu", # TODO: remove if not used
     #"actor_net_l2_reg": 1e-4,          # TODO: remove if not used
     #"actor_net_std_init": 0.35,        # TODO: remove if not used
-    "normalize_rewards": False,
+    "normalize_rewards": True,
     "normalize_observations": True,
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval

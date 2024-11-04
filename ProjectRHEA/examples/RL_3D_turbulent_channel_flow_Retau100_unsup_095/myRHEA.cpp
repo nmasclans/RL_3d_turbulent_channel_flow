@@ -2088,7 +2088,7 @@ void myRHEA::calculateReward() {
     l2_d_rmsf_u        = std::sqrt( l2_d_rmsf_u / total_volume_local);
     l2_avg_u_previous  = std::sqrt( l2_avg_u_previous  / total_volume_local);
     l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
-    reward_local       = 1.0 - ( l2_d_avg_u / l2_avg_u_previous + l2_d_rmsf_u / l2_rmsf_u_previous) * averaging_time;
+    reward_local       = 1.0 - ( l2_d_avg_u / l2_avg_u_previous + l2_d_rmsf_u / l2_rmsf_u_previous) * std::pow(averaging_time, 2.0);
 
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local
