@@ -19,7 +19,7 @@ using namespace std;
 #define _RL_CONTROL_IS_SUPERVISED_ 0
 #define _SPACE_AVERAGE_RL_ACTION_ 1
 #define _WITNESS_XZ_SLICES_ 1
-#define _TWO_DIMENSIONAL_STATE_ 1
+#define _INCLUDE_RL_TIME_INTO_STATE_ 1
 
 /// Pi number
 //const double pi = 2.0*asin( 1.0 );
@@ -522,12 +522,11 @@ void myRHEA::calculateSourceTerms() {
                 }
 
                 if ( !first_actuation_period_done ) {
-                    calculateReward();              /// initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous' (UNSUPERVISED)
+                    calculateReward();      /// update avg_u_previous_field, rmsf_u_previous_field for next reward calculation
                     updateState();
                     first_actuation_period_done = true;
                     previous_actuation_time = previous_actuation_time + actuation_period;
                     if (my_rank == 0) {
-                        cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'" << endl;
                         cout << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
                     }
                 } else {
@@ -587,22 +586,6 @@ void myRHEA::calculateSourceTerms() {
                     vector<vector<double>> Dij(3, vector<double>(3, 0.0));
                     vector<vector<double>> Qij(3, vector<double>(3, 0.0));
                     vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
-/// #if _SPACE_AVERAGE_RL_ACTION_
-///                     size_t actuation_idx_max = static_cast<size_t>(num_control_cubes) - 1;
-///                     double y_local_top_wall, y_local_bottom_wall;
-///                     double y_dist_to_local_top_wall, y_dist_to_local_bottom_wall;
-///                     double DeltaRkk_current, DeltaRkk_prev, DeltaRkk_next;
-///                     double DeltaThetaZ_current, DeltaThetaZ_prev, DeltaThetaZ_next;          
-///                     double DeltaThetaY_current, DeltaThetaY_prev, DeltaThetaY_next;          
-///                     double DeltaThetaX_current, DeltaThetaX_prev, DeltaThetaX_next;          
-///                     double DeltaXmap1_current,  DeltaXmap1_prev,  DeltaXmap1_next;      
-///                     double DeltaXmap2_current,  DeltaXmap2_prev,  DeltaXmap2_next;  
-///                     double y_central_current,   y_central_prev,   y_central_next;    
-///                     int space_avg_bottom_counter = 0;
-///                     int space_avg_top_counter    = 0;
-///                     int space_avg_none_counter   = 0;
-///                     int applied_action_counter   = 0;
-/// #endif
                     
                     /// Calculate DeltaRij = Rij_perturbated - Rij_original
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -614,73 +597,13 @@ void myRHEA::calculateSourceTerms() {
 
                                     /// Get perturbation values from RL agent
                                     actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
-/// #if _SPACE_AVERAGE_RL_ACTION_
-///                                     applied_action_counter += 1;
-///                                     /// Apply action space-averaging if needed
-///                                     y_local_bottom_wall         = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_INIY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_INIY_]-1,k)] );
-///                                     y_local_top_wall            = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_]+1,k)] );
-///                                     y_dist_to_local_bottom_wall = abs(y_local_bottom_wall - y_field[I1D(i,j,k)]);
-///                                     y_dist_to_local_top_wall    = abs(y_local_top_wall    - y_field[I1D(i,j,k)]);
-///                                     /// -> action averaging with previous action if close to local bottom wall (& not in global bottom wall, act_idx != 0)
-///                                     if ( ( y_dist_to_local_bottom_wall < y_dist_to_local_top_wall ) && ( actuation_idx > 0) ) {
-///                                         /// define current (my_rank) and previous action (my_rank - 1)
-///                                         DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_prev    = action_global_instant[(actuation_idx-1) * action_dim + 0];
-///                                         DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_prev = action_global_instant[(actuation_idx-1) * action_dim + 1];
-///                                         DeltaThetaY_current = action_global_instant[actuation_idx * action_dim + 2]; DeltaThetaY_prev = action_global_instant[(actuation_idx-1) * action_dim + 2];
-///                                         DeltaThetaX_current = action_global_instant[actuation_idx * action_dim + 3]; DeltaThetaX_prev = action_global_instant[(actuation_idx-1) * action_dim + 3];
-///                                         DeltaXmap1_current  = action_global_instant[actuation_idx * action_dim + 4]; DeltaXmap1_prev  = action_global_instant[(actuation_idx-1) * action_dim + 4];
-///                                         DeltaXmap2_current  = action_global_instant[actuation_idx * action_dim + 5]; DeltaXmap2_prev  = action_global_instant[(actuation_idx-1) * action_dim + 5];
-///                                         y_central_current   = control_cubes_y_central[actuation_idx];                y_central_prev   = control_cubes_y_central[actuation_idx-1];
-///                                         /// calculate space-averaged action
-///                                         DeltaRkk    = DeltaRkk_prev    + 0.5 * (DeltaRkk_current    - DeltaRkk_prev)    * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_prev) / (y_central_current - y_central_prev) ) );
-///                                         DeltaThetaZ = DeltaThetaZ_prev + 0.5 * (DeltaThetaZ_current - DeltaThetaZ_prev) * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_prev) / (y_central_current - y_central_prev) ) );
-///                                         DeltaThetaY = DeltaThetaY_prev + 0.5 * (DeltaThetaY_current - DeltaThetaY_prev) * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_prev) / (y_central_current - y_central_prev) ) );
-///                                         DeltaThetaX = DeltaThetaX_prev + 0.5 * (DeltaThetaX_current - DeltaThetaX_prev) * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_prev) / (y_central_current - y_central_prev) ) );
-///                                         DeltaXmap1  = DeltaXmap1_prev  + 0.5 * (DeltaXmap1_current  - DeltaXmap1_prev)  * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_prev) / (y_central_current - y_central_prev) ) );
-///                                         DeltaXmap2  = DeltaXmap2_prev  + 0.5 * (DeltaXmap2_current  - DeltaXmap2_prev)  * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_prev) / (y_central_current - y_central_prev) ) );
-///                                         /// Update counter for debugging
-///                                         space_avg_bottom_counter += 1;
-///                                     }
-///                                     /// -> action averaging with next action if close to local top wall (& not in global top wall, act_idx != )
-///                                     else if ( ( y_dist_to_local_bottom_wall > y_dist_to_local_top_wall ) && ( actuation_idx < actuation_idx_max ) ) {
-///                                         /// define current (my_rank) and next action (my_rank + 1)
-///                                         DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_next    = action_global_instant[(actuation_idx+1) * action_dim + 0];
-///                                         DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_next = action_global_instant[(actuation_idx+1) * action_dim + 1];
-///                                         DeltaThetaY_current = action_global_instant[actuation_idx * action_dim + 2]; DeltaThetaY_next = action_global_instant[(actuation_idx+1) * action_dim + 2];
-///                                         DeltaThetaX_current = action_global_instant[actuation_idx * action_dim + 3]; DeltaThetaX_next = action_global_instant[(actuation_idx+1) * action_dim + 3];
-///                                         DeltaXmap1_current  = action_global_instant[actuation_idx * action_dim + 4]; DeltaXmap1_next  = action_global_instant[(actuation_idx+1) * action_dim + 4];
-///                                         DeltaXmap2_current  = action_global_instant[actuation_idx * action_dim + 5]; DeltaXmap2_next  = action_global_instant[(actuation_idx+1) * action_dim + 5];
-///                                         y_central_current   = control_cubes_y_central[actuation_idx];                y_central_next   = control_cubes_y_central[actuation_idx+1];
-///                                         /// calculate space-averaged action
-///                                         DeltaRkk    = DeltaRkk_current    + 0.5 * (DeltaRkk_next    - DeltaRkk_current)    * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_current) / (y_central_next - y_central_current) ) );
-///                                         DeltaThetaZ = DeltaThetaZ_current + 0.5 * (DeltaThetaZ_next - DeltaThetaZ_current) * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_current) / (y_central_next - y_central_current) ) );
-///                                         DeltaThetaY = DeltaThetaY_current + 0.5 * (DeltaThetaY_next - DeltaThetaY_current) * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_current) / (y_central_next - y_central_current) ) );
-///                                         DeltaThetaX = DeltaThetaX_current + 0.5 * (DeltaThetaX_next - DeltaThetaX_current) * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_current) / (y_central_next - y_central_current) ) );
-///                                         DeltaXmap1  = DeltaXmap1_current  + 0.5 * (DeltaXmap1_next  - DeltaXmap1_current)  * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_current) / (y_central_next - y_central_current) ) );
-///                                         DeltaXmap2  = DeltaXmap2_current  + 0.5 * (DeltaXmap2_next  - DeltaXmap2_current)  * ( 1.0 - std::cos( M_PI * (y_field[I1D(i,j,k)] - y_central_current) / (y_central_next - y_central_current) ) );
-///                                         /// Update counter for debugging
-///                                         space_avg_top_counter += 1;
-///                                     }
-///                                     /// -> action not space averaged, far from the pseudo-environment boundaries
-///                                     else {
-///                                         DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-///                                         DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
-///                                         DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
-///                                         DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
-///                                         DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
-///                                         DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-///                                         /// Update counter for debugging
-///                                         space_avg_none_counter += 1;
-///                                     }
-/// #else                               
-                                    /// Do not apply action space-averaging 
                                     DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
                                     DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
                                     DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
                                     DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
                                     DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
                                     DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-/// #endif
+                                    
                                     /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
                                     isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
                                     Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
@@ -755,11 +678,7 @@ void myRHEA::calculateSourceTerms() {
                             }
                         }
                     }
-/// #if _SPACE_AVERAGE_RL_ACTION_
-///                     /// Debugging
-///                     cout << "Rank " << my_rank << " has applied accion in " << applied_action_counter << " points, with " 
-///                          << " space averaging in " << space_avg_bottom_counter << " (bottom), " << space_avg_top_counter << " (top), " << space_avg_none_counter << " (none) points" << endl; 
-/// #endif
+
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_DeltaRij" );
 
@@ -800,7 +719,7 @@ void myRHEA::calculateSourceTerms() {
                                 rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
                                 rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
                                 rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
-#endif
+#endif  /// of _SPACE_AVERAGE_RL_ACTION_
                             }
                         }
                     }
@@ -957,7 +876,7 @@ void myRHEA::calculateSourceTerms() {
                             }
                         }
                     }
-#endif
+#endif /// of _SPACE_AVERAGE_RL_ACTION_
 
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_control_term" );
@@ -982,7 +901,7 @@ void myRHEA::calculateSourceTerms() {
         }
     }               /// end if (rk_time_stage == 1)
     
-#endif
+#endif /// of _ACTIVE_CONTROL_BODY_FORCE_
 
     /// Update halo values
     f_rhou_field.update();
@@ -1099,7 +1018,7 @@ void myRHEA::timeAdvanceConservedVariables() {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 #endif
 #if _REGULARIZE_RL_ACTION_
-                /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+                /// ---- Smooth regularization of RL control load by hyperbolic tangent function ----
                 /// Calculate RL control load ratio wrt RHS with no RL control load
                 rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
                 rhov_rhs      = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)];
@@ -1124,8 +1043,8 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rl_f_rhou_field[I1D(i,j,k)] = rhou_rl_f_reg;
                 rl_f_rhov_field[I1D(i,j,k)] = rhov_rl_f_reg;
                 rl_f_rhow_field[I1D(i,j,k)] = rhow_rl_f_reg;
-                /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
-#endif
+#endif  /// of _REGULARIZE_RL_ACTION_
+
                 /// Work of momentum sources
                 f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)]) * u_field[I1D(i,j,k)]
                          + (f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]) * v_field[I1D(i,j,k)]
@@ -1648,10 +1567,14 @@ void myRHEA::preproceWitnessPoints() {
             state_local_size2_counter += 1;
         }
     }
-#if _TWO_DIMENSIONAL_STATE_
-    this->state_local_size2 = 2 * state_local_size2_counter;  // each mpi process updates attribute 'state_local_size2', x2 because each witness has 2-D state information
+    
+    // Each mpi process updates attribute 'state_local_size2'
+#if _INCLUDE_RL_TIME_INTO_STATE_
+    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, ||rmsf_u||_2, t_RL )
+    this->state_local_size2 = 3 * state_local_size2_counter;
 #else
-    this->state_local_size2 = state_local_size2_counter;  // each mpi process updates attribute 'state_local_size2'
+    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2, ||rmsf_u||_2 )
+    this->state_local_size2 = 2 * state_local_size2_counter;
 #endif
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
@@ -1949,7 +1872,7 @@ void myRHEA::updateState() {
     int xz_slice_points_counter;
 #else
     int i_index, j_index, k_index;
-#endif
+#endif  /// of _WITNESS_XZ_SLICES_
 
     for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Owner rank writes to file
@@ -1964,26 +1887,14 @@ void myRHEA::updateState() {
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
-#if _RL_CONTROL_IS_SUPERVISED_
-                    state_local[state_local_size2_counter]   += std::pow(rmsf_u_field[I1D(i,j_index,k)] - rmsf_u_reference_field[I1D(i,j_index,k)], 2.0);
-#if _TWO_DIMENSIONAL_STATE_
-                    state_local[state_local_size2_counter+1] += std::pow(avg_u_field[I1D(i,j_index,k)]  - avg_u_reference_field[I1D(i,j_index,k)], 2.0);
-#endif /// of _WITNESS_XZ_SLICES_
-
-#else  /// of _RL_CONTROL_IS_SUPERVISED_
-                    state_local[state_local_size2_counter]   += std::pow(rmsf_u_field[I1D(i,j_index,k)], 2.0);
-#if _TWO_DIMENSIONAL_STATE_
-                    state_local[state_local_size2_counter+1] += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
-#endif /// of _WITNESS_XZ_SLICES_
-#endif /// of _RL_CONTROL_IS_SUPERVISED_
-      
+                    state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(rmsf_u_field[I1D(i,j_index,k)], 2.0);
                     xz_slice_points_counter += 1;
                 }
             }
+
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
-#if _TWO_DIMENSIONAL_STATE_
             state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
-#endif /// from conditional _WITNESS_XZ_SLICES_
 
 #else ///  _WITNESS_XZ_SLICES_ 0
             /// Get local indices i, j, k
@@ -1992,25 +1903,19 @@ void myRHEA::updateState() {
             k_index = temporal_witness_probes[twp].getLocalIndexK();
 
             /// Calculate state value/s
-#if _RL_CONTROL_IS_SUPERVISED_
-            state_local[state_local_size2_counter]   = rmsf_u_field[I1D(i_index,j_index,k_index)] - rmsf_u_reference_field[I1D(i_index,j_index,k_index)];
-#if _TWO_DIMENSIONAL_STATE_
-            state_local[state_local_size2_counter+1] = avg_u_field[I1D(i_index,j_index,k_index)]  - avg_u_reference_field[I1D(i_index,j_index,k_index)];
-#endif /// of _TWO_DIMENSIONAL_STATE_
-
-#else  /// of _RL_CONTROL_IS_SUPERVISED_
-            state_local[state_local_size2_counter]   = rmsf_u_field[I1D(i_index,j_index,k_index)];
-#if _TWO_DIMENSIONAL_STATE_
-            state_local[state_local_size2_counter+1] = avg_u_field[I1D(i_index,j_index,k_index)];
-#endif /// of _TWO_DIMENSIONAL_STATE_
-#endif /// of _RL_CONTROL_IS_SUPERVISED_
+            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+1] = rmsf_u_field[I1D(i_index,j_index,k_index)];
 #endif /// of _WITNESS_XZ_SLICES_
 
+#if _INCLUDE_RL_TIME_INTO_STATE_
+            state_local[state_local_size2_counter+2] = current_time - begin_actuation_time;
+#endif /// of _INCLUDE_RL_TIME_INTO_STATE_
+
             /// Update local state counter
-#if _TWO_DIMENSIONAL_STATE_
-            state_local_size2_counter += 2;
+#if _INCLUDE_RL_TIME_INTO_STATE_
+            state_local_size2_counter += 3;
 #else
-            state_local_size2_counter += 1;
+            state_local_size2_counter += 2;
 #endif
         }
     }
@@ -2054,9 +1959,15 @@ void myRHEA::calculateReward() {
     l2_rmsf_u_reference = std::sqrt( l2_rmsf_u_reference / length_y );
     relative_l2_err_avg_u  = l2_err_avg_u  / l2_avg_u_reference;
     relative_l2_err_rmsf_u = l2_err_rmsf_u / l2_rmsf_u_reference;
-    reward_local = 1.0 - relative_l2_err_avg_u - relative_l2_err_rmsf_u;
+    reward_local = ( 1.0 - ( relative_l2_err_avg_u + relative_l2_err_rmsf_u ) )
+                   * std::pow(current_time - begin_actuation_time, 2.0);
     /// Debugging
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << endl;
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local
+         << ", with l2_err_avg_u: " << l2_err_avg_u
+         << ", l2_err_rmsf_u: " << l2_err_rmsf_u
+         << ", l2_avg_u_reference: " << l2_avg_u_reference
+         << ", l2_rmsf_u_reference: " << l2_rmsf_u_reference
+         << ", current_time - begin_averaging_time: " << (current_time - begin_actuation_time) << endl;
 
 #else                           /// Unsupervised Reward
     /// Initialize variables
@@ -2088,7 +1999,8 @@ void myRHEA::calculateReward() {
     l2_d_rmsf_u        = std::sqrt( l2_d_rmsf_u / total_volume_local);
     l2_avg_u_previous  = std::sqrt( l2_avg_u_previous  / total_volume_local);
     l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
-    reward_local       = 1.0 - ( l2_d_avg_u / l2_avg_u_previous + l2_d_rmsf_u / l2_rmsf_u_previous) * std::pow(averaging_time, 2.0);
+    reward_local       = ( 1.0 - ( ( l2_d_avg_u / l2_avg_u_previous ) + ( l2_d_rmsf_u / l2_rmsf_u_previous ) ) )
+                         * std::pow(current_time - begin_actuation_time, 2.0);
 
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local
@@ -2096,7 +2008,7 @@ void myRHEA::calculateReward() {
          << ", l2_d_rmsf_u: " << l2_d_rmsf_u
          << ", l2_avg_u_previous: " << l2_avg_u_previous
          << ", l2_rmsf_u_previous: " << l2_rmsf_u_previous 
-         << ", averaging_time: " << averaging_time << endl;
+         << ", current_time - begin_averaging_time: " << (current_time - begin_actuation_time) << endl;
     
     /// Update avg_u_previous_field & rmsf_u_previous_field for next reward calculation
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
