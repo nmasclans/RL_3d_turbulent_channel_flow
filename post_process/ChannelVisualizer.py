@@ -584,13 +584,16 @@ class ChannelVisualizer():
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
-            ymin = np.min([np.min(um_ref),np.min(um_odt)])
-            ymax = np.min([np.max(um_ref),np.max(um_odt)])
+            if ylim is None:
+                ymin = np.min([np.min(um_ref),np.min(um_odt)])
+                ymax = np.min([np.max(um_ref),np.max(um_odt)])
+            else:
+                ymin, ymax = ylim
             for i in range(len(x_actuator_boundaries)):
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
-        plt.semilogx(yplus_ref, um_ref, '-', color="black", lw=2, label=r"Reference")
-        plt.semilogx(yplus_odt, um_odt, '-', color="tab:green", lw=2, label=r"RL")
+        plt.semilogx(yplus_ref, um_ref, '-', color="black",     lw=2, label=r"Reference")
+        plt.semilogx(yplus_odt, um_odt, ':', color="tab:green", lw=2, label=r"RL")
 
         if ylim is not None:
             plt.ylim(ylim)
@@ -619,13 +622,16 @@ class ChannelVisualizer():
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
-            ymin = np.min([np.min(urmsf_ref),np.min(urmsf_odt)])
-            ymax = np.min([np.max(urmsf_ref),np.max(urmsf_odt)])
+            if ylim is None:
+                ymin = np.min([np.min(um_ref),np.min(um_odt)])
+                ymax = np.min([np.max(um_ref),np.max(um_odt)])
+            else:
+                ymin, ymax = ylim
             for i in range(len(x_actuator_boundaries)):
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
-        plt.semilogx(yplus_ref, urmsf_ref, '--',  color='black', label=r"Reference")
-        plt.semilogx(yplus_odt, urmsf_odt, '-',   color='black', label=r"RL")
+        plt.semilogx(yplus_ref, urmsf_ref, '-',  color='black',     label=r"Reference")
+        plt.semilogx(yplus_odt, urmsf_odt, ':',  color='tab:green', label=r"RL")
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
