@@ -324,7 +324,7 @@ print("Triangle barycentric map plotted successfully!")
 
 print("Building gif frames...")
 frames_avg_u = []; frames_rmsf_u = []; frames_rkk = []; frames_eig = []; frames_xmap_coord = []; frames_xmap_triang = []; 
-avg_u_max    = int(np.max([np.max(avg_u_RL),  np.max(avg_u_nonRL),  np.max(avg_u_ref)]))+1
+avg_u_max    = 20.0
 rmsf_u_max   = int(np.max([np.max(rmsf_u_RL), np.max(rmsf_u_nonRL), np.max(rmsf_u_ref)]))+1
 for i_RL in range(n_RL):
     # log progress
