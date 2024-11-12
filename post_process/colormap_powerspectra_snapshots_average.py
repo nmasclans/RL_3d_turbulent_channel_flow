@@ -1,5 +1,3 @@
-import h5py
-import os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +12,8 @@ from matplotlib import cm, ticker
 from matplotlib.ticker import LogLocator, FuncFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter1d
+
+from utils import build_csv_from_h5_snapshot
 
 #np.set_printoptions(threshold=sys.maxsize)
 #plt.rc( 'text', usetex = True )
@@ -48,6 +48,8 @@ u_tau = 1.0
 rho_w = 1.0  
 mu_w  = rho_w * u_tau / Re_tau  # = 1.0 / Re_tau
 nu_w  = mu_w / rho_w            # = 1.0 / Re_tau
+print(f"\nFlow parameters: \n- Re_tau: {Re_tau}\n- u_tau: {u_tau}\n- rho_w: {rho_w}\n- mu_w: {mu_w}\n- nu_w: {nu_w}")
+
 # Domain & Grid parameters
 delta = 1.0
 L_x   = 12.566370614 
@@ -64,13 +66,30 @@ elif Re_tau == 180:
     num_grid_y = 128
     A_x = 0
     A_y = -1.875
+else:
+    raise ValueError(f"Unknown Grid and Stretching parameters for Re_tau = {Re_tau}")
 x_0 = 0.0
 eta = (1.0 - 0.5) / num_grid_y
 delta_viscous = x_0 + L_y * eta + A_y * (0.5 * L_y - L_y * eta) * (1.0 - eta) * eta    # [m]
+print(f"\nDomain & Grid parameters: \n- delta: {delta}\n- L_x: {L_x}\n- L_y: {L_y}\n- num_grid_x: {num_grid_x}\n- num_grid_y: {num_grid_x}\n- A_x: {A_x}\n- A_y: {A_y}\n- eta: {eta}\n- delta_viscous: {delta_viscous}")
+
 # Spatial -> Temporal advancement conversion
 assert A_x == 0.0, "dx -> dt Not implemented for stretching in x-direction A_x != 0.0"
-t_ftt = delta / u_tau           # [s]
+t_ftt = delta / u_tau           # flow-through-time [s]
 dt_dx = t_ftt / L_x             # [s/m]
+print(f"\nSpatial to Temporal conversion: \n- t_ftt: {t_ftt}\n- dt_dx: {dt_dx}")
+
+# Probes y-coordinates at RL agent location - center y-coordinate of control cubes
+if Re_tau == 100.0:
+    probes_y_coords = np.array([0.125, 0.375, 0.625, 0.875, 1.125, 1.375, 1.625, 1.875])
+elif Re_tau == 180:
+    probes_y_coords = np.array([0.059369, 0.208542, 0.4811795, 0.819736, 1.18026, 1.51882, 1.79146, 1.94063])
+else:
+    raise ValueError(f"Unknown 'y_probes' for Re_tau = {Re_tau}")
+probes_z_coords   = 2.0
+probes_zy_desired = np.array(np.meshgrid(probes_z_coords, probes_y_coords)).T.reshape(-1,2)   # shape: [n_probes, 2]
+n_probes          = probes_zy_desired.shape[0]    # num.probes in the zy-plane, num. pairs of (z,y) coordinates
+
 # Visualization parameters
 window_length   = 11 # Adjust based on your data
 polyorder       = 3
@@ -83,32 +102,24 @@ plot_test       = False
 fontsize        = 18
 resolution      = 192
 
-# TODO: erase directories parameters
-#name_directory =          "D192"
-#directories = [ "probeline_D192_x_over_Lx_0.20_probes",
-#                "probeline_D192_x_over_Lx_0.40_probes",
-#                "probeline_D192_x_over_Lx_0.60_probes",
-#                "probeline_D192_x_over_Lx_0.80_probes"]
+# h5 files for Reference, non-RL and RL data
+filename_ref   = f"./data_Retau{Re_tau:.0f}/3d_turbulent_channel_flow_reference.h5"
+filename_nonRL = []     # TODO: implement!
+filename_RL    = []     # TODO: implement!
+kwargs = {"num_grid_x": num_grid_x, 
+          "num_grid_y": num_grid_y,
+          "dt_dx": dt_dx,
+          "n_probes": n_probes,
+          "probes_zy_desired": probes_zy_desired
+}
 
-def build_csv_from_h5_snapshot(filename_h5):
-    # Get data: x, y, z, u, v, w; attributes: time
-    with h5py.File(filename_h5, 'r') as file:
-        time   = file.attrs['time']
-        x_data = file['x'][1:-1,1:-1,1:-1]    # 1:-1 to take only inner grid points
-        y_data = file['x'][1:-1,1:-1,1:-1]
-        z_data = file['x'][1:-1,1:-1,1:-1]
-        u_data = file['u'][1:-1,1:-1,1:-1]
-        v_data = file['v'][1:-1,1:-1,1:-1]
-        w_data = file['w'][1:-1,1:-1,1:-1]
-    num_points_z, num_points_y, num_points_x = u_data.shape
-    assert num_points_x == num_grid_x & num_points_y == num_grid_y
-    # Convert dx -> dt
-    t0 = time
-    x0 = x_data[0,0,0]
-    dx_data   = x_data - x0             # shape [num_points_z, num_points_y, num_points_x]
-    time_data = t0 + dt_dx * dx_data    # shape [num_points_z, num_points_y, num_points_x]
-    x_data    = np.ones([num_points_z, num_points_y, num_points_x]) * x0
-    # TODO: continue from here!
+# Generated probes data (csv) directories
+probes_dir_ref   = f"./data_Retau{Re_tau:.0f}/probelines"
+probes_dir_nonRL = ""   # TODO: implement!
+probes_dir_RL    = ""   # TODO: implement!
+
+build_csv_from_h5_snapshot(filename_ref, "reference", probes_dir_ref, **kwargs)
+# TODO: do the same for nonRL and RL files
 
 """
 def exponential_moving_average(signal, alpha=0.3):

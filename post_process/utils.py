@@ -1,6 +1,7 @@
+import h5py
 import numpy as np
 import math
-
+import os
 
 #-----------------------------------------------------------------------------------------
 #           Anisotropy tensor, eigen-decomposition, mapping to barycentric map 
@@ -143,3 +144,63 @@ def compute_reynolds_stress_dof(Rxx, Rxy, Rxz, Ryy, Ryz, Rzz,
         xmap2[p]   = bar_map_xy[1]
 
     return (Rkk, lambda1, lambda2, lambda3, xmap1, xmap2)
+
+#-----------------------------------------------------------------------------------------
+#           Temporal probes at (y,z) coordinate pair along x-direction 
+#-----------------------------------------------------------------------------------------
+
+
+def build_csv_from_h5_snapshot(input_h5_filepath, file_details, output_csv_directory, num_grid_x, num_grid_y, dt_dx, n_probes, probes_zy_desired):
+
+    # Get data: x, y, z, u, v, w; attributes: time
+    with h5py.File(input_h5_filepath, 'r') as file:
+        t0     = file.attrs['Time']
+        x_data = file['x'][1:-1,1:-1,1:-1]    # 1:-1 to take only inner grid points
+        y_data = file['x'][1:-1,1:-1,1:-1]
+        z_data = file['x'][1:-1,1:-1,1:-1]
+        u_data = file['u'][1:-1,1:-1,1:-1]
+        v_data = file['v'][1:-1,1:-1,1:-1]
+        w_data = file['w'][1:-1,1:-1,1:-1]
+    num_points_z, num_points_y, num_points_x = u_data.shape
+    assert num_points_x == num_grid_x & num_points_y == num_grid_y
+    
+    # Convert dx -> dt --> rebuild 'x_data' and 'time_data' to translate spatial advancement to temporal advancement
+    x0 = x_data[0,0,0]
+    dx_data = x_data - x0             # shape [num_points_z, num_points_y, num_points_x]
+    t_data  = t0 + dt_dx * dx_data    # shape [num_points_z, num_points_y, num_points_x]
+    x_data  = x0 * np.ones([num_points_z, num_points_y, num_points_x])
+    
+    # Find probes (z,y) coordinates closest to chosen 'zy_probes' pairs of coordinates
+    # ASSUMPTION: regular grid!
+    probes_zy = np.zeros([n_probes,2])  # (z,y) coordinates pairs
+    probes_kj = np.zeros([n_probes,2])  # (k,j) indexes paris (on z,y-directions) 
+    y_coords = y_data[0,:,0]
+    z_coords = z_data[:,0,0] 
+    for i_probe in range(n_probes):
+        [z_i, y_i] = probes_zy_desired[i_probe,:]
+        k_i = np.argmin(np.abs(z_coords - z_i));    z_i = z_coords[k_i]
+        j_i = np.argmin(np.abs(y_coords - y_i));    y_i = y_coords[k_i]
+        probes_kj[i_probe,:] = [k_i, j_i];          probes_zy[i_probe,:] = [z_i, y_i]
+    print(f"\nDesired probes (z,y)-coordinates: \n{probes_zy_desired}")
+    print(f"\nFound probes (z,y)-coordinates: \n{probes_zy}")
+    print(f"\nFound probes (k,z)-index for (z,y)-coordinates: \n{probes_kj}")
+    
+    # Get probes data and store in csv file
+    print("\nSaving probes data...")
+    for i_probe in range(n_probes):
+        k,j = probes_kj[i_probe,:]
+        t_ = t_data[k,j,:]    # 1-D array, length num_points_x (= num_points_t)
+        x_ = x_data[k,j,:]
+        y_ = y_data[k,j,:]
+        z_ = z_data[k,j,:]
+        u_ = u_data[k,j,:]
+        v_ = v_data[k,j,:]
+        w_ = w_data[k,j,:]
+        fname_ = os.path.join(output_csv_directory, f'{file_details}_probeline{i_probe}_k{k}_j{k}.csv')
+        np.savetxt(fname_, 
+                   X=(t_, x_, y_, z_, u_, v_, w_),
+                   header='# t[s]    x[m]    y[m]    z[m]    rho[kg/m3]    u[m/s]    v[m/s]    w[m/s]',
+                   delimiter=' ',
+                   fmt='%.10e',
+        )
+        print(f"Probe {i_probe} in '{fname_}'")
