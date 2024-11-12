@@ -6,11 +6,8 @@ import glob
 import numpy as np
 import h5py    
 import matplotlib.pyplot as plt
-from matplotlib.transforms import Bbox
-from matplotlib import rc,rcParams
-import matplotlib.colors as colors
-from matplotlib import ticker
-import matplotlib.cm as cm
+from matplotlib import rc, rcParams
+
 #np.set_printoptions(threshold=sys.maxsize)
 #plt.rc( 'text', usetex = True )
 #rc('font', family='sanserif')
@@ -18,7 +15,6 @@ import matplotlib.cm as cm
 #plt.rcParams['text.latex.preamble'] = [ r'\usepackage{amsmath}', r'\usepackage{amssymb}', r'\usepackage{color}' ]
 
 #--------------------------------------------------------------------------------------------
-
 
 # --- Get CASE parameters ---
 
