@@ -60,7 +60,9 @@ postDir = train_name
 if not os.path.exists(postDir):
     os.mkdir(postDir)
 
-# --- RL pseudo-environments / actuators boundaries ---
+# Reference & non-RL data directory
+filePath = os.path.dirname(os.path.abspath(__file__))
+compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 
 if np.isclose(Re_tau, 100, atol=1e-8):
     Re_tau_theoretical = 100.0
@@ -106,10 +108,10 @@ else:
     print(f"No files found matching the pattern: {pattern}")
 
 # --- non-RL (not-converged) filename ---
-filename_nonRL = f"{case_dir}/post_process/reference_data/3d_turbulent_channel_flow_{iteration}.h5"
+filename_nonRL = f"{compareDatasetDir}/3d_turbulent_channel_flow_{iteration}.h5"
 
 # --- non-RL converged reference filename ---
-filename_ref = f"{case_dir}/post_process/reference_data/3d_turbulent_channel_flow_reference.h5"
+filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 
 # ----------- Get RL and non-RL data ------------
 
@@ -123,8 +125,13 @@ if not os.path.isfile(filename_nonRL):
     sys.exit(1)
 
 # --- Get RL (non-converged) data from h5 files ---
-print("\nImporting RL data from h5 files...")
+
+print("\nImporting data from files...")
+print("\nImporting data from RL files:")
+
 n_RL = len(filename_RL_list)
+print(f"Num. RL files: {n_RL}")
+
 for i_RL in range(n_RL):
     filename_RL = filename_RL_list[i_RL]
     with h5py.File( filename_RL, 'r' ) as data_file:
@@ -156,7 +163,6 @@ for i_RL in range(n_RL):
         favre_vffvff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         favre_vffwff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         favre_wffwff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
-        print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL:.6f}")
     # Fill allocation arrays
     y_data_RL[i_RL,:,:,:]            = y_data_RL_aux
     avg_u_data_RL[i_RL,:,:,:]        = avg_u_data_RL_aux
@@ -167,9 +173,11 @@ for i_RL in range(n_RL):
     favre_vffvff_data_RL[i_RL,:,:,:] = favre_vffvff_data_RL_aux
     favre_vffwff_data_RL[i_RL,:,:,:] = favre_vffwff_data_RL_aux
     favre_wffwff_data_RL[i_RL,:,:,:] = favre_wffwff_data_RL_aux
-    ### # Check same averaging time
-    ### if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
-    ###     raise ValueError("Averaging time should be equal for all RL h5 files")
+    # Check same averaging time
+    if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
+        raise ValueError("Averaging time should be equal for all RL h5 files")
+    # Logging
+    print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL:.6f}")
 
 # --- Get non-RL (non-converged) data from h5 file ---
 print(f"\nImporting non-RL non-converged data from file '{filename_nonRL}'...")
@@ -316,8 +324,8 @@ print("Rij decomposed successfully!")
 print("Building triangle barycentric map plots...")
 #for i_RL in range(n_RL):
 #    visualizer.build_anisotropy_tensor_barycentric_xmap_triang(y_delta_RL,    xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_nonConv, f"anisotropy_tensor_barycentric_map_RL_{file_details_list[i_RL]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_nonRL, xmap1_nonRL,    xmap2_nonRL,    averaging_time_nonConv, f"anisotropy_tensor_barycentric_map_nonRL")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_ref,   xmap1_ref,      xmap2_ref,      averaging_time_ref,     f"anisotropy_tensor_barycentric_map_ref")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_nonRL, xmap1_nonRL,    xmap2_nonRL,    averaging_time_nonConv, f"anisotropy_tensor_barycentric_map_nonRL_{iteration}")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_ref,   xmap1_ref,      xmap2_ref,      averaging_time_ref,     "anisotropy_tensor_barycentric_map_ref")
 print("Triangle barycentric map plotted successfully!")
 
 # ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
@@ -339,7 +347,7 @@ for i_RL in range(n_RL):
     frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_nonConv, global_step_list[i_RL])
 
 print("Building gifs from frames...")
-visualizer.build_main_gifs_from_frames(frames_avg_u, frames_rmsf_u, frames_rkk, frames_eig, frames_xmap_coord, frames_xmap_triang)
+visualizer.build_main_gifs_from_frames(frames_avg_u, frames_rmsf_u, frames_rkk, frames_eig, frames_xmap_coord, frames_xmap_triang, iteration)
 print("Gifs plotted successfully!")
 
 

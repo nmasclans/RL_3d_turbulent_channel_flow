@@ -2,3 +2,5 @@
 /data_Retau100
 /data_Retau180
 *.csv
+*.h5
+*.xdmf

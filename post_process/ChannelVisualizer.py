@@ -688,7 +688,7 @@ class ChannelVisualizer():
 
 # --------------------- anisotropy tensor barycentric map in barycentric realizable triangle ------------------------
 
-    def build_anisotropy_tensor_barycentric_xmap_triang(self, y_delta, bar_map_x, bar_map_y, avg_time, title):
+    def build_anisotropy_tensor_barycentric_xmap_triang(self, y_delta, bar_map_x, bar_map_y, avg_time, filename):
         
         plt.figure()
 
@@ -719,9 +719,9 @@ class ChannelVisualizer():
         plt.title(rf"$t^+ = {avg_time:.2f}$")
         
         # save figure
-        filename = os.path.join(self.postRlzDir, f"{title}")
-        print(f"\nMAKING PLOT OF BARYCENTRIC MAP OF ANISOTROPY TENSOR in {filename}" )
-        plt.savefig(filename)
+        filepath = os.path.join(self.postRlzDir, f"{filename}")
+        print(f"\nMAKING PLOT OF BARYCENTRIC MAP OF ANISOTROPY TENSOR in {filepath}" )
+        plt.savefig(filepath)
 
 
     def build_anisotropy_tensor_barycentric_xmap_triang_frame(self, frames, y_delta, bar_map_x, bar_map_y, avg_time, global_step):
@@ -1001,29 +1001,29 @@ class ChannelVisualizer():
     
 # ------------------------------------------------------------------------
 
-    def build_main_gifs_from_frames(self, frames_avg_u, frames_rmsf_u, frames_rkk, frames_eig, frames_xmap_coord, frames_xmap_triang):
+    def build_main_gifs_from_frames(self, frames_avg_u, frames_rmsf_u, frames_rkk, frames_eig, frames_xmap_coord, frames_xmap_triang, iteration=None):
       
-        filename = os.path.join(self.postRlzDir, "u_mean_global_steps.gif")
+        filename = os.path.join(self.postRlzDir, f"u_mean_global_steps_{iteration}.gif")
         print(f"\nMAKING GIF U-MEAN for RUNTIME calculations along TRAINING GLOBAL STEPS in {filename}" )
         frames_avg_u[0].save(filename, save_all=True, append_images=frames_avg_u[1:], duration=100, loop=0)    
 
-        filename = os.path.join(self.postRlzDir, "u_rms_global_steps.gif")
+        filename = os.path.join(self.postRlzDir, f"u_rms_global_steps_{iteration}.gif")
         print(f"\nMAKING GIF U-RMSF for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
         frames_rmsf_u[0].save(filename, save_all=True, append_images=frames_rmsf_u[1:], duration=100, loop=0)    
 
-        filename = os.path.join(self.postRlzDir, "anisotropy_tensor_Rkk_trace_global_steps.gif")
+        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_Rkk_trace_global_steps_{iteration}.gif")
         print(f"\nMAKING GIF TRACE/MAGNITUDE OF REYNOLDS STRESS TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
         frames_rkk[0].save(filename, save_all=True, append_images=frames_rkk[1:], duration=100, loop=0)    
 
-        filename = os.path.join(self.postRlzDir, "anisotropy_tensor_eigenvalues_global_steps.gif")
+        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_eigenvalues_global_steps_{iteration}.gif")
         print(f"\nMAKING GIF EIGENVALUES OF ANISOTROPY TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
         frames_eig[0].save(filename, save_all=True, append_images=frames_eig[1:], duration=100, loop=0)
 
-        filename = os.path.join(self.postRlzDir, "anisotropy_tensor_barycentric_map_coord_global_steps.gif")
+        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_barycentric_map_coord_global_steps_{iteration}.gif")
         print(f"\nMAKING GIF OF BARYCENTRIC MAP COORDINATES OF ANISOTROPY TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
         frames_xmap_coord[0].save(filename, save_all=True, append_images=frames_xmap_coord[1:], duration=100, loop=0)
 
-        filename = os.path.join(self.postRlzDir, "anisotropy_tensor_barycentric_map_triang_global_steps.gif")
+        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_barycentric_map_triang_global_steps_{iteration}.gif")
         print(f"\nMAKING GIF OF BARYCENTRIC MAP REALIZABLE TRIANGLE OF ANISOTROPY TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
         frames_xmap_triang[0].save(filename, save_all=True, append_images=frames_xmap_triang[1:], duration=100, loop=0)
 

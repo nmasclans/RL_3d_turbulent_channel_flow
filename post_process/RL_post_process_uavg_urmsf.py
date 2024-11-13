@@ -36,10 +36,14 @@ delta   = 1.0				# Channel half-height [m]
 mu_ref  = rho_0*u_tau*delta/Re_tau	# Dynamic viscosity [Pa s]
 nu_ref  = mu_ref/rho_0			# Kinematic viscosity [m2/s]
 
-# post-processing directory
+# training post-processing directory
 postDir = train_name
 if not os.path.exists(postDir):
     os.mkdir(postDir)
+
+# Reference & non-RL data directory
+filePath = os.path.dirname(os.path.abspath(__file__))
+compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 
 max_length_legend_RL = 10
 
@@ -88,10 +92,10 @@ else:
     print(f"No files found matching the pattern: {pattern}")
 
 # --- non-RL (not-converged) filename ---
-filename_nonRL = f"{case_dir}/post_process/reference_data/3d_turbulent_channel_flow_{iteration}.h5"
+filename_nonRL = f"{compareDatasetDir}/3d_turbulent_channel_flow_{iteration}.h5"
 
 # --- non-RL converged reference filename ---
-filename_ref = f"{case_dir}/post_process/reference_data/3d_turbulent_channel_flow_reference.h5"
+filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 
 # ----------- Get RL and non-RL data ------------
 
@@ -108,9 +112,13 @@ if not os.path.isfile(filename_ref):
     sys.exit(1)
 
 # --- Get RL (non-converged) data from h5 files ---
+
 print("\nImporting data from files...")
+print("\nImporting data from RL files:")
+
 n_RL = len(filename_RL_list)
 print(f"Num. RL files: {n_RL}")
+
 for i_RL in range(n_RL):
     filename_RL = filename_RL_list[i_RL]
     with h5py.File( filename_RL, 'r' ) as data_file:
@@ -137,7 +145,6 @@ for i_RL in range(n_RL):
         rmsf_u_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         rmsf_v_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
         rmsf_w_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
-        print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL:.6f}")
     # Fill allocation arrays
     y_data_RL[i_RL,:,:,:]      = y_data_RL_aux
     avg_u_data_RL[i_RL,:,:,:]  = avg_u_data_RL_aux
@@ -147,8 +154,10 @@ for i_RL in range(n_RL):
     rmsf_v_data_RL[i_RL,:,:,:] = rmsf_v_data_RL_aux
     rmsf_w_data_RL[i_RL,:,:,:] = rmsf_w_data_RL_aux
     # Check same averaging time
-    ### if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
-    ###     raise ValueError("Averaging time should be equal for all RL h5 files")
+    if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
+        raise ValueError("Averaging time should be equal for all RL h5 files")
+    # Logging
+    print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL:.6f}")
 
 # --- Get non-RL (non-converged) data from h5 file ---
 with h5py.File( filename_nonRL, 'r' ) as data_file:
@@ -160,7 +169,7 @@ with h5py.File( filename_nonRL, 'r' ) as data_file:
     rmsf_u_data_nonRL = data_file['rmsf_u'][1:-1,1:-1,1:-1]
     rmsf_v_data_nonRL = data_file['rmsf_v'][1:-1,1:-1,1:-1]
     rmsf_w_data_nonRL = data_file['rmsf_w'][1:-1,1:-1,1:-1]
-print(f"Non-RL non-converged data imported from file '{filename_nonRL}' - averaging time: {averaging_time_nonRL:.6f}")
+print(f"\nNon-RL non-converged data imported from file '{filename_nonRL}' - averaging time: {averaging_time_nonRL:.6f}")
 ### Check same averaging time for RL & non-RL
 ###if not np.isclose(averaging_time_RL, averaging_time_nonRL, atol=1e-8):
 ###    raise ValueError(f"Averaging time should be equal for both RL & non-RL h5 files, while RL: {averaging_time_RL} != nonRL: {averaging_time_nonRL}")
@@ -178,7 +187,7 @@ with h5py.File( filename_ref, 'r' ) as data_file:
     rmsf_v_data_ref = data_file['rmsf_v'][1:-1,1:-1,1:-1]
     rmsf_w_data_ref = data_file['rmsf_w'][1:-1,1:-1,1:-1]
 assert averaging_time_ref > averaging_time_nonConv, f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging time {averaging_time_nonConv:.6f}"
-print(f"Non-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
+print(f"\nNon-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
 print("Data imported successfully!")
 
 # -------------- Averaging fields using XZ symmetries --------------
