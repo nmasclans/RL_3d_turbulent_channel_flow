@@ -156,8 +156,8 @@ def build_csv_from_h5_snapshot(input_h5_filepath, file_details, output_csv_direc
     with h5py.File(input_h5_filepath, 'r') as file:
         t0     = file.attrs['Time']
         x_data = file['x'][1:-1,1:-1,1:-1]    # 1:-1 to take only inner grid points
-        y_data = file['x'][1:-1,1:-1,1:-1]
-        z_data = file['x'][1:-1,1:-1,1:-1]
+        y_data = file['y'][1:-1,1:-1,1:-1]
+        z_data = file['z'][1:-1,1:-1,1:-1]
         u_data = file['u'][1:-1,1:-1,1:-1]
         v_data = file['v'][1:-1,1:-1,1:-1]
         w_data = file['w'][1:-1,1:-1,1:-1]
@@ -169,17 +169,17 @@ def build_csv_from_h5_snapshot(input_h5_filepath, file_details, output_csv_direc
     dx_data = x_data - x0             # shape [num_points_z, num_points_y, num_points_x]
     t_data  = t0 + dt_dx * dx_data    # shape [num_points_z, num_points_y, num_points_x]
     x_data  = x0 * np.ones([num_points_z, num_points_y, num_points_x])
-    
+
     # Find probes (z,y) coordinates closest to chosen 'zy_probes' pairs of coordinates
     # ASSUMPTION: regular grid!
-    probes_zy = np.zeros([n_probes,2])  # (z,y) coordinates pairs
-    probes_kj = np.zeros([n_probes,2])  # (k,j) indexes paris (on z,y-directions) 
+    probes_zy = np.zeros([n_probes,2])                  # (z,y) coordinates pairs
+    probes_kj = np.zeros([n_probes,2], dtype='int64')   # (k,j) indexes paris (on z,y-directions) 
     y_coords = y_data[0,:,0]
     z_coords = z_data[:,0,0] 
     for i_probe in range(n_probes):
         [z_i, y_i] = probes_zy_desired[i_probe,:]
         k_i = np.argmin(np.abs(z_coords - z_i));    z_i = z_coords[k_i]
-        j_i = np.argmin(np.abs(y_coords - y_i));    y_i = y_coords[k_i]
+        j_i = np.argmin(np.abs(y_coords - y_i));    y_i = y_coords[j_i]
         probes_kj[i_probe,:] = [k_i, j_i];          probes_zy[i_probe,:] = [z_i, y_i]
     print(f"\nDesired probes (z,y)-coordinates: \n{probes_zy_desired}")
     print(f"\nFound probes (z,y)-coordinates: \n{probes_zy}")
