@@ -310,10 +310,10 @@ def process_probeline_h5(file_path, params):
     # Transform y to y+ coordinate
     isBottomWall = y_probe < delta
     if isBottomWall:
-        print("Probeline in bottom wall")
+        print(f"Probeline in bottom wall, y = {y_probe}")
         y_plus_probe = y_probe * rho0 * u_tau / mu0
     else: 
-        print("Probeline in top wall")
+        print(f"Probeline in top wall, y = {y_probe}")
         y_plus_probe = (2 * delta - y_probe) * rho0 * u_tau / mu0
 
     # Check Assumption 2: constant probeline time-step (required to calculate fft!)
@@ -394,27 +394,68 @@ def process_probeline_h5(file_path, params):
 
 
 
-    def process_probelines_list(probes_filepath_list, file_details, params):
+def process_probelines_list(probes_filepath_list, file_details, params):
         
-        print(f"\nProcessing probelines list...")
-        
-        # Get probelines data from each probeline h5 file
-        y_plus_dict = {}
-        wavelength_dict = {}
-        wavenumber_dict = {}
-        nonfiltered_streamwise_momentum_spectra_dict = {}
-        streamwise_momentum_spectra_dict = {}
-        n_probes = len(probes_filepath_list)
-        for i_probe in range(n_probes):
-            file_path = probes_filepath_list[i_probe]
-            y_plus, wavelength, wavenumber, nonfiltered_streamwise_momentum_spectra, streamwise_momentum_spectra \
-                = process_probeline_h5(file_path, params)
-            y_plus_dict[i_probe] = y_plus
-            wavelength_dict[i_probe] = wavelength
-            wavenumber_dict[i_probe] = wavenumber
-            nonfiltered_streamwise_momentum_spectra_dict[i_probe] = nonfiltered_streamwise_momentum_spectra
-            streamwise_momentum_spectra_dict[i_probe] = streamwise_momentum_spectra
-        
-        # Average streamwise-momentum-spectra for probes with same y_plus coordinate
-        averaged_probes_dict = {}
-        # TODO: continue here!
+    print(f"\nProcessing probelines list...")
+    
+    # Get probelines data from each probeline h5 file
+    # use lists because the number of wavenumbers is unknown, shape [n_probes, ?]
+    y_plus_list = []        
+    wavelength_list = []
+    wavenumber_list = []
+    nonfiltered_streamwise_momentum_spectra_list = []
+    streamwise_momentum_spectra_list = []
+    n_probes = len(probes_filepath_list)
+    for i_probe in range(n_probes):
+        file_path = probes_filepath_list[i_probe]
+        y_plus_i, wavelength_i, wavenumber_i, nonfiltered_streamwise_momentum_spectra_i, streamwise_momentum_spectra_i \
+            = process_probeline_h5(file_path, params)
+        y_plus_list.append(y_plus_i)
+        wavelength_list.append(wavelength_i)
+        wavenumber_list.append(wavenumber_i)
+        nonfiltered_streamwise_momentum_spectra_list.append(nonfiltered_streamwise_momentum_spectra_i)
+        streamwise_momentum_spectra_list.append(streamwise_momentum_spectra_i)
+    
+    # Convert lists into np.arrays
+    y_plus     = np.array(y_plus_list)                        # shape [n_probes]
+    wavelength = np.array(wavelength_list)                # shape [n_probes, n_wavenumbers]
+    wavenumber = np.array(wavenumber_list)                # shape [n_probes, n_wavenumbers]
+    nonfiltered_streamwise_momentum_spectra = np.array(nonfiltered_streamwise_momentum_spectra_list)      # shape [n_probes, n_wavenumbers]
+    streamwise_momentum_spectra             = np.array(streamwise_momentum_spectra_list)                  # shape [n_probes, n_wavenumbers]
+    n_wavenumbers = wavenumber.shape[1]
+    
+    # Find unique y_plus coordinates of probelines, with a certain tolerance
+    tolerance = 1e-5
+    rounded_y_plus     = np.round(y_plus / tolerance) * tolerance
+    unique_y_plus      = np.sort(np.unique(rounded_y_plus))
+    n_probes_unique_y  = len(unique_y_plus)    # <= n_probes
+    avg_probes_counter = np.zeros([n_probes_unique_y])
+    avg_y_plus         = np.zeros([n_probes_unique_y])
+    avg_wavelength     = np.zeros([n_probes_unique_y, n_wavenumbers])
+    avg_wavenumber     = np.zeros([n_probes_unique_y, n_wavenumbers])
+    avg_nonfiltered_streamwise_momentum_spectra = np.zeros([n_probes_unique_y, n_wavenumbers])
+    avg_streamwise_momentum_spectra             = np.zeros([n_probes_unique_y, n_wavenumbers])
+    print(f"Unique y-plus values, considering all #{n_probes} probelines: {unique_y_plus}")
+
+    # Average streamwise-momentum-spectra for probes with same y_plus coordinate
+    for i_probe in range(n_probes):
+        # Find corresponding unique value of y_plus from the probeline (within certain tolerance)
+        y_plus_i = y_plus[i_probe]
+        unique_y_plus_idx = np.where(np.abs(y_plus_i-unique_y_plus) < tolerance)[0]
+        assert len(unique_y_plus_idx)==1, "Incorrect number of unique_y_plus_idx, 1 index should be found."
+        # Average probeline data with other probelines at same y_plus (within certain tolerance)
+        avg_y_plus[unique_y_plus_idx]       += y_plus[i_probe]
+        avg_wavelength[unique_y_plus_idx,:] += wavelength[i_probe,:]
+        avg_wavenumber[unique_y_plus_idx,:] += wavenumber[i_probe,:]
+        avg_nonfiltered_streamwise_momentum_spectra[unique_y_plus_idx,:] += nonfiltered_streamwise_momentum_spectra[i_probe,:]
+        avg_streamwise_momentum_spectra[unique_y_plus_idx,:]             += streamwise_momentum_spectra[i_probe,:]
+        avg_probes_counter[unique_y_plus_idx] += 1.0
+    avg_y_plus                                  = (avg_y_plus.T / avg_probes_counter).T
+    avg_wavelength                              = (avg_wavelength.T / avg_probes_counter).T
+    avg_wavenumber                              = (avg_wavenumber.T / avg_probes_counter).T
+    avg_nonfiltered_streamwise_momentum_spectra = (avg_nonfiltered_streamwise_momentum_spectra.T / avg_probes_counter).T
+    avg_streamwise_momentum_spectra             = (avg_streamwise_momentum_spectra.T / avg_probes_counter).T
+    print("\nPairs of ( y-plus, number of probes averaged at such unique y-plus ):", list(zip(unique_y_plus, avg_probes_counter)))
+    print("\nPairs of ( y-plus, avg y-plus at such unique y-plus ):", list(zip(unique_y_plus, avg_y_plus)))
+
+    # TODO: continue from here!
