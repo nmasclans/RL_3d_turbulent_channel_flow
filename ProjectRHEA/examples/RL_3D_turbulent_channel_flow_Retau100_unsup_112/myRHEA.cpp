@@ -69,7 +69,7 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 #if _REGULARIZE_RL_ACTION_
-const vector<double> reg_lambda_vect = {0.65, 0.65, 0.5, 0.5, 0.5, 0.5, 0.65, 0.65};    /// TODO: add check somewhere, length must correspond to num. nodes total, and num. nodes along y-axis
+const vector<double> reg_lambda_vect = {0.6, 0.6, 0.5, 0.5, 0.5, 0.5, 0.6, 0.6};    /// TODO: add check somewhere, length must correspond to num. nodes total, and num. nodes along y-axis
 #endif
 
 int action_dim = 6;
