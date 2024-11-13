@@ -1,4 +1,6 @@
+import os
 import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
@@ -13,7 +15,7 @@ from matplotlib.ticker import LogLocator, FuncFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter1d
 
-from utils import build_csv_from_h5_snapshot
+from utils import build_probelines_csv_from_snapshot_h5
 
 #np.set_printoptions(threshold=sys.maxsize)
 #plt.rc( 'text', usetex = True )
@@ -35,6 +37,10 @@ try :
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
 
+
+# Reference & non-RL data directory
+filePath = os.path.dirname(os.path.abspath(__file__))
+compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 
 # Custom colormap
 cmap = plt.get_cmap('RdBu_r')  # Replace with your desired colormap
@@ -103,7 +109,7 @@ fontsize        = 18
 resolution      = 192
 
 # h5 files for Reference, non-RL and RL data
-filename_ref   = f"./data_Retau{Re_tau:.0f}/3d_turbulent_channel_flow_reference.h5"
+filename_ref   = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 filename_nonRL = []     # TODO: implement!
 filename_RL    = []     # TODO: implement!
 kwargs = {"num_grid_x": num_grid_x, 
@@ -114,11 +120,14 @@ kwargs = {"num_grid_x": num_grid_x,
 }
 
 # Generated probes data (csv) directories
-probes_dir_ref   = f"./data_Retau{Re_tau:.0f}/probelines"
-probes_dir_nonRL = ""   # TODO: implement!
+probes_dir_ref   = f"{compareDatasetDir}/probelines"
+probes_dir_nonRL = probes_dir_ref
 probes_dir_RL    = ""   # TODO: implement!
+if not os.path.exists(probes_dir_ref):
+    os.makedirs(probes_dir_ref)
+    print(f"\nNew directory created for Reference & non-RL probelines: {probes_dir_ref}")
 
-build_csv_from_h5_snapshot(filename_ref, "reference", probes_dir_ref, **kwargs)
+build_probelines_csv_from_snapshot_h5(filename_ref, "reference", probes_dir_ref, **kwargs)
 # TODO: do the same for nonRL and RL files
 
 """

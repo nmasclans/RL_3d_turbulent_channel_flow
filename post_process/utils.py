@@ -150,7 +150,9 @@ def compute_reynolds_stress_dof(Rxx, Rxy, Rxz, Ryy, Ryz, Rzz,
 #-----------------------------------------------------------------------------------------
 
 
-def build_csv_from_h5_snapshot(input_h5_filepath, file_details, output_csv_directory, num_grid_x, num_grid_y, dt_dx, n_probes, probes_zy_desired):
+def build_probelines_csv_from_snapshot_h5(
+    input_h5_filepath, file_details, output_csv_directory, num_grid_x, num_grid_y, dt_dx, n_probes, probes_zy_desired
+):
 
     # Get data: x, y, z, u, v, w; attributes: time
     with h5py.File(input_h5_filepath, 'r') as file:
@@ -196,11 +198,11 @@ def build_csv_from_h5_snapshot(input_h5_filepath, file_details, output_csv_direc
         u_ = u_data[k,j,:]
         v_ = v_data[k,j,:]
         w_ = w_data[k,j,:]
-        fname_ = os.path.join(output_csv_directory, f'{file_details}_probeline{i_probe}_k{k}_j{k}.csv')
+        fname_ = os.path.join(output_csv_directory, f'probeline{i_probe}_k{k}_j{j}_{file_details}.csv')
         np.savetxt(fname_, 
-                   X=(t_, x_, y_, z_, u_, v_, w_),
-                   header='# t[s]    x[m]    y[m]    z[m]    rho[kg/m3]    u[m/s]    v[m/s]    w[m/s]',
-                   delimiter=' ',
+                   X=np.array([t_, x_, y_, z_, u_, v_, w_]).T,
+                   header='t[s],          x[m],            y[m],            z[m],            u[m/s],          v[m/s],           w[m/s]',
+                   delimiter=',',
                    fmt='%.10e',
         )
         print(f"Probe {i_probe} in '{fname_}'")
