@@ -15,7 +15,7 @@ from matplotlib.ticker import LogLocator, FuncFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter1d
 
-from utils import build_probelines_csv_from_snapshot_h5
+from utils import build_probelines_from_snapshot_h5, process_probeline_h5, process_probelines_list
 
 #np.set_printoptions(threshold=sys.maxsize)
 #plt.rc( 'text', usetex = True )
@@ -37,6 +37,10 @@ try :
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
 
+# Training post-processing directory
+postDir = train_name
+if not os.path.exists(postDir):
+    os.mkdir(postDir)
 
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
@@ -51,10 +55,10 @@ if np.isclose(Re_tau, 100, atol=1e-8):  # Re_tau = 100
 elif np.isclose(Re_tau, 180, atol=1e-8):
     Re_tau = 180.0
 u_tau = 1.0
-rho_w = 1.0  
-mu_w  = rho_w * u_tau / Re_tau  # = 1.0 / Re_tau
-nu_w  = mu_w / rho_w            # = 1.0 / Re_tau
-print(f"\nFlow parameters: \n- Re_tau: {Re_tau}\n- u_tau: {u_tau}\n- rho_w: {rho_w}\n- mu_w: {mu_w}\n- nu_w: {nu_w}")
+rho0  = 1.0  
+mu0   = rho0 * u_tau / Re_tau  # = 1.0 / Re_tau
+nu0   = mu0 / rho0             # = 1.0 / Re_tau
+print(f"\nFlow parameters: \n- Re_tau: {Re_tau}\n- u_tau: {u_tau}\n- rho0: {rho0}\n- mu0: {mu0}\n- nu0: {nu0}")
 
 # Domain & Grid parameters
 delta = 1.0
@@ -96,27 +100,40 @@ probes_z_coords   = 2.0
 probes_zy_desired = np.array(np.meshgrid(probes_z_coords, probes_y_coords)).T.reshape(-1,2)   # shape: [n_probes, 2]
 n_probes          = probes_zy_desired.shape[0]    # num.probes in the zy-plane, num. pairs of (z,y) coordinates
 
-# Visualization parameters
-window_length   = 11 # Adjust based on your data
-polyorder       = 3
-y_plus_max_urms = 12
-y_plus_max_u    = 20
-y_plus_max_cp   = 140
-y_limit         = y_plus_max_u
-log_smooth      = False
-plot_test       = False
-fontsize        = 18
-resolution      = 192
+# Filters parameters
+gf_sigma          = 7   # Gaussian filter 'sigma'
+sgf_window_length = 11  # Savitzky-Golay filter 'window_length'
+sgf_polyorder     = 5   # Savitzky-Golay filter 'polyorder', polynomial order
+
+# Fourier Transform Visualization parameters
+y_plus_max_urms  = 12
+y_plus_max_u     = 20
+y_plus_max_cp    = 140
+y_limit          = y_plus_max_u
+wavelength_limit = 2 * delta / num_grid_y
+log_smooth       = False
+fontsize         = 18
 
 # h5 files for Reference, non-RL and RL data
 filename_ref   = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 filename_nonRL = []     # TODO: implement!
 filename_RL    = []     # TODO: implement!
-kwargs = {"num_grid_x": num_grid_x, 
-          "num_grid_y": num_grid_y,
-          "dt_dx": dt_dx,
-          "n_probes": n_probes,
-          "probes_zy_desired": probes_zy_desired
+params = {
+    "num_grid_x": num_grid_x, 
+    "num_grid_y": num_grid_y,
+    "dt_dx": dt_dx,
+    "n_probes": n_probes,
+    "probes_zy_desired": probes_zy_desired,
+    "rho0": rho0,
+    "mu0": mu0,
+    "u_tau": u_tau,
+    "delta": delta,
+    "delta_viscous": delta_viscous,
+    "gf_sigma": gf_sigma,
+    "sgf_window_length": sgf_window_length,
+    "sgf_polyorder": sgf_polyorder,
+    "wavelength_limit": wavelength_limit,
+    "train_post_process_dir": postDir,
 }
 
 # Generated probes data (csv) directories
@@ -127,114 +144,12 @@ if not os.path.exists(probes_dir_ref):
     os.makedirs(probes_dir_ref)
     print(f"\nNew directory created for Reference & non-RL probelines: {probes_dir_ref}")
 
-build_probelines_csv_from_snapshot_h5(filename_ref, "reference", probes_dir_ref, **kwargs)
 # TODO: do the same for nonRL and RL files
-
+probes_filepath_list_ref = build_probelines_from_snapshot_h5(filename_ref, "reference", probes_dir_ref, params)
+_ = process_probelines_list(probes_filepath_list_ref, "reference", params)
+    
+    
 """
-def exponential_moving_average(signal, alpha=0.3):
-    ema = [signal[0]]  # Initialize with the first value
-    for x in signal[1:]:
-        ema.append(alpha * x + (1 - alpha) * ema[-1])
-    return np.array(ema)
-
-def low_pass_filter(signal, cutoff_freq, sample_rate):
-    fft_signal = np.fft.fft(signal)
-    fft_freqs = np.fft.fftfreq(len(signal), 1/sample_rate)
-    # Apply the filter by zeroing out frequencies higher than the cutoff
-    fft_signal[np.abs(fft_freqs) > cutoff_freq] = 0
-    return np.fft.ifft(fft_signal).real
-
-
-def process_file(file_path, limit_wavelength):
-    data = np.loadtxt(file_path, delimiter=',')
-    time = data[:, 0]
-    u = data[:, 5] - np.mean(data[:, 5])
-    v = data[:, 6] - np.mean(data[:, 6])
-    w = data[:, 7] - np.mean(data[:, 7])
-    rho = data[:, 4] - np.mean(data[:, 4])
-    mean_rho = np.mean(data[:, 4])
-    mean_mu = np.mean(data[:, 12])
-    
-    if tw:
-        y_plus_data = (2*delta-data[5, 2]) * rho_w * u_tau / mu_w
-    if bw: 
-        y_plus_data = data[5, 2] * rho_w * u_tau / mu_w
-        
-    #DFFT
-    fft_result_u = np.fft.fft(u)
-    fft_result_rho = np.fft.fft(rho)
-    fft_result_total = np.fft.fft(rho*u*u)
-    fft_freq = np.fft.fftfreq(len(time), time[1] - time[0])
-
-    #Filtering negative frequencies
-    positive_freq_indices = fft_freq > 0
-    
-    #print(positive_freq_indices)
-    fft_freq = fft_freq[positive_freq_indices]
-    fft_result_u = fft_result_u[positive_freq_indices]
-    fft_result_rho = fft_result_rho[positive_freq_indices]
-    fft_result_total = fft_result_total[positive_freq_indices]
-
-    # Obtaining the spectrum of streamwise momentum
-    N = len(fft_freq)
-    
-    #streamwise_spectrum = (np.abs(fft_result_u)**2 * np.abs(fft_result_rho)) / N
-    streamwise_spectrum = np.abs(fft_result_total) /N
-    
-    # temporal wavelength and wavenumber
-    wavelength = u_tau / np.abs(fft_freq)
-    wavenumber = u_tau * np.abs(fft_freq)
-    
-    # spatial wavenumber based on taylor hipotheses
-    spatial_wavenumber = wavenumber*u_tau
-    
-    # Assuming `original_spectrum` is the spectrum before smoothing
-    test_spectrum = streamwise_spectrum
-    
-    #Types of smoothening
-    streamwise_spectrum = gaussian_filter1d(streamwise_spectrum, sigma=7)
-    #streamwise_spectrum = exponential_moving_average(streamwise_spectrum, alpha=0.3)
-    #streamwise_spectrum = low_pass_filter(streamwise_spectrum, cutoff_freq=0.2, sample_rate=1)
-    
-    #sorting indexes
-    sorted_indices = np.argsort(wavenumber)
-    spatial_wavenumber = spatial_wavenumber[sorted_indices]
-    streamwise_spectrum = streamwise_spectrum[sorted_indices]
-    
-    #premultiplied spectra
-    streamwise_spectrum = streamwise_spectrum * spatial_wavenumber
-    test_spectrum   = test_spectrum   * spatial_wavenumber
-    streamwise_spectrum = savgol_filter(streamwise_spectrum, window_length=7, polyorder=2)
-    
-    
-    #filtering wavelengths below the grid cutoff
-    # Correct logical indexing
-    filtered_indices = (wavelength[sorted_indices] >= limit_wavelength) 
-    streamwise_spectrum = streamwise_spectrum[filtered_indices]
-    test_spectrum = test_spectrum[filtered_indices]
-    spatial_wavenumber = spatial_wavenumber[filtered_indices]
-    
-    #normalization
-    normalized_spatial_wavenumber = spatial_wavenumber * delta_viscous
-    normalized_premultiplied_spectrum = streamwise_spectrum / (mean_rho*u_tau**2)
-    normalized_premultiplied_original_spectrum = test_spectrum / (mean_rho*u_tau**2)
-    #print("min of normalized wavelength = ",np.amin(normalized_spatial_wavenumber))
-    #print("max of normalized wavelength = ",np.amax(normalized_spatial_wavenumber))
-    
-    if plot_test:
-        plt.figure(figsize=(12, 6))
-        plt.loglog(1/normalized_spatial_wavenumber, normalized_premultiplied_original_spectrum, label='Original Spectrum')
-        plt.loglog(1/normalized_spatial_wavenumber, normalized_premultiplied_spectrum, label='Smoothed Spectrum')
-        plt.xlabel('Wavelength or Spatial Wavenumber')
-        plt.ylabel('Spectral Value')
-        plt.xscale('log')
-        plt.title('Comparison of Original and Smoothed Spectrum')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-    return normalized_spatial_wavenumber, normalized_premultiplied_spectrum, y_plus_data, mean_rho, mean_mu
-
-
 def plot_colormap(directory, resolution):
     all_spectra = []
     for directory in directories:
