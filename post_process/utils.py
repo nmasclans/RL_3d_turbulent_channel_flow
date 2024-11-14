@@ -172,10 +172,13 @@ def build_probelines_from_snapshot_h5(
         x_data = file['x'][1:-1,1:-1,1:-1]    # 1:-1 to take only inner grid points
         y_data = file['y'][1:-1,1:-1,1:-1]
         z_data = file['z'][1:-1,1:-1,1:-1]
-        u_data = file['u'][1:-1,1:-1,1:-1]
-        v_data = file['v'][1:-1,1:-1,1:-1]
-        w_data = file['w'][1:-1,1:-1,1:-1]
-    num_points_z, num_points_y, num_points_x = u_data.shape
+        #u_data = file['u'][1:-1,1:-1,1:-1]
+        #v_data = file['v'][1:-1,1:-1,1:-1]
+        #w_data = file['w'][1:-1,1:-1,1:-1]
+        rmsf_u_data = file['rmsf_u'][1:-1,1:-1,1:-1]
+        rmsf_v_data = file['rmsf_v'][1:-1,1:-1,1:-1]
+        rmsf_w_data = file['rmsf_w'][1:-1,1:-1,1:-1]
+    num_points_z, num_points_y, num_points_x = rmsf_u_data.shape
     assert num_points_x == num_grid_x & num_points_y == num_grid_y
     
     # Convert dx -> dt --> rebuild 'x_data' and 'time_data' to translate spatial advancement to temporal advancement
@@ -209,9 +212,12 @@ def build_probelines_from_snapshot_h5(
         x_ = x_data[k,j,:]
         y_ = y_data[k,j,:]
         z_ = z_data[k,j,:]
-        u_ = u_data[k,j,:]
-        v_ = v_data[k,j,:]
-        w_ = w_data[k,j,:]
+        #u_ = u_data[k,j,:]
+        #v_ = v_data[k,j,:]
+        #w_ = w_data[k,j,:]
+        rmsf_u_ = rmsf_u_data[k,j,:]
+        rmsf_v_ = rmsf_v_data[k,j,:]
+        rmsf_w_ = rmsf_w_data[k,j,:]
         # Check (x,y,z) = ct., and (t) increases for each probeline data point
         if np.all([np.isclose(x_, x_[0]), np.isclose(y_, y_[0]), np.isclose(z_, z_[0])]):
             x_probe = x_[0]
@@ -219,23 +225,18 @@ def build_probelines_from_snapshot_h5(
             z_probe = z_[0]
         else:
             raise ValueError(f"Error in probeline '{i_probe}' from snapshot '{input_h5_filepath}' which has different (x,y,z)-coords; all y-coords shoud be the same, as probeline corresponds to specific (x,)y,z coordinates, increasing in time")
+        
         # --- Save probeline data ---
-        ### # Save in .csv:
-        ### fpath = os.path.join(output_csv_directory, f'probeline{i_probe}_k{k}_j{j}_{file_details}.csv')
-        ### np.savetxt(fpath, 
-        ###            X=np.array([t_, x_, y_, z_, u_, v_, w_]).T,
-        ###            header='t[s],          x[m],            y[m],            z[m],            u[m/s],          v[m/s],           w[m/s]',
-        ###            delimiter=',',
-        ###            fmt='%.10e',
-        ### )
-        ### print(f"Saved probeline {i_probe} in: {fpath}")
         # Save in .csv (only save 1 single value for x,y,z coordinates, which are constant for all probeline data of a specific probeline)
         fpath = os.path.join(output_csv_directory, f'probeline{i_probe}_k{k}_j{j}_{file_details}.h5')
         with h5py.File(fpath,'w') as f:
-            f.create_dataset("t_data", data=t_)
-            f.create_dataset("u_data", data=u_)
-            f.create_dataset("v_data", data=v_)
-            f.create_dataset("w_data", data=w_)
+            f.create_dataset("t", data=t_)
+            #f.create_dataset("u", data=u_)
+            #f.create_dataset("v", data=v_)
+            #f.create_dataset("w", data=w_)
+            f.create_dataset("rmsf_u", data=rmsf_u_)
+            f.create_dataset("rmsf_v", data=rmsf_v_)
+            f.create_dataset("rmsf_w", data=rmsf_w_)
             f.attrs['x_probe'] = x_probe
             f.attrs['y_probe'] = y_probe
             f.attrs['z_probe'] = z_probe
@@ -274,38 +275,23 @@ def process_probeline_h5(file_path, params):
     mu0               = params["mu0"]
     u_tau             = params["u_tau"]
     delta             = params["delta"]
-    delta_viscous     = params["delta_viscous"]
     gf_sigma          = params["gf_sigma"]
     sgf_window_length = params["sgf_window_length"]
     sgf_polyorder     = params["sgf_polyorder"]
     wavelength_limit  = params["wavelength_limit"]
 
-    ### # Get probeline data in .csv file
-    ### data = np.loadtxt(file_path, delimiter=',')
-    ### t_data = data[:, 0]
-    ### x_data = data[:, 1]
-    ### y_data = data[:, 2]
-    ### z_data = data[:, 3]
-    ### u_data = data[:, 4] - np.mean(data[:, 4])    # u-avg using only 1FTT data
-    ### v_data = data[:, 5] - np.mean(data[:, 5])    # v-avg using only 1FTT data
-    ### w_data = data[:, 6] - np.mean(data[:, 6])    # w-avg using only 1FFT data
-    ### # Check all y-coordinates are equal, as probeline corresponds to specific (x,)y,z coordinates, increasing time
-    ### if np.all([np.isclose(x_data, x_data[0]), np.isclose(y_data, y_data[0]), np.isclose(z_data, z_data[0])]):
-    ###     x_probe = x_data[0]
-    ###     y_probe = y_data[0]
-    ###     z_probe = z_data[0]
-    ###     print(f"Probeline coordinates: ({x_probe:.4f}, {y_probe:.4f}, {z_probe:.4f})")
-    ### else:
-    ###     raise ValueError(f"Error in probeline '{file_path}' with different (x,y,z)-coords; all y-coords shoud be the same, as probeline corresponds to specific (x,)y,z coordinates, increasing in time")
     # Get probeline data in .h5 file
     with h5py.File(file_path, 'r') as f:
-        t_data  = f['t_data'][:]
-        u_data  = f['u_data'][:]
-        v_data  = f['v_data'][:]
-        w_data  = f['w_data'][:]
-        x_probe = f.attrs['x_probe']
+        t_data      = f['t'][:]
+        #u_data     = f['u'][:]
+        #v_data     = f['v'][:]
+        #w_data     = f['w'][:]
+        rmsf_u_data = f['rmsf_u'][:]
+        rmsf_v_data = f['rmsf_v'][:]
+        rmsf_w_data = f['rmsf_w'][:]
+        #x_probe = f.attrs['x_probe']
         y_probe = f.attrs['y_probe']
-        z_probe = f.attrs['z_probe']
+        #z_probe = f.attrs['z_probe']
 
     # Transform y to y+ coordinate
     isBottomWall = y_probe < delta
@@ -323,8 +309,8 @@ def process_probeline_h5(file_path, params):
         raise ValueError(f"Assumption not satisfied: grid has stretching in x-direction (A_x>0) which transformed [3-D snapshot at spec. time] into [1-D probeline at spec. (x,y,z), increasing time] to have different dt along probeline evolution")
         
     # Direct Fast Fourier Transform (DFFT)
-    fft_uf      = np.fft.fft(u_data)
-    fft_rhoufuf = np.fft.fft(rho0 * u_data * u_data)
+    fft_uf      = np.fft.fft(rmsf_u_data)
+    fft_rhoufuf = np.fft.fft(rho0 * rmsf_u_data * rmsf_u_data)  #  Spectral turbulent kinetic energy density of the streamwise velocity
     fft_freq    = np.fft.fftfreq(len(t_data), dt)
 
     # Filtering negative frequencies
@@ -335,62 +321,58 @@ def process_probeline_h5(file_path, params):
     N           = len(fft_freq)
 
     # Spatial wavelength and wavenumber, based on Taylor hypothesis
-    spatial_wavelength = u_tau / np.abs(fft_freq)
-    spatial_wavenumber = u_tau * np.abs(fft_freq)
+    wavenumber  = np.abs(fft_freq)                  # wavenumber (k)
+    wavelength  = (2*np.pi) / wavenumber            # wavelength (lambda)
     
-    # Spectrum of streamwise momentum
+    # Spectral turbulent kinetic energy density of the streamwise velocity (Euu)
     streamwise_spectrum = np.abs(fft_rhoufuf) / N
     
     # Sort all by increasing wavenumber / decreasing wavelength
-    sorted_indices      = np.argsort(spatial_wavenumber)
-    spatial_wavelength  = spatial_wavelength[sorted_indices]
-    spatial_wavenumber  = spatial_wavenumber[sorted_indices]
-    streamwise_spectrum = streamwise_spectrum[sorted_indices]
-    nonfiltered_streamwise_spectrum = streamwise_spectrum.copy()
+    sorted_indices                  = np.argsort(wavenumber)
+    wavenumber                      = wavenumber[sorted_indices]
+    wavelength                      = wavelength[sorted_indices]
+    streamwise_spectrum             = streamwise_spectrum[sorted_indices]
+    ### nonfiltered_streamwise_spectrum = streamwise_spectrum.copy()
     
-    # 1st Smoothing: Apply smoothing by Gaussian filter
-    streamwise_spectrum = gaussian_filter1d(streamwise_spectrum, sigma=gf_sigma, mode='nearest')
-    #streamwise_spectrum = exponential_moving_average(streamwise_spectrum, alpha=0.3)
-    #streamwise_spectrum = low_pass_filter(streamwise_spectrum, cutoff_freq=0.2, sample_rate=1)
-    
-    # Premultiplied spectra: k * fft(rhoufuf)
-    streamwise_spectrum             = streamwise_spectrum * spatial_wavenumber
-    nonfiltered_streamwise_spectrum = nonfiltered_streamwise_spectrum * spatial_wavenumber
-
-    # 2nd Smoothing: Apply smoothing by Savitzky-Golay polynomial regression filter
-    streamwise_spectrum = savgol_filter(streamwise_spectrum, window_length=sgf_window_length, polyorder=sgf_polyorder)  
-    # TODO: check if necessary to apply 2 filters: gaussian + sav-gol, or if only Gaussian filtering is enough  
+    ### # 1st Smoothing: Apply smoothing by Gaussian filter
+    ### streamwise_spectrum = gaussian_filter1d(streamwise_spectrum, sigma=gf_sigma, mode='nearest')
+    ### #streamwise_spectrum = exponential_moving_average(streamwise_spectrum, alpha=0.3)
+    ### #streamwise_spectrum = low_pass_filter(streamwise_spectrum, cutoff_freq=0.2, sample_rate=1)
+    ### 
+    ### # Premultiplied spectra: k * fft(rhoufuf) (k*Euu)
+    ### streamwise_spectrum             = wavenumber * streamwise_spectrum
+    ### nonfiltered_streamwise_spectrum = wavenumber * nonfiltered_streamwise_spectrum
+    ### 
+    ### # 2nd Smoothing: Apply smoothing by Savitzky-Golay polynomial regression filter
+    ### premultiplied_streamwise_spectrum = savgol_filter(premultiplied_streamwise_spectrum, window_length=sgf_window_length, polyorder=sgf_polyorder)  
+    ### # TODO: check if necessary to apply 2 filters: gaussian + sav-gol, or if only Gaussian filtering is enough  
     
     # Truncate wavelengths below the grid cutoff
-    truncated_indices   = (spatial_wavelength >= wavelength_limit) 
-    spatial_wavelength  = spatial_wavelength[truncated_indices]
-    spatial_wavenumber  = spatial_wavenumber[truncated_indices]
+    truncated_indices   = (wavelength >= wavelength_limit) 
+    wavenumber          = wavenumber[truncated_indices]
+    wavelength          = wavelength[truncated_indices]
     streamwise_spectrum = streamwise_spectrum[truncated_indices]
-    nonfiltered_streamwise_spectrum = nonfiltered_streamwise_spectrum[truncated_indices]
     
-    # Normalize
-    normalized_spatial_wavelength              = spatial_wavelength / delta_viscous
-    normalized_spatial_wavenumber              = spatial_wavenumber * delta_viscous
-    normalized_streamwise_spectrum             = streamwise_spectrum / (rho0 * u_tau**2)
-    normalized_nonfiltered_streamwise_spectrum = nonfiltered_streamwise_spectrum / (rho0 * u_tau**2)
-    #print("min of normalized wavelength = ",np.amin(normalized_spatial_wavenumber))
-    #print("max of normalized wavelength = ",np.amax(normalized_spatial_wavenumber))
+    # Normalize in wall-units
+    wavenumber_plus          = wavenumber / (rho0 * u_tau / mu0)     # wavenumber in wall units (k+)
+    wavelength_plus          = wavelength * (rho0 * u_tau / mu0)     # wavelength in wall units (lambda+), same transformation as y -> y+
+    streamwise_spectrum_plus = streamwise_spectrum / (rho0 * u_tau**2)              # (k * Euu+)
     
     if False:
         plt.figure(figsize=(12, 6))
-        plt.loglog(normalized_spatial_wavenumber, normalized_nonfiltered_streamwise_spectrum, label='Original Spectrum')
-        plt.loglog(normalized_spatial_wavenumber, normalized_streamwise_spectrum, label='Smoothed Spectrum')
-        plt.xlabel(r"Spatial wavenumber, $k$")
-        plt.ylabel(r"Streamwise momentum spectrum, $kE_{\rho u u}$")
+        plt.loglog(wavenumber, wavenumber * streamwise_spectrum)
+        #plt.xlabel(r"Wavenumber, $k_x$")
+        plt.xlabel(r"$k_x$")
+        #plt.ylabel(r"Premultiplied spectral turbulent kinetic energy density of streamwise velocity, $k_x\,E_{uu}$")
+        plt.ylabel(r"$k_x\,E_{uu}$")
         plt.xscale('log')
-        plt.title('Comparison of Original vs Smoothed Spectrum')
-        plt.legend()
+        plt.title('')
         plt.grid(True)
-        fname = os.path.join(params["train_post_process_dir"], "streamwise_momentum_spectra.jpg")
+        fname = os.path.join(params["train_post_process_dir"], "spectral_kEuu_vs_k.jpg")
         plt.savefig(fname)
         print(f"Plot original vs. smoothed streamwise momentum spectra in: {fname}")
 
-    return y_plus_probe, normalized_spatial_wavelength, normalized_spatial_wavenumber, normalized_nonfiltered_streamwise_spectrum, normalized_streamwise_spectrum
+    return y_plus_probe, wavenumber, wavenumber_plus, wavelength, wavelength_plus, streamwise_spectrum, streamwise_spectrum_plus
 
 
 
@@ -400,62 +382,125 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     
     # Get probelines data from each probeline h5 file
     # use lists because the number of wavenumbers is unknown, shape [n_probes, ?]
-    y_plus_list = []        
-    wavelength_list = []
-    wavenumber_list = []
-    nonfiltered_streamwise_momentum_spectra_list = []
-    streamwise_momentum_spectra_list = []
+    y_plus_list      = []        
+    k_list           = []
+    k_plus_list      = []
+    lambda_list      = []
+    lambda_plus_list = []
+    Euu_list         = []
+    Euu_plus_list    = []
     n_probes = len(probes_filepath_list)
     for i_probe in range(n_probes):
         file_path = probes_filepath_list[i_probe]
-        y_plus_i, wavelength_i, wavenumber_i, nonfiltered_streamwise_momentum_spectra_i, streamwise_momentum_spectra_i \
+        y_plus_i, k_i, k_plus_i, lambda_i, lambda_plus_i, Euu_i, Euu_plus_i, \
             = process_probeline_h5(file_path, params)
         y_plus_list.append(y_plus_i)
-        wavelength_list.append(wavelength_i)
-        wavenumber_list.append(wavenumber_i)
-        nonfiltered_streamwise_momentum_spectra_list.append(nonfiltered_streamwise_momentum_spectra_i)
-        streamwise_momentum_spectra_list.append(streamwise_momentum_spectra_i)
+        k_list.append(k_i)
+        k_plus_list.append(k_plus_i)
+        lambda_list.append(lambda_i)
+        lambda_plus_list.append(lambda_plus_i)
+        Euu_list.append(Euu_i)
+        Euu_plus_list.append(Euu_plus_i)
     
     # Convert lists into np.arrays
-    y_plus     = np.array(y_plus_list)                        # shape [n_probes]
-    wavelength = np.array(wavelength_list)                # shape [n_probes, n_wavenumbers]
-    wavenumber = np.array(wavenumber_list)                # shape [n_probes, n_wavenumbers]
-    nonfiltered_streamwise_momentum_spectra = np.array(nonfiltered_streamwise_momentum_spectra_list)      # shape [n_probes, n_wavenumbers]
-    streamwise_momentum_spectra             = np.array(streamwise_momentum_spectra_list)                  # shape [n_probes, n_wavenumbers]
-    n_wavenumbers = wavenumber.shape[1]
+    y_plus_arr      = np.array(y_plus_list)         # shape [n_probes]
+    k_arr           = np.array(k_list)              # shape [n_probes, n_k]
+    k_plus_arr      = np.array(k_plus_list)         # shape [n_probes, n_k]
+    lambda_arr      = np.array(lambda_list)         # shape [n_probes, n_k]
+    lambda_plus_arr = np.array(lambda_plus_list)    # shape [n_probes, n_k]
+    Euu_arr         = np.array(Euu_list)            # shape [n_probes, n_k]
+    Euu_plus_arr    = np.array(Euu_plus_list)       # shape [n_probes, n_k]
+    n_k = k_arr.shape[1]
     
     # Find unique y_plus coordinates of probelines, with a certain tolerance
     tolerance = 1e-5
-    rounded_y_plus     = np.round(y_plus / tolerance) * tolerance
-    unique_y_plus      = np.sort(np.unique(rounded_y_plus))
-    n_probes_unique_y  = len(unique_y_plus)    # <= n_probes
-    avg_probes_counter = np.zeros([n_probes_unique_y])
-    avg_y_plus         = np.zeros([n_probes_unique_y])
-    avg_wavelength     = np.zeros([n_probes_unique_y, n_wavenumbers])
-    avg_wavenumber     = np.zeros([n_probes_unique_y, n_wavenumbers])
-    avg_nonfiltered_streamwise_momentum_spectra = np.zeros([n_probes_unique_y, n_wavenumbers])
-    avg_streamwise_momentum_spectra             = np.zeros([n_probes_unique_y, n_wavenumbers])
+    rounded_y_plus      = np.round(y_plus_arr / tolerance) * tolerance
+    unique_y_plus       = np.sort(np.unique(rounded_y_plus))
+    n_avg_probes        = len(unique_y_plus)    # <= n_probes
+    avg_probes_counter  = np.zeros([n_avg_probes])
+    avg_y_plus          = np.zeros([n_avg_probes])
+    avg_k               = np.zeros([n_avg_probes, n_k])
+    avg_k_plus          = np.zeros([n_avg_probes, n_k])
+    avg_lambda          = np.zeros([n_avg_probes, n_k])
+    avg_lambda_plus     = np.zeros([n_avg_probes, n_k])
+    avg_Euu             = np.zeros([n_avg_probes, n_k])
+    avg_Euu_plus        = np.zeros([n_avg_probes, n_k])
     print(f"Unique y-plus values, considering all #{n_probes} probelines: {unique_y_plus}")
 
     # Average streamwise-momentum-spectra for probes with same y_plus coordinate
     for i_probe in range(n_probes):
         # Find corresponding unique value of y_plus from the probeline (within certain tolerance)
-        y_plus_i = y_plus[i_probe]
-        unique_y_plus_idx = np.where(np.abs(y_plus_i-unique_y_plus) < tolerance)[0]
-        assert len(unique_y_plus_idx)==1, "Incorrect number of unique_y_plus_idx, 1 index should be found."
+        y_plus_i = y_plus_arr[i_probe]
+        avg_probes_idx = np.where(np.abs(y_plus_i-unique_y_plus) < tolerance)[0]
+        assert len(avg_probes_idx)==1, "Incorrect number of avg_probes_idx, 1 index should be found."
         # Average probeline data with other probelines at same y_plus (within certain tolerance)
-        avg_y_plus[unique_y_plus_idx]       += y_plus[i_probe]
-        avg_wavelength[unique_y_plus_idx,:] += wavelength[i_probe,:]
-        avg_wavenumber[unique_y_plus_idx,:] += wavenumber[i_probe,:]
-        avg_nonfiltered_streamwise_momentum_spectra[unique_y_plus_idx,:] += nonfiltered_streamwise_momentum_spectra[i_probe,:]
-        avg_streamwise_momentum_spectra[unique_y_plus_idx,:]             += streamwise_momentum_spectra[i_probe,:]
-        avg_probes_counter[unique_y_plus_idx] += 1.0
-    avg_y_plus                                  = (avg_y_plus.T / avg_probes_counter).T
-    avg_wavelength                              = (avg_wavelength.T / avg_probes_counter).T
-    avg_wavenumber                              = (avg_wavenumber.T / avg_probes_counter).T
-    avg_nonfiltered_streamwise_momentum_spectra = (avg_nonfiltered_streamwise_momentum_spectra.T / avg_probes_counter).T
-    avg_streamwise_momentum_spectra             = (avg_streamwise_momentum_spectra.T / avg_probes_counter).T
+        avg_probes_counter[avg_probes_idx] += 1.0
+        avg_y_plus[avg_probes_idx]         += y_plus_arr[i_probe]
+        avg_k[avg_probes_idx,:]            += k_arr[i_probe,:]
+        avg_k_plus[avg_probes_idx,:]       += k_plus_arr[i_probe,:]
+        avg_lambda[avg_probes_idx,:]       += lambda_arr[i_probe,:]
+        avg_lambda_plus[avg_probes_idx,:]  += lambda_plus_arr[i_probe,:]
+        avg_Euu[avg_probes_idx,:]          += Euu_arr[i_probe,:]
+        avg_Euu_plus[avg_probes_idx,:]     += Euu_plus_arr[i_probe,:]
+    assert avg_probes_counter.sum().astype(int) == n_probes, "Sum of averaged probes for each unique y-coord must be equal to the total number of probes 'n_probes'"
+    avg_y_plus      = (avg_y_plus.T / avg_probes_counter).T
+    avg_k           = (avg_k.T / avg_probes_counter).T
+    avg_k_plus      = (avg_k_plus.T / avg_probes_counter).T
+    avg_lambda      = (avg_lambda.T / avg_probes_counter).T
+    avg_lambda_plus = (avg_lambda_plus.T / avg_probes_counter).T
+    avg_Euu         = (avg_Euu.T / avg_probes_counter).T
+    avg_Euu_plus    = (avg_Euu_plus.T / avg_probes_counter).T
     print("\nPairs of ( y-plus, number of probes averaged at such unique y-plus ):", list(zip(unique_y_plus, avg_probes_counter)))
     print("\nPairs of ( y-plus, avg y-plus at such unique y-plus ):", list(zip(unique_y_plus, avg_y_plus)))
 
-    # TODO: continue from here!
+    if True:
+        for i_avg_probe in range(n_avg_probes):
+            # Plot kEuu vs lambda
+            plt.figure(figsize=(12, 6))
+            plt.loglog(avg_lambda_plus[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:])
+            #plt.xlabel(r"Wavelength, $\lambda_x^+$")
+            plt.xlabel(r"$\lambda_x^+$")
+            #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+            plt.ylabel(r"$k_x\,E_{uu}^+$")
+            plt.xscale('log')
+            plt.title(r"$y^+=$" + f"{avg_y_plus[i_avg_probe]:.3f}")
+            plt.grid(True)
+            fname = os.path.join(params["train_post_process_dir"], f"kEuu+_vs_lambda+_j{i_avg_probe}_{file_details}.jpg")
+            plt.savefig(fname)
+            plt.close()
+            print(f"Plot kEuu+ vs. lambda+ at y+={avg_y_plus[i_avg_probe]:.3f} in {fname}")
+
+            # Plot kEuu vs k
+            plt.figure(figsize=(12, 6))
+            plt.loglog(avg_k[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:])
+            #plt.xlabel(r"Wavenumber, $k_x$")
+            plt.xlabel(r"$k_x$")
+            #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+            plt.ylabel(r"$k_x\,E_{uu}^+$")
+            plt.xscale('log')
+            plt.title(r"$y^+=$" + f"{avg_y_plus[i_avg_probe]:.3f}")
+            plt.grid(True)
+            fname = os.path.join(params["train_post_process_dir"], f"kEuu+_vs_k_j{i_avg_probe}_{file_details}.jpg")
+            plt.savefig(fname)
+            plt.close()
+            print(f"Plot kEuu+ vs. k at y+={avg_y_plus[i_avg_probe]:.3f} in {fname}")
+            
+            # Plot Euu vs kplus
+            plt.figure(figsize=(12, 6))
+            plt.loglog(avg_k_plus[i_avg_probe,:], avg_Euu_plus[i_avg_probe,:], '-k')
+            # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
+            k_plus_slope   = np.linspace(10**(-1.5), 10**(-0.8), 50)
+            Euu_plus_slope = 1e-5*k_plus_slope**(-5.0/3.0)
+            plt.loglog(k_plus_slope, Euu_plus_slope, '--k')
+            #plt.xlabel(r"Wavenumber, $k_x$")
+            plt.xlabel(r"$k_x^+$")
+            #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+            plt.ylabel(r"$E_{uu}^+$")
+            plt.xscale('log')
+            plt.title(r"$y^+=$" + f"{avg_y_plus[i_avg_probe]:.3f}")
+            plt.grid(True)
+            fname = os.path.join(params["train_post_process_dir"], f"Euu+_vs_k+_j{i_avg_probe}_{file_details}.jpg")
+            plt.savefig(fname)
+            plt.close()
+            print(f"Plot KEuu+ vs. k+ at y+={avg_y_plus[i_avg_probe]:.3f} in {fname}")
+            
