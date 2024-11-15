@@ -176,8 +176,8 @@ def build_probelines_from_snapshot_h5(
 
     # Get data: x, y, z, u, v, w; attributes: time
     with h5py.File(input_h5_filepath, 'r') as file:
-        t0     = file.attrs['Time']
-        tavg0  = file.attrs['AveragingTime']
+        t0     = file.attrs['Time'][0]              # [0] to take the np.float64 scalar value, not a np.array
+        tavg0  = file.attrs['AveragingTime'][0]
         x_data = file['x'][1:-1,1:-1,1:-1]    # 1:-1 to take only inner grid points
         y_data = file['y'][1:-1,1:-1,1:-1]
         z_data = file['z'][1:-1,1:-1,1:-1]
@@ -334,8 +334,9 @@ def process_probeline_h5(file_path, params):
     N           = len(fft_freq)
 
     # Spatial wavelength and wavenumber, based on Taylor hypothesis
-    wavenumber  = np.abs(fft_freq)                  # wavenumber (k)
-    wavelength  = (2*np.pi) / wavenumber            # wavelength (lambda)
+    # Source: https://gibbs.science/efd/lectures/lecture_24.pdf
+    wavenumber  = np.abs(fft_freq) / u_mean ?                     # spatial wavenumber (k)
+    wavelength  = ( (2*np.pi) / wavenumber ) * u_mean ?           # spatial wavelength (lambda)
     
     # Spectral turbulent kinetic energy density of the streamwise velocity (Euu)
     streamwise_spectrum = np.abs(fft_rhoufuf) / N
