@@ -16,12 +16,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter1d
 
 from utils import build_probelines_from_snapshot_h5, process_probeline_h5, process_probelines_list
-
-#np.set_printoptions(threshold=sys.maxsize)
-#plt.rc( 'text', usetex = True )
-#rc('font', family='sanserif')
-#plt.rc( 'font', size = 18 )
-#plt.rcParams['text.latex.preamble'] = [ r'\usepackage{amsmath}', r'\usepackage{amssymb}', r'\usepackage{color}' ]
+from ChannelVisualizer import ChannelVisualizer
 
 #--------------------------------------------------------------------------------------------
 
@@ -41,6 +36,11 @@ except :
 postDir = train_name
 if not os.path.exists(postDir):
     os.mkdir(postDir)
+
+# Probelines directory (calculated from h5 snapshots)
+probelinesDir = os.path.join(postDir, "probelines")
+if not os.path.exists(probelinesDir):
+    os.mkdir(probelinesDir)
 
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
@@ -67,6 +67,7 @@ L_y   = 2 * delta               # Domain length in y-direction
 if Re_tau == 100.0:
     num_grid_x = 64
     num_grid_y = 64  # Number of internal grid points in the y-direction
+    num_grid_z = 64
     A_x = 0.0
     A_y = 0.0        # Streching factor in y-direction, 
                      # with stretching factors: x = x_0 + L*eta + A*( 0.5*L - L*eta )*( 1.0 - eta )*eta,
@@ -74,6 +75,7 @@ if Re_tau == 100.0:
 elif Re_tau == 180:
     num_grid_x = 256
     num_grid_y = 128
+    num_grid_z = 128
     A_x = 0
     A_y = -1.875
 else:
@@ -92,11 +94,11 @@ print(f"\nSpatial to Temporal conversion: \n- t_ftt: {t_ftt}\n- dt_dx: {dt_dx}")
 # Probes y-coordinates at RL agent location - center y-coordinate of control cubes
 if Re_tau == 100.0:
     # Selected y-coordinates at RL agents center of action domain
-    probes_y_coords = np.sort(np.array([0.125, 0.375, 0.625, 0.875, 1.125, 1.375, 1.625, 1.875]))
+    probes_y_coords = np.sort(np.array([0.125, 0.375, 0.625, 0.875])) #, 1.125, 1.375, 1.625, 1.875]))
     # All z coordinates, probes information will be averaged along z for each y-coord
     probes_z_coords = np.sort(np.array([0.03272492, 0.09817477, 0.16362462, 0.22907446, 0.29452431, 0.35997416, 0.42542401, 0.49087385, 0.5563237 , 0.62177355, 0.68722339, 0.75267324, 0.81812309, 0.88357293, 0.94902278, 1.01447263, 1.07992247, 1.14537232, 1.21082217, 1.27627202, 1.34172186, 1.40717171, 1.47262156, 1.5380714 , 1.60352125, 1.6689711 , 1.73442094, 1.79987079, 1.86532064, 1.93077049, 1.99622033, 2.06167018, 2.12712003, 2.19256987, 2.25801972, 2.32346957, 2.38891941, 2.45436926, 2.51981911, 2.58526895, 2.6507188 , 2.71616865, 2.7816185 , 2.84706834, 2.91251819, 2.97796804, 3.04341788, 3.10886773, 3.17431758, 3.23976742, 3.30521727, 3.37066712, 3.43611697, 3.50156681, 3.56701666, 3.63246651, 3.69791635, 3.7633662 , 3.82881605, 3.89426589, 3.95971574, 4.02516559, 4.09061543, 4.15606528]))
 elif Re_tau == 180:
-    probes_y_coords = np.sort(np.array([0.059369, 0.208542, 0.4811795, 0.819736, 1.18026, 1.51882, 1.79146, 1.94063]))
+    probes_y_coords = np.sort(np.array([0.059369, 0.208542, 0.4811795, 0.819736])) #, 1.18026, 1.51882, 1.79146, 1.94063]))
     probes_z_coords = np.sort(np.array([0.01636246, 0.04908739, 0.08181231, 0.11453723, 0.14726216, 0.17998708, 0.212712, 0.24543693, 0.27816185, 0.31088677, 0.3436117 , 0.37633662, 0.40906154, 0.44178647, 0.47451139, 0.50723631, 0.53996124, 0.57268616, 0.60541108, 0.63813601, 0.67086093, 0.70358585, 0.73631078, 0.7690357 , 0.80176063, 0.83448555, 0.86721047, 0.8999354 , 0.93266032, 0.96538524, 0.99811017, 1.03083509, 1.06356001, 1.09628494, 1.12900986, 1.16173478, 1.19445971, 1.22718463, 1.25990955, 1.29263448, 1.3253594 , 1.35808432, 1.39080925, 1.42353417, 1.45625909, 1.48898402, 1.52170894, 1.55443387, 1.58715879, 1.61988371, 1.65260864, 1.68533356, 1.71805848, 1.75078341, 1.78350833, 1.81623325, 1.84895818, 1.8816831 , 1.91440802, 1.94713295, 1.97985787, 2.01258279, 2.04530772, 2.07803264, 2.11075756, 2.14348249, 2.17620741, 2.20893233, 2.24165726, 2.27438218, 2.30710711, 2.33983203, 2.37255695, 2.40528188, 2.4380068 , 2.47073172, 2.50345665, 2.53618157, 2.56890649, 2.60163142, 2.63435634, 2.66708126, 2.69980619, 2.73253111, 2.76525603, 2.79798096, 2.83070588, 2.8634308 , 2.89615573, 2.92888065, 2.96160557, 2.9943305 , 3.02705542, 3.05978035, 3.09250527, 3.12523019, 3.15795512, 3.19068004, 3.22340496, 3.25612989, 3.28885481, 3.32157973, 3.35430466, 3.38702958, 3.4197545 , 3.45247943, 3.48520435, 3.51792927, 3.5506542 , 3.58337912, 3.61610404, 3.64882897, 3.68155389, 3.71427881, 3.74700374, 3.77972866, 3.81245359, 3.84517851, 3.87790343, 3.91062836, 3.94335328, 3.9760782 , 4.00880313, 4.04152805, 4.07425297, 4.1069779 , 4.13970282, 4.17242774]))
 else:
     raise ValueError(f"Unknown 'y_probes' for Re_tau = {Re_tau}")
@@ -117,6 +119,12 @@ wavelength_limit = 2 * delta / num_grid_y
 log_smooth       = False
 fontsize         = 18
 
+# Initialize visualizer
+
+visualizer = ChannelVisualizer(postDir)
+
+#--------------------------------------------------------------------------------------------
+
 # h5 files for Reference, non-RL and RL data
 filename_ref   = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 filename_nonRL = []     # TODO: implement!
@@ -124,6 +132,7 @@ filename_RL    = []     # TODO: implement!
 params = {
     "num_grid_x": num_grid_x, 
     "num_grid_y": num_grid_y,
+    "num_grid_z": num_grid_z,
     "dt_dx": dt_dx,
     "n_probes": n_probes,
     "probes_zy_desired": probes_zy_desired,
@@ -139,18 +148,17 @@ params = {
     "train_post_process_dir": postDir,
 }
 
-# Generated probes data (csv) directories
-probes_dir_ref   = f"{compareDatasetDir}/probelines"
-probes_dir_nonRL = probes_dir_ref
-probes_dir_RL    = ""   # TODO: implement!
-if not os.path.exists(probes_dir_ref):
-    os.makedirs(probes_dir_ref)
-    print(f"\nNew directory created for Reference & non-RL probelines: {probes_dir_ref}")
+# Transform 3-d spatial snapshot (at specific time, for all domain grid points (x,y,z)) 
+# into 1-d probelines temporal data (at specific (x,y,z), increasing time) 
+# -> store 1-d probelines in probeline_*.h5 files
+# TODO: do the same for non-RL & RL !
+file_details = "reference"
+probes_filepath_list_ref = build_probelines_from_snapshot_h5(filename_ref, file_details, probelinesDir, params)
+tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
+    = process_probelines_list(probes_filepath_list_ref, file_details, params)
+visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+    file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
 
-# TODO: do the same for nonRL and RL files
-probes_filepath_list_ref = build_probelines_from_snapshot_h5(filename_ref, "reference", probes_dir_ref, params)
-_ = process_probelines_list(probes_filepath_list_ref, "reference", params)
-    
     
 """
 def plot_colormap(directory, resolution):

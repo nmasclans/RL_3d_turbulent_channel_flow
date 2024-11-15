@@ -7,6 +7,15 @@ import os
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import savgol_filter
 
+# Latex figures
+plt.rc( 'text',       usetex = True )
+plt.rc( 'font',       size = 18 )
+plt.rc( 'axes',       labelsize = 18)
+plt.rc( 'legend',     fontsize = 12, frameon = False)
+plt.rc( 'text.latex', preamble = r'\usepackage{amsmath} \usepackage{amssymb} \usepackage{color}')
+plt.rc( 'savefig',    format = "jpg", dpi = 600)
+
+
 #-----------------------------------------------------------------------------------------
 #           Anisotropy tensor, eigen-decomposition, mapping to barycentric map 
 #-----------------------------------------------------------------------------------------
@@ -154,14 +163,13 @@ def compute_reynolds_stress_dof(Rxx, Rxy, Rxz, Ryy, Ryz, Rzz,
 #-----------------------------------------------------------------------------------------
 
 def build_probelines_from_snapshot_h5(
-    input_h5_filepath, file_details, output_csv_directory, params
+    input_h5_filepath, file_details, output_probelines_directory, params
 ):
-
-    print(f"\nProcessing h5 snapshot: {input_h5_filepath}")
 
     # Problem parameters
     num_grid_x = params["num_grid_x"] 
     num_grid_y = params["num_grid_y"]
+    num_grid_z = params["num_grid_z"]
     dt_dx = params["dt_dx"]
     n_probes = params["n_probes"]
     probes_zy_desired = params["probes_zy_desired"]
@@ -169,6 +177,7 @@ def build_probelines_from_snapshot_h5(
     # Get data: x, y, z, u, v, w; attributes: time
     with h5py.File(input_h5_filepath, 'r') as file:
         t0     = file.attrs['Time']
+        tavg0  = file.attrs['AveragingTime']
         x_data = file['x'][1:-1,1:-1,1:-1]    # 1:-1 to take only inner grid points
         y_data = file['y'][1:-1,1:-1,1:-1]
         z_data = file['z'][1:-1,1:-1,1:-1]
@@ -179,13 +188,15 @@ def build_probelines_from_snapshot_h5(
         rmsf_v_data = file['rmsf_v'][1:-1,1:-1,1:-1]
         rmsf_w_data = file['rmsf_w'][1:-1,1:-1,1:-1]
     num_points_z, num_points_y, num_points_x = rmsf_u_data.shape
-    assert num_points_x == num_grid_x & num_points_y == num_grid_y
-    
+    assert num_points_x == num_grid_x & num_points_y == num_grid_y & num_points_z == num_grid_z, f"Grid num. points different than expected" \
+        + f"({num_points_x}, {num_grid_x}), ({num_points_y}, {num_grid_y})"
+    print(f"\nProcessing h5 snapshot: {input_h5_filepath}, with averaging time: {tavg0}")    
+
     # Convert dx -> dt --> rebuild 'x_data' and 'time_data' to translate spatial advancement to temporal advancement
-    x0 = x_data[0,0,0]
-    dx_data = x_data - x0             # shape [num_points_z, num_points_y, num_points_x]
-    t_data  = t0 + dt_dx * dx_data    # shape [num_points_z, num_points_y, num_points_x]
-    x_data  = x0 * np.ones([num_points_z, num_points_y, num_points_x])
+    x0        = x_data[0,0,0]
+    dx_data   = x_data - x0              # shape [num_points_z, num_points_y, num_points_x]
+    t_data    = t0 + dt_dx * dx_data     # shape [num_points_z, num_points_y, num_points_x]
+    x_data    = x0 * np.ones([num_points_z, num_points_y, num_points_x])
 
     # Find probes (z,y) coordinates closest to chosen 'zy_probes' pairs of coordinates
     # ASSUMPTION: regular grid!
@@ -228,7 +239,7 @@ def build_probelines_from_snapshot_h5(
         
         # --- Save probeline data ---
         # Save in .csv (only save 1 single value for x,y,z coordinates, which are constant for all probeline data of a specific probeline)
-        fpath = os.path.join(output_csv_directory, f'probeline{i_probe}_k{k}_j{j}_{file_details}.h5')
+        fpath = os.path.join(output_probelines_directory, f'probeline{i_probe}_k{k}_j{j}_{file_details}.h5')
         with h5py.File(fpath,'w') as f:
             f.create_dataset("t", data=t_)
             #f.create_dataset("u", data=u_)
@@ -237,6 +248,7 @@ def build_probelines_from_snapshot_h5(
             f.create_dataset("rmsf_u", data=rmsf_u_)
             f.create_dataset("rmsf_v", data=rmsf_v_)
             f.create_dataset("rmsf_w", data=rmsf_w_)
+            f.attrs['AveragingTime'] = tavg0
             f.attrs['x_probe'] = x_probe
             f.attrs['y_probe'] = y_probe
             f.attrs['z_probe'] = z_probe
@@ -289,9 +301,10 @@ def process_probeline_h5(file_path, params):
         rmsf_u_data = f['rmsf_u'][:]
         rmsf_v_data = f['rmsf_v'][:]
         rmsf_w_data = f['rmsf_w'][:]
-        #x_probe = f.attrs['x_probe']
-        y_probe = f.attrs['y_probe']
-        #z_probe = f.attrs['z_probe']
+        tavg0_probe = f.attrs['AveragingTime']
+        #x_probe    = f.attrs['x_probe']
+        y_probe     = f.attrs['y_probe']
+        #z_probe    = f.attrs['z_probe']
 
     # Transform y to y+ coordinate
     isBottomWall = y_probe < delta
@@ -372,8 +385,7 @@ def process_probeline_h5(file_path, params):
         plt.savefig(fname)
         print(f"Plot original vs. smoothed streamwise momentum spectra in: {fname}")
 
-    return y_plus_probe, wavenumber, wavenumber_plus, wavelength, wavelength_plus, streamwise_spectrum, streamwise_spectrum_plus
-
+    return tavg0_probe, y_probe, y_plus_probe, wavenumber, wavenumber_plus, wavelength, wavelength_plus, streamwise_spectrum, streamwise_spectrum_plus
 
 
 def process_probelines_list(probes_filepath_list, file_details, params):
@@ -382,6 +394,8 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     
     # Get probelines data from each probeline h5 file
     # use lists because the number of wavenumbers is unknown, shape [n_probes, ?]
+    tavg0_list       = []        
+    y_list           = []        
     y_plus_list      = []        
     k_list           = []
     k_plus_list      = []
@@ -392,8 +406,10 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     n_probes = len(probes_filepath_list)
     for i_probe in range(n_probes):
         file_path = probes_filepath_list[i_probe]
-        y_plus_i, k_i, k_plus_i, lambda_i, lambda_plus_i, Euu_i, Euu_plus_i, \
+        tavg0_i, y_i, y_plus_i, k_i, k_plus_i, lambda_i, lambda_plus_i, Euu_i, Euu_plus_i, \
             = process_probeline_h5(file_path, params)
+        tavg0_list.append(tavg0_i)
+        y_list.append(y_i)
         y_plus_list.append(y_plus_i)
         k_list.append(k_i)
         k_plus_list.append(k_plus_i)
@@ -403,6 +419,8 @@ def process_probelines_list(probes_filepath_list, file_details, params):
         Euu_plus_list.append(Euu_plus_i)
     
     # Convert lists into np.arrays
+    tavg0_arr       = np.array(tavg0_list)
+    y_arr           = np.array(y_list)              # shape [n_probes]
     y_plus_arr      = np.array(y_plus_list)         # shape [n_probes]
     k_arr           = np.array(k_list)              # shape [n_probes, n_k]
     k_plus_arr      = np.array(k_plus_list)         # shape [n_probes, n_k]
@@ -411,13 +429,20 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     Euu_arr         = np.array(Euu_list)            # shape [n_probes, n_k]
     Euu_plus_arr    = np.array(Euu_plus_list)       # shape [n_probes, n_k]
     n_k = k_arr.shape[1]
-    
+
+    # Check all probelines have same tavg0
+    if np.all(np.isclose(tavg0_arr, tavg0_arr[0])):
+        tavg0 = tavg0_arr[0]
+    else:
+        raise ValueError(f"Probelines have different averaging time, with tavg0_arr = {tavg0_arr:.6f}")
+
     # Find unique y_plus coordinates of probelines, with a certain tolerance
     tolerance = 1e-5
     rounded_y_plus      = np.round(y_plus_arr / tolerance) * tolerance
     unique_y_plus       = np.sort(np.unique(rounded_y_plus))
     n_avg_probes        = len(unique_y_plus)    # <= n_probes
     avg_probes_counter  = np.zeros([n_avg_probes])
+    avg_y               = np.zeros([n_avg_probes])
     avg_y_plus          = np.zeros([n_avg_probes])
     avg_k               = np.zeros([n_avg_probes, n_k])
     avg_k_plus          = np.zeros([n_avg_probes, n_k])
@@ -425,7 +450,7 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     avg_lambda_plus     = np.zeros([n_avg_probes, n_k])
     avg_Euu             = np.zeros([n_avg_probes, n_k])
     avg_Euu_plus        = np.zeros([n_avg_probes, n_k])
-    print(f"Unique y-plus values, considering all #{n_probes} probelines: {unique_y_plus}")
+    print(f"\nAveraging #{n_probes} probelines into {n_avg_probes} avg. probelines in z-direction, with unique y+ values: {unique_y_plus}")
 
     # Average streamwise-momentum-spectra for probes with same y_plus coordinate
     for i_probe in range(n_probes):
@@ -435,6 +460,7 @@ def process_probelines_list(probes_filepath_list, file_details, params):
         assert len(avg_probes_idx)==1, "Incorrect number of avg_probes_idx, 1 index should be found."
         # Average probeline data with other probelines at same y_plus (within certain tolerance)
         avg_probes_counter[avg_probes_idx] += 1.0
+        avg_y[avg_probes_idx]              += y_arr[i_probe]
         avg_y_plus[avg_probes_idx]         += y_plus_arr[i_probe]
         avg_k[avg_probes_idx,:]            += k_arr[i_probe,:]
         avg_k_plus[avg_probes_idx,:]       += k_plus_arr[i_probe,:]
@@ -443,6 +469,7 @@ def process_probelines_list(probes_filepath_list, file_details, params):
         avg_Euu[avg_probes_idx,:]          += Euu_arr[i_probe,:]
         avg_Euu_plus[avg_probes_idx,:]     += Euu_plus_arr[i_probe,:]
     assert avg_probes_counter.sum().astype(int) == n_probes, "Sum of averaged probes for each unique y-coord must be equal to the total number of probes 'n_probes'"
+    avg_y           = (avg_y.T / avg_probes_counter).T
     avg_y_plus      = (avg_y_plus.T / avg_probes_counter).T
     avg_k           = (avg_k.T / avg_probes_counter).T
     avg_k_plus      = (avg_k_plus.T / avg_probes_counter).T
@@ -450,57 +477,10 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     avg_lambda_plus = (avg_lambda_plus.T / avg_probes_counter).T
     avg_Euu         = (avg_Euu.T / avg_probes_counter).T
     avg_Euu_plus    = (avg_Euu_plus.T / avg_probes_counter).T
-    print("\nPairs of ( y-plus, number of probes averaged at such unique y-plus ):", list(zip(unique_y_plus, avg_probes_counter)))
-    print("\nPairs of ( y-plus, avg y-plus at such unique y-plus ):", list(zip(unique_y_plus, avg_y_plus)))
+    print("\nAveraged probes along z-direction, averaged probes for identical y-coords")
+    print("Unique y-plus:", unique_y_plus )
+    print("Averaged probes y+:", avg_y_plus)
+    print("Averaged probes y:", avg_y)
+    print("Num. averaged probes:", avg_probes_counter)
 
-    if True:
-        for i_avg_probe in range(n_avg_probes):
-            # Plot kEuu vs lambda
-            plt.figure(figsize=(12, 6))
-            plt.loglog(avg_lambda_plus[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:])
-            #plt.xlabel(r"Wavelength, $\lambda_x^+$")
-            plt.xlabel(r"$\lambda_x^+$")
-            #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
-            plt.ylabel(r"$k_x\,E_{uu}^+$")
-            plt.xscale('log')
-            plt.title(r"$y^+=$" + f"{avg_y_plus[i_avg_probe]:.3f}")
-            plt.grid(True)
-            fname = os.path.join(params["train_post_process_dir"], f"kEuu+_vs_lambda+_j{i_avg_probe}_{file_details}.jpg")
-            plt.savefig(fname)
-            plt.close()
-            print(f"Plot kEuu+ vs. lambda+ at y+={avg_y_plus[i_avg_probe]:.3f} in {fname}")
-
-            # Plot kEuu vs k
-            plt.figure(figsize=(12, 6))
-            plt.loglog(avg_k[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:])
-            #plt.xlabel(r"Wavenumber, $k_x$")
-            plt.xlabel(r"$k_x$")
-            #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
-            plt.ylabel(r"$k_x\,E_{uu}^+$")
-            plt.xscale('log')
-            plt.title(r"$y^+=$" + f"{avg_y_plus[i_avg_probe]:.3f}")
-            plt.grid(True)
-            fname = os.path.join(params["train_post_process_dir"], f"kEuu+_vs_k_j{i_avg_probe}_{file_details}.jpg")
-            plt.savefig(fname)
-            plt.close()
-            print(f"Plot kEuu+ vs. k at y+={avg_y_plus[i_avg_probe]:.3f} in {fname}")
-            
-            # Plot Euu vs kplus
-            plt.figure(figsize=(12, 6))
-            plt.loglog(avg_k_plus[i_avg_probe,:], avg_Euu_plus[i_avg_probe,:], '-k')
-            # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
-            k_plus_slope   = np.linspace(10**(-1.5), 10**(-0.8), 50)
-            Euu_plus_slope = 1e-5*k_plus_slope**(-5.0/3.0)
-            plt.loglog(k_plus_slope, Euu_plus_slope, '--k')
-            #plt.xlabel(r"Wavenumber, $k_x$")
-            plt.xlabel(r"$k_x^+$")
-            #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
-            plt.ylabel(r"$E_{uu}^+$")
-            plt.xscale('log')
-            plt.title(r"$y^+=$" + f"{avg_y_plus[i_avg_probe]:.3f}")
-            plt.grid(True)
-            fname = os.path.join(params["train_post_process_dir"], f"Euu+_vs_k+_j{i_avg_probe}_{file_details}.jpg")
-            plt.savefig(fname)
-            plt.close()
-            print(f"Plot KEuu+ vs. k+ at y+={avg_y_plus[i_avg_probe]:.3f} in {fname}")
-            
+    return tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus

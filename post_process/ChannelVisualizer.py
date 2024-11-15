@@ -1108,8 +1108,8 @@ class ChannelVisualizer():
         plt.savefig(filename)
         plt.close()
 
-
 # ------------------------------------ RL Convergence along ODT Realizations -------------------------------------------
+
     def RL_u_mean_convergence(self, yplus, rlzArr, 
                               um_RL_nonConv, urmsf_RL_nonConv, um_nonRL_nonConv, urmsf_nonRL_nonConv, um_baseline, urmsf_baseline, 
                               um_NRMSE_RL, urmsf_NRMSE_RL, um_NRMSE_nonRL, urmsf_NRMSE_nonRL,
@@ -1561,3 +1561,72 @@ class ChannelVisualizer():
             plt.tight_layout()
             plt.savefig(filename)
             plt.close()
+
+
+# ------------------------------------ Energy Spectra -------------------------------------------
+
+    def plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+        self, file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus,
+    ):
+        ls = ['-','--','-.',':']
+        n_avg_probes = len(avg_y)
+
+        # Plot kEuu vs lambda
+        fname = os.path.join(self.postRlzDir, f"kEuu+_vs_lambda+_{file_details}.jpg")
+        plt.figure(figsize=(12, 6))
+        for i_avg_probe in range(n_avg_probes):
+            plt.loglog(avg_lambda_plus[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
+        #plt.xlabel(r"Wavelength, $\lambda_x^+$")
+        plt.xlabel(r"$\lambda_x^+$")
+        #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+        plt.ylabel(r"$k_x\,E_{uu}^+$")
+        plt.xscale('log')
+        plt.grid(True)
+        plt.legend()
+        title_str = r"$t_{avg}=$" + rf"${tavg0:.2f}$"
+        plt.title(title_str)
+        plt.tight_layout()
+        plt.savefig(fname)
+        print(f"\nPlot kEuu+ vs. lambda+: {fname}")
+
+        # Plot kEuu vs k
+        fname = os.path.join(self.postRlzDir, f"kEuu+_vs_k_{file_details}.jpg")
+        plt.figure(figsize=(12, 6))
+        for i_avg_probe in range(n_avg_probes):
+            plt.loglog(avg_k[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
+        #plt.xlabel(r"Wavenumber, $k_x$")
+        plt.xlabel(r"$k_x$")
+        #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+        plt.ylabel(r"$k_x\,E_{uu}^+$")
+        plt.xscale('log')
+        plt.grid(True)
+        plt.legend()
+        title_str = r"$t_{avg}=$" + rf"${tavg0:.2f}$"
+        plt.title(title_str)
+        plt.tight_layout()
+        plt.savefig(fname)
+        print(f"\nPlot kEuu+ vs. k: {fname}")
+            
+        # Plot Euu vs kplus
+        fname = os.path.join(self.postRlzDir, f"Euu+_vs_k+_{file_details}.jpg")
+        plt.figure(figsize=(12, 6))
+        for i_avg_probe in range(n_avg_probes):
+            plt.loglog(avg_k_plus[i_avg_probe,:], avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
+        # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
+        k_plus_slope   = np.linspace(10**(-2.0), 10**(-1.0), 50)
+        Euu_plus_slope = 2e-4*k_plus_slope**(-5.0/3.0)
+        plt.loglog(k_plus_slope, Euu_plus_slope, '--', color="tab:blue", lw=2)
+        plt.text(10**(-1.3), 10**(-1.2), r"$\sim k_x^{+(-5/3)}$", fontsize=18)
+        #plt.xlabel(r"Wavenumber, $k_x$")
+        plt.xlabel(r"$k_x^+$")
+        #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+        plt.ylabel(r"$E_{uu}^+$")
+        plt.xscale('log')
+        plt.grid(True)
+        plt.legend()
+        title_str = r"$t_{avg}=$" + rf"${tavg0:.2f}$"
+        plt.title(title_str)
+        plt.tight_layout()
+        plt.savefig(fname)
+        print(f"\nPlot KEuu+ vs. k+: {fname}")
+            
