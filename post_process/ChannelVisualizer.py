@@ -1572,7 +1572,7 @@ class ChannelVisualizer():
         n_avg_probes = len(avg_y)
 
         # Plot kEuu vs lambda
-        fname = os.path.join(self.postRlzDir, f"kEuu+_vs_lambda+_{file_details}.jpg")
+        fname = os.path.join(self.postRlzDir, f"spectral_kEuu+_vs_lambda+_{file_details}.jpg")
         plt.figure(figsize=(12, 6))
         for i_avg_probe in range(n_avg_probes):
             plt.loglog(avg_lambda_plus[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
@@ -1590,7 +1590,7 @@ class ChannelVisualizer():
         print(f"\nPlot kEuu+ vs. lambda+: {fname}")
 
         # Plot kEuu vs k
-        fname = os.path.join(self.postRlzDir, f"kEuu+_vs_k_{file_details}.jpg")
+        fname = os.path.join(self.postRlzDir, f"spectral_kEuu+_vs_k_{file_details}.jpg")
         plt.figure(figsize=(12, 6))
         for i_avg_probe in range(n_avg_probes):
             plt.loglog(avg_k[i_avg_probe,:], avg_k[i_avg_probe,:] * avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
@@ -1608,7 +1608,7 @@ class ChannelVisualizer():
         print(f"\nPlot kEuu+ vs. k: {fname}")
             
         # Plot Euu vs kplus
-        fname = os.path.join(self.postRlzDir, f"Euu+_vs_k+_{file_details}.jpg")
+        fname = os.path.join(self.postRlzDir, f"spectral_Euu+_vs_k+_{file_details}.jpg")
         plt.figure(figsize=(12, 6))
         for i_avg_probe in range(n_avg_probes):
             plt.loglog(avg_k_plus[i_avg_probe,:], avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
