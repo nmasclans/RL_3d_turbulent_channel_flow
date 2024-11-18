@@ -1613,10 +1613,10 @@ class ChannelVisualizer():
         for i_avg_probe in range(n_avg_probes):
             plt.loglog(avg_k_plus[i_avg_probe,:], avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
         # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
-        k_plus_slope   = np.linspace(10**(-2.0), 10**(-1.0), 50)
-        Euu_plus_slope = 2e-4*k_plus_slope**(-5.0/3.0)
+        k_plus_slope   = np.linspace(10**(-3.0), 10**(-1.9), 50)
+        Euu_plus_slope = 1e-6*k_plus_slope**(-5.0/3.0)
         plt.loglog(k_plus_slope, Euu_plus_slope, '--', color="tab:blue", lw=2)
-        plt.text(10**(-1.3), 10**(-1.2), r"$\sim k_x^{+(-5/3)}$", fontsize=18)
+        plt.text(10**(-2.0), 10**(-2.2), r"$\sim k_x^{+(-5/3)}$", fontsize=18)
         #plt.xlabel(r"Wavenumber, $k_x$")
         plt.xlabel(r"$k_x^+$")
         #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
