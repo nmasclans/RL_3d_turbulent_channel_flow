@@ -579,27 +579,28 @@ class ChannelVisualizer():
 
 # --------------------- u-velocity vs reference as gif evolution ------------------------
 
-    def build_um_fig(self, yplus_odt, yplus_ref, um_odt, um_ref, avg_time, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_um_fig(self, yplus_RL, yplus_nonRL, yplus_ref, um_RL, um_nonRL, um_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
         
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
             if ylim is None:
-                ymin = np.min([np.min(um_ref),np.min(um_odt)])
-                ymax = np.min([np.max(um_ref),np.max(um_odt)])
+                ymin = np.min([np.min(um_ref),np.min(um_RL)])
+                ymax = np.min([np.max(um_ref),np.max(um_RL)])
             else:
                 ymin, ymax = ylim
             for i in range(len(x_actuator_boundaries)):
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
         plt.semilogx(yplus_ref, um_ref, '-', color="black",     lw=2, label=r"Reference")
-        plt.semilogx(yplus_odt, um_odt, ':', color="tab:green", lw=2, label=r"RL")
+        plt.semilogx(yplus_nonRL, um_nonRL, '--', color="tab:blue", lw=2, label=r"non-RL")
+        plt.semilogx(yplus_RL,    um_RL,    ':', color="tab:green", lw=2, label=r"RL")
 
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(r"$\overline{u}^{+}$")
-        plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
+        plt.title(rf"non-RL: $tavg^+ = {avg_time_nonRL:.0f}$; RL: $tavg^+ = {avg_time_RL:.0f}$, step = {global_step}")
         plt.yticks([0.0, 5.0, 10.0, 15.0, 20.0])
         plt.legend(loc='lower right')
         plt.tight_layout()
@@ -607,9 +608,9 @@ class ChannelVisualizer():
         return fig
     
 
-    def build_um_frame(self, frames, yplus_odt, yplus_ref, um_odt, um_ref, avg_time, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_um_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, um_RL, um_nonRL, um_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
         
-        fig = self.build_um_fig(yplus_odt, yplus_ref, um_odt, um_ref, avg_time, global_step, ylim, x_actuator_boundaries)
+        fig = self.build_um_fig(yplus_RL, yplus_nonRL, yplus_ref, um_RL, um_nonRL, um_ref, avg_time_RL, avg_time_nonRL, global_step, ylim, x_actuator_boundaries)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -617,36 +618,37 @@ class ChannelVisualizer():
         return frames
 
 
-    def build_urmsf_fig(self, yplus_odt, yplus_ref, urmsf_odt, urmsf_ref, avg_time, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_urmsf_fig(self, yplus_RL, yplus_nonRL, yplus_ref, urmsf_RL, urmsf_nonRL, urmsf_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
         
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
             if ylim is None:
-                ymin = np.min([np.min(um_ref),np.min(um_odt)])
-                ymax = np.min([np.max(um_ref),np.max(um_odt)])
+                ymin = np.min([np.min(urmsf_ref),np.min(urmsf_RL)])
+                ymax = np.min([np.max(urmsf_ref),np.max(urmsf_RL)])
             else:
                 ymin, ymax = ylim
             for i in range(len(x_actuator_boundaries)):
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
-        plt.semilogx(yplus_ref, urmsf_ref, '-',  color='black',     label=r"Reference")
-        plt.semilogx(yplus_odt, urmsf_odt, ':',  color='tab:green', label=r"RL")
+        plt.semilogx(yplus_ref,   urmsf_ref, '-',    color='black',     label=r"Reference")
+        plt.semilogx(yplus_nonRL, urmsf_nonRL, '--', color='tab:blue', label=r"non-RL")
+        plt.semilogx(yplus_RL,    urmsf_RL, ':',     color='tab:green', label=r"RL")
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(r"$u^{+}_{\textrm{rmsf}}$")
         plt.grid(axis="y")
-        plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
+        plt.title(rf"non-RL: $tavg^+ = {avg_time_nonRL:.0f}$; RL: $tavg^+ = {avg_time_RL:.0f}$, step = {global_step}")
         plt.legend(loc='lower right', ncol = 2, fontsize=12)
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
     
 
-    def build_urmsf_frame(self, frames, yplus_odt, yplus_ref, urmsf_odt, urmsf_ref, avg_time, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_urmsf_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, urmsf_RL, urmsf_nonRL, urmsf_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
         
-        fig = self.build_urmsf_fig(yplus_odt, yplus_ref, urmsf_odt, urmsf_ref, avg_time, global_step, ylim, x_actuator_boundaries)
+        fig = self.build_urmsf_fig(yplus_RL, yplus_nonRL, yplus_ref, urmsf_RL, urmsf_nonRL, urmsf_ref, avg_time_RL, avg_time_nonRL, global_step, ylim, x_actuator_boundaries)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
