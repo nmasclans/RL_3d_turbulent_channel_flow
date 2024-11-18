@@ -1,3 +1,5 @@
+import glob
+import h5py
 import os
 import sys
 
@@ -48,6 +50,24 @@ compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 
 # Custom colormap
 cmap = plt.get_cmap('RdBu_r')  # Replace with your desired colormap
+
+# RL parameters
+t_episode_train = 1.0
+dt_phys = 1e-4
+cfd_n_envs = 1
+rl_n_envs  = 8
+simulation_time_per_train_step   = t_episode_train * cfd_n_envs       # total cfd simulated time per training step (in parallel per each cfd_n_envs)
+num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
+num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
+iteration_restart_data_file      = 3210000
+iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
+assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
+print("\nRL parameters: \n- Simulation time per train step:", simulation_time_per_train_step, 
+      "\n- Num. global steps per train step:", num_global_steps_per_train_step,
+      "\n- Num. iterations per train step:", num_iterations_per_train_step,
+      "\n- Iteration restart data file (init train step):", iteration_restart_data_file,
+      "\n- Iteration end train step:", iteration_end_train_step,
+) 
 
 # Flow parameters 
 if np.isclose(Re_tau, 100, atol=1e-8):  # Re_tau = 100
@@ -121,10 +141,64 @@ visualizer = ChannelVisualizer(postDir)
 
 #--------------------------------------------------------------------------------------------
 
-# h5 files for Reference, non-RL and RL data
+# --- Reference filename ---
 filename_ref   = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
-filename_nonRL = []     # TODO: implement!
-filename_RL    = []     # TODO: implement!
+
+# --- RL filenames ---
+pattern = f"{case_dir}/rhea_exp/output_data/RL_3d_turbulent_channel_flow_{iteration}_ensemble{ensemble}_*.h5"
+matching_files = sorted(glob.glob(pattern))
+filename_RL_list     = []
+global_step_str_list    = []
+global_step_num_list = []
+if matching_files:
+    print("\nRL files:")
+    for file in matching_files:
+        filename_RL_list.append(file)
+        base_filename = os.path.basename(file)
+        global_step_str = base_filename.split('_')[-1].replace('.h5', '')
+        global_step_str_list.append(global_step_str)
+        global_step_num = int(global_step_str[4:])
+        global_step_num_list.append(global_step_num)
+        print(f"Filename: {base_filename}, Global step string: {global_step_str}, Global step number: {global_step_num}")
+else:
+    print(f"No files found matching the pattern: {pattern}")
+n_RL = len(filename_RL_list)
+
+# --- non-RL filenames ---
+train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
+iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
+filename_nonRL_list = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list]
+n_nonRL = len(train_step_list)
+print("\nnon-RL files:")
+for i_nonRL in range(n_nonRL):
+    print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
+assert n_nonRL == n_RL
+
+# --- Get averaging time of 'Reference', 'non-RL' and 'RL' and build 'file_details' information ---
+# > Reference
+with h5py.File(filename_ref, 'r') as file:
+    t_avg_ref = file.attrs['AveragingTime'][0]
+file_details_ref = "Reference"
+# > RL
+t_avg_RL = []
+file_details_RL = []
+for i in range(n_RL):
+    with h5py.File(filename_RL_list[i], 'r') as file:
+        t_avg = file.attrs['AveragingTime'][0]
+        t_avg_RL.append(int(t_avg))
+        file_details_RL.append(f"RL_{global_step_num_list[i]:.0f}")
+# > non-RL
+t_avg_nonRL = []
+file_details_nonRL = []
+for i in range(n_nonRL):
+    with h5py.File(filename_nonRL_list[i], 'r') as file:
+        t_avg = np.round(file.attrs['AveragingTime'][0], 3)
+        t_avg_nonRL.append(int(t_avg))
+        file_details_nonRL.append(f"nonRL_{train_step_list[i]:.0f}")
+print("\nAveraging Time: \n- Reference:", t_avg_ref, "\n- RL:", t_avg_RL, "\n- non-RL:", t_avg_nonRL)
+print("\nFile details: \n- Reference:", file_details_ref, "\n- RL:", file_details_RL, "\n- non-RL:", file_details_nonRL)
+
+# --- Params dictionary ---
 params = {
     "num_grid_x": num_grid_x, 
     "num_grid_y": num_grid_y,
@@ -144,16 +218,41 @@ params = {
     "train_post_process_dir": postDir,
 }
 
-# Transform 3-d spatial snapshot (at specific time, for all domain grid points (x,y,z)) 
+# --- 3d-spatial snapshots to 1d-temporal probelines & build plots---
+
+# - Transform 3-d spatial snapshot (at specific time, for all domain grid points (x,y,z)) 
 # into 1-d probelines temporal data (at specific (x,y,z), increasing time) 
-# -> store 1-d probelines in probeline_*.h5 files
-# TODO: do the same for non-RL & RL !
-file_details = "reference"
-probes_filepath_list_ref = build_probelines_from_snapshot_h5(filename_ref, file_details, probelinesDir, params)
+# - Build plots
+
+# > Reference
+filename     = filename_ref
+file_details = file_details_ref
+probes_filepath_list = build_probelines_from_snapshot_h5(filename, file_details_ref, probelinesDir, params)
 tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
-    = process_probelines_list(probes_filepath_list_ref, file_details, params)
+    = process_probelines_list(probes_filepath_list, file_details_ref, params)
 visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
     file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
+# > RL
+for i in range(n_RL):
+    filename     = filename_RL_list[i]
+    file_details = file_details_RL[i]
+    probes_filepath_list = build_probelines_from_snapshot_h5(filename, file_details, probelinesDir, params)
+    tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
+        = process_probelines_list(probes_filepath_list, file_details_ref, params)
+    visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+        file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
+# > non-RL
+for i in range(n_nonRL):
+    filename     = filename_nonRL_list[i]
+    file_details = file_details_nonRL[i]
+    probes_filepath_list = build_probelines_from_snapshot_h5(filename, file_details, probelinesDir, params)
+    tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
+        = process_probelines_list(probes_filepath_list, file_details_ref, params)
+    visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+        file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
+
+
+
 
 
 """
