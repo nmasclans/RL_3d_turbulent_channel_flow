@@ -398,8 +398,8 @@ for i_RL in range(n_RL):
     frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_RL, global_step_list[i_RL])
 
 print("Building gifs from frames...")
-frames_dict = {'Rkk':}
-visualizer.build_main_gifs_from_frames(frames_rkk, frames_eig, frames_xmap_coord, frames_xmap_triang, iteration)
+frames_dict = {'anisotropy_tensor_Rkk':frames_rkk, 'anisotropy_tensor_eigenvalues':frames_eig, 'anisotropy_tensor_barycentric_map':frames_xmap_coord, 'anisotropy_tensor_barycentric_map_triangle':frames_xmap_triang}
+visualizer.build_main_gifs_from_frames(frames_dict, iteration)
 print("Gifs plotted successfully!")
 
 
