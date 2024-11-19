@@ -579,28 +579,28 @@ class ChannelVisualizer():
 
 # --------------------- u-velocity vs reference as gif evolution ------------------------
 
-    def build_um_fig(self, yplus_RL, yplus_nonRL, yplus_ref, um_RL, um_nonRL, um_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_vel_avg_fig(self, yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, vel_name='u', ylim=None, x_actuator_boundaries=None):
         
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
             if ylim is None:
-                ymin = np.min([np.min(um_ref),np.min(um_RL)])
-                ymax = np.min([np.max(um_ref),np.max(um_RL)])
+                ymin = np.min([np.min(vel_avg_ref),np.min(vel_avg_RL)])
+                ymax = np.min([np.max(vel_avg_ref),np.max(vel_avg_RL)])
             else:
                 ymin, ymax = ylim
             for i in range(len(x_actuator_boundaries)):
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
-        plt.semilogx(yplus_ref, um_ref, '-', color="black",     lw=2, label=r"Reference")
-        plt.semilogx(yplus_nonRL, um_nonRL, '--', color="tab:blue", lw=2, label=r"non-RL")
-        plt.semilogx(yplus_RL,    um_RL,    ':', color="tab:green", lw=2, label=r"RL")
+        plt.semilogx(yplus_ref,   vel_avg_ref,   '-',  color="black",     lw=2, label=r"Reference")
+        plt.semilogx(yplus_nonRL, vel_avg_nonRL, '--', color="tab:blue",  lw=2, label=r"non-RL")
+        plt.semilogx(yplus_RL,    vel_avg_RL,    ':',  color="tab:green", lw=2, label=r"RL")
 
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
-        plt.ylabel(r"$\overline{u}^{+}$")
-        plt.title(rf"non-RL: $tavg^+ = {avg_time_nonRL:.0f}$; RL: $tavg^+ = {avg_time_RL:.0f}$, step = {global_step}")
+        plt.ylabel(rf"$\overline{{{vel_name}}}^{{+}}$")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\nRL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.yticks([0.0, 5.0, 10.0, 15.0, 20.0])
         plt.legend(loc='lower right')
         plt.tight_layout()
@@ -608,9 +608,10 @@ class ChannelVisualizer():
         return fig
     
 
-    def build_um_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, um_RL, um_nonRL, um_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_vel_avg_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, 
+                       vel_name='u', ylim=None, x_actuator_boundaries=None):
         
-        fig = self.build_um_fig(yplus_RL, yplus_nonRL, yplus_ref, um_RL, um_nonRL, um_ref, avg_time_RL, avg_time_nonRL, global_step, ylim, x_actuator_boundaries)
+        fig = self.build_um_fig(yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, ylim, x_actuator_boundaries)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -618,37 +619,39 @@ class ChannelVisualizer():
         return frames
 
 
-    def build_urmsf_fig(self, yplus_RL, yplus_nonRL, yplus_ref, urmsf_RL, urmsf_nonRL, urmsf_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_vel_rmsf_fig(self, yplus_RL, yplus_nonRL, yplus_ref, vel_rmsf_RL, vel_rmsf_nonRL, vel_rmsf_ref, avg_time_RL, avg_time_nonRL, global_step, 
+                           vel_name='u', ylim=None, x_actuator_boundaries=None):
         
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
             if ylim is None:
-                ymin = np.min([np.min(urmsf_ref),np.min(urmsf_RL)])
-                ymax = np.min([np.max(urmsf_ref),np.max(urmsf_RL)])
+                ymin = np.min([np.min(vel_rmsf_ref),np.min(vel_rmsf_RL)])
+                ymax = np.min([np.max(vel_rmsf_ref),np.max(vel_rmsf_RL)])
             else:
                 ymin, ymax = ylim
             for i in range(len(x_actuator_boundaries)):
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
-        plt.semilogx(yplus_ref,   urmsf_ref, '-',    color='black',     label=r"Reference")
-        plt.semilogx(yplus_nonRL, urmsf_nonRL, '--', color='tab:blue', label=r"non-RL")
-        plt.semilogx(yplus_RL,    urmsf_RL, ':',     color='tab:green', label=r"RL")
+        plt.semilogx(yplus_ref,   vel_rmsf_ref, '-',    color='black',     label=r"Reference")
+        plt.semilogx(yplus_nonRL, vel_rmsf_nonRL, '--', color='tab:blue',  label=r"non-RL")
+        plt.semilogx(yplus_RL,    vel_rmsf_RL, ':',     color='tab:green', label=r"RL")
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
-        plt.ylabel(r"$u^{+}_{\textrm{rmsf}}$")
+        plt.ylabel(rf"${vel_name}^{{+}}_{{\textrm{{rmsf}}}}$")
         plt.grid(axis="y")
-        plt.title(rf"non-RL: $tavg^+ = {avg_time_nonRL:.0f}$; RL: $tavg^+ = {avg_time_RL:.0f}$, step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\nRL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.legend(loc='lower right', ncol = 2, fontsize=12)
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
     
 
-    def build_urmsf_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, urmsf_RL, urmsf_nonRL, urmsf_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=None, x_actuator_boundaries=None):
+    def build_vel_rmsf_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, vel_rmsf_RL, vel_rmsf_nonRL, vel_rmsf_ref, avg_time_RL, avg_time_nonRL, global_step, 
+                             vel_name='u', ylim=None, x_actuator_boundaries=None):
         
-        fig = self.build_urmsf_fig(yplus_RL, yplus_nonRL, yplus_ref, urmsf_RL, urmsf_nonRL, urmsf_ref, avg_time_RL, avg_time_nonRL, global_step, ylim, x_actuator_boundaries)
+        fig = self.build_vel_rmsf_fig(yplus_RL, yplus_nonRL, yplus_ref, vel_rmsf_RL, vel_rmsf_nonRL, vel_rmsf_ref, avg_time_RL, avg_time_nonRL, global_step, vel_name, ylim, x_actuator_boundaries)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -1003,31 +1006,14 @@ class ChannelVisualizer():
     
 # ------------------------------------------------------------------------
 
-    def build_main_gifs_from_frames(self, frames_avg_u, frames_rmsf_u, frames_rkk, frames_eig, frames_xmap_coord, frames_xmap_triang, iteration=None):
+    def build_main_gifs_from_frames(self, frames_dict, iteration=None):
       
-        filename = os.path.join(self.postRlzDir, f"u_mean_global_steps_{iteration}.gif")
-        print(f"\nMAKING GIF U-MEAN for RUNTIME calculations along TRAINING GLOBAL STEPS in {filename}" )
-        frames_avg_u[0].save(filename, save_all=True, append_images=frames_avg_u[1:], duration=100, loop=0)    
-
-        filename = os.path.join(self.postRlzDir, f"u_rms_global_steps_{iteration}.gif")
-        print(f"\nMAKING GIF U-RMSF for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
-        frames_rmsf_u[0].save(filename, save_all=True, append_images=frames_rmsf_u[1:], duration=100, loop=0)    
-
-        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_Rkk_trace_global_steps_{iteration}.gif")
-        print(f"\nMAKING GIF TRACE/MAGNITUDE OF REYNOLDS STRESS TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
-        frames_rkk[0].save(filename, save_all=True, append_images=frames_rkk[1:], duration=100, loop=0)    
-
-        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_eigenvalues_global_steps_{iteration}.gif")
-        print(f"\nMAKING GIF EIGENVALUES OF ANISOTROPY TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
-        frames_eig[0].save(filename, save_all=True, append_images=frames_eig[1:], duration=100, loop=0)
-
-        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_barycentric_map_coord_global_steps_{iteration}.gif")
-        print(f"\nMAKING GIF OF BARYCENTRIC MAP COORDINATES OF ANISOTROPY TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
-        frames_xmap_coord[0].save(filename, save_all=True, append_images=frames_xmap_coord[1:], duration=100, loop=0)
-
-        filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_barycentric_map_triang_global_steps_{iteration}.gif")
-        print(f"\nMAKING GIF OF BARYCENTRIC MAP REALIZABLE TRIANGLE OF ANISOTROPY TENSOR for RUNTIME calculations along TRAINING GLOBAL STEPS {filename}" )
-        frames_xmap_triang[0].save(filename, save_all=True, append_images=frames_xmap_triang[1:], duration=100, loop=0)
+        for k,v in frames_dict:
+            frames_name = k
+            frames_list = v
+            filename = os.path.join(self.postRlzDir, f"{frames_name}_global_steps_{iteration}.gif")
+            print(f"\nMAKING GIF {frames_name} for RUNTIME calculations along TRAINING GLOBAL STEPS in {filename}" )
+            frames_list[0].save(filename, save_all=True, append_images=frames_list[1:], duration=100, loop=0)    
 
 # ------------------------------------------------------------------------
 

@@ -294,7 +294,7 @@ TKE_RL    = 0.5 * ( rmsf_u_plus_RL**2    + rmsf_v_plus_RL**2    + rmsf_w_plus_RL
 TKE_nonRL = 0.5 * ( rmsf_u_plus_nonRL**2 + rmsf_v_plus_nonRL**2 + rmsf_w_plus_nonRL**2 )
 TKE_ref   = 0.5 * ( rmsf_u_plus_ref**2   + rmsf_v_plus_ref**2   + rmsf_w_plus_ref**2   )
 
-# -------------- Build plots --------------
+# -------------- Build plots avg-u and rmsf-u,v,w profiles --------------
 
 print("\nBuilding plots...")
 
@@ -329,7 +329,9 @@ plt.grid(which='both',  axis='x')
 plt.grid(which='major', axis='y')
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+filename = f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+print("Done plot:", filename)
 # Clear plot
 plt.clf()
 
@@ -364,7 +366,9 @@ plt.grid(which='major', axis='y')
 plt.text( 1.05, 1.0, 'u_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+filename = f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+print("Done plot:", filename)
 # Clear plot
 plt.clf()
 
@@ -399,7 +403,9 @@ plt.grid(which='major', axis='y')
 plt.text( 17.5, 0.2, 'v_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+filename = f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+print("Done plot:", filename)
 # Clear plot
 plt.clf()
 
@@ -434,7 +440,9 @@ plt.grid(which='major', axis='y')
 plt.text( 17.5, 0.2, 'w_rms+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+filename = f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+print("Done plot:", filename)
 # Clear plot
 plt.clf()
 
@@ -469,11 +477,37 @@ plt.grid(which='major', axis='y')
 plt.text( 17.5, 0.2, 'TKE+' )
 legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.tick_params( axis = 'both', pad = 7.5 )
-plt.savefig( f'{postDir}/tke_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg', format = 'jpg', dpi=600, bbox_inches = 'tight' )
+filename = f'{postDir}/tke_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+print("Done plot:", filename)
 # Clear plot
 plt.clf()
 
-print("Plots built successfully!")
+# ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
+
+print("Building gif frames for u-avg and u,v,w-rmsf profiles...")
+from ChannelVisualizer import ChannelVisualizer
+visualizer = ChannelVisualizer(postDir)
+frames_avg_u = []; frames_rmsf_u = []; frames_rmsf_v = []; frames_rmsf_w = []
+avg_u_max    = 20.0
+rmsf_u_max   = int(np.max([np.max(rmsf_u_plus_RL), np.max(rmsf_u_plus_nonRL), np.max(rmsf_u_plus_ref)]))+1
+rmsf_v_max   = int(np.max([np.max(rmsf_v_plus_RL), np.max(rmsf_v_plus_nonRL), np.max(rmsf_v_plus_ref)]))+1
+rmsf_w_max   = int(np.max([np.max(rmsf_w_plus_RL), np.max(rmsf_w_plus_nonRL), np.max(rmsf_w_plus_ref)]))+1
+for i_RL in range(n_RL):
+    # log progress
+    if i_RL % (n_RL//10 or 1) == 0:
+        print(f"{i_RL/n_RL*100:.0f}%")
+    # Build frames
+    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL, y_plus_nonRL, y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_RL],  avg_u_plus_ref,  averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=[0.0, avg_u_max],  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL, y_plus_nonRL, y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_RL], rmsf_u_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=[0.0, rmsf_u_max], x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL, y_plus_nonRL, y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_RL], rmsf_v_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='v', ylim=[0.0, rmsf_v_max], x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL, y_plus_nonRL, y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_RL], rmsf_w_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='w', ylim=[0.0, rmsf_w_max], x_actuator_boundaries=y_plus_actuators_boundaries)
+
+print("Building gifs from frames...")
+frames_dict = {'avg_u':frames_avg_u, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
+visualizer.build_main_gifs_from_frames(frames_dict, iteration)
+print("Gifs plotted successfully!")
+
 
 
 ############################# RL & non-RL Errors w.r.t. Reference #############################
@@ -493,7 +527,7 @@ y_plus = np.concatenate([[0.0],y_plus_ref,[delta]])
 
 # --- Calculate errors using spatial interpolation ---
 
-print("\nCalculating errors...")
+print("\nCalculating L1, L2, Linf errors...")
 # Absolute error 
 abs_error_avg_u_plus_RL  = np.zeros( [n_RL, y_plus_ref.size] ); abs_error_avg_u_plus_nonRL  = np.zeros( [n_nonRL, y_plus_ref.size] )
 abs_error_rmsf_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size] ); abs_error_rmsf_u_plus_nonRL = np.zeros( [n_nonRL, y_plus_ref.size] )
