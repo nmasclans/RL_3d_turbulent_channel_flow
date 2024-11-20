@@ -359,7 +359,7 @@ print("Fields averaged successfully!")
 
 # ----------- Decompose Rij into d.o.f --------------
 
-print("Decomposing Rij into Rij dof...")
+print("\nDecomposing Rij into Rij dof...")
 Rkk_RL     = np.zeros([n_RL, num_points_y_half]);    Rkk_nonRL     = np.zeros([n_nonRL, num_points_y_half]);    Rkk_ref     = np.zeros(num_points_y_half)
 lambda1_RL = np.zeros([n_RL, num_points_y_half]);    lambda1_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda1_ref = np.zeros(num_points_y_half)
 lambda2_RL = np.zeros([n_RL, num_points_y_half]);    lambda2_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda2_ref = np.zeros(num_points_y_half)
@@ -399,16 +399,16 @@ print("Rij decomposed successfully!")
 
 # ---------------------- Plot Barycentric Map for each RL global step (specific iteration & ensemble) ---------------------- 
 
-print("Building triangle barycentric map plots...")
+print("\nBuilding triangle barycentric map plots...")
 #for i_RL in range(n_RL):
 #    visualizer.build_anisotropy_tensor_barycentric_xmap_triang(y_delta_RL,    xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_RL, f"anisotropy_tensor_barycentric_map_RL_{file_details_list[i_RL]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL[0], xmap1_nonRL[0], xmap2_nonRL[0], averaging_time_nonRL[0], f"anisotropy_tensor_barycentric_map_nonRL_{iteration_nonRL_list[0]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_ref,      xmap1_ref,      xmap2_ref,      averaging_time_ref,       "anisotropy_tensor_barycentric_map_ref")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL, xmap1_nonRL[0], xmap2_nonRL[0], averaging_time_nonRL[0], f"anisotropy_tensor_barycentric_map_nonRL_{iteration_nonRL_list[0]}")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_ref,   xmap1_ref,      xmap2_ref,      averaging_time_ref,       "anisotropy_tensor_barycentric_map_ref")
 print("Triangle barycentric map plotted successfully!")
 
 # ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
 
-print("Building gif frames...")
+print("\nBuilding gif frames...")
 frames_rkk = []; frames_eig = []; frames_xmap_coord = []; frames_xmap_triang = []; 
 for i in range(n_RL):
     # log progress
@@ -421,8 +421,8 @@ for i in range(n_RL):
     frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref,     averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
 
 print("Building gifs from frames...")
-frames_dict = {'anisotropy_tensor_Rkk':frames_rkk, 'anisotropy_tensor_eigenvalues':frames_eig, 'anisotropy_tensor_barycentric_map':frames_xmap_coord, 'anisotropy_tensor_barycentric_map_triangle':frames_xmap_triang}
-visualizer.build_main_gifs_from_frames(frames_dict, iteration)
+frames_dict = {'anisotropy_tensor_Rkk':frames_rkk, 'anisotropy_tensor_eigenvalues':frames_eig, 'anisotropy_tensor_barycentric_map_coord':frames_xmap_coord, 'anisotropy_tensor_barycentric_map_triangle':frames_xmap_triang}
+visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")
 
 

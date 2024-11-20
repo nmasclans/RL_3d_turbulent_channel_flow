@@ -580,7 +580,6 @@ class ChannelVisualizer():
 # --------------------- u-velocity vs reference as gif evolution ------------------------
 
     def build_vel_avg_fig(self, yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, vel_name='u', ylim=None, x_actuator_boundaries=None):
-        
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
@@ -595,14 +594,14 @@ class ChannelVisualizer():
         plt.semilogx(yplus_ref,   vel_avg_ref,   '-',  color="black",     lw=2, label=r"Reference")
         plt.semilogx(yplus_nonRL, vel_avg_nonRL, '--', color="tab:blue",  lw=2, label=r"non-RL")
         plt.semilogx(yplus_RL,    vel_avg_RL,    ':',  color="tab:green", lw=2, label=r"RL")
-
+        # plot parameters
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(rf"$\overline{{{vel_name}}}^{{+}}$")
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.yticks([0.0, 5.0, 10.0, 15.0, 20.0])
-        plt.legend(loc='lower right')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
@@ -610,7 +609,6 @@ class ChannelVisualizer():
 
     def build_vel_avg_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, 
                        vel_name='u', ylim=None, x_actuator_boundaries=None):
-        
         fig = self.build_vel_avg_fig(yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, vel_name, ylim, x_actuator_boundaries)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
@@ -621,7 +619,6 @@ class ChannelVisualizer():
 
     def build_vel_rmsf_fig(self, yplus_RL, yplus_nonRL, yplus_ref, vel_rmsf_RL, vel_rmsf_nonRL, vel_rmsf_ref, avg_time_RL, avg_time_nonRL, global_step, 
                            vel_name='u', ylim=None, x_actuator_boundaries=None):
-        
         fig, ax = plt.subplots()
         # vlines for actuator boundaries
         if x_actuator_boundaries is not None:
@@ -642,7 +639,7 @@ class ChannelVisualizer():
         plt.ylabel(rf"${vel_name}^{{+}}_{{\textrm{{rmsf}}}}$")
         plt.grid(axis="y")
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
-        plt.legend(loc='lower right', ncol = 2, fontsize=12)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
@@ -671,7 +668,7 @@ class ChannelVisualizer():
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(r"$\overline{u}^{+}$")
         plt.yticks([0.0, 5.0, 10.0, 15.0, 20.0])
-        plt.legend(loc='upper left')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
@@ -721,7 +718,8 @@ class ChannelVisualizer():
         plt.text( 0.4850, 0.9000, r'$\textbf{x}_{3_{c}}$' )
         cbar = plt.colorbar()
         cbar.set_label( r'$y/\delta$' )
-        plt.title(rf"$t^+ = {avg_time:.2f}$")
+        plt.title(rf"$t_{{\textrm{{avg}}}}^{{+}} = {avg_time:.2f}$")
+        plt.tight_layout()
         
         # save figure
         filepath = os.path.join(self.postRlzDir, f"{filename}")
@@ -761,7 +759,7 @@ class ChannelVisualizer():
         cbar.set_label( r'$y/\delta$' )
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.legend(loc='upper right')
-        plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
+        plt.tight_layout()
         ###plt.clim( 0.0, 20.0 )
 
         # ------ gif frame by pillow ---------
@@ -780,15 +778,15 @@ class ChannelVisualizer():
     def build_reynolds_stress_tensor_trace_fig(self, ydelta_RL, ydelta_nonRL, ydelta_ref, Rkk_RL, Rkk_nonRL, Rkk_ref, \
                                                avg_time_RL, avg_time_nonRL, global_step):
         fig, ax = plt.subplots()
-        plt.plot(ydelta_ref, Rkk_ref,   '-',  color='black',     label=r"Reference")
-        plt.plot(ydelta_odt, Rkk_nonRL, '--', color='tab:blue',  label=r"non-RL")
-        plt.plot(ydelta_odt, Rkk_RL,    ':',  color='tab:green', label=r"RL")
+        plt.plot(ydelta_ref,   Rkk_ref,   '-',  color='black',     label=r"Reference")
+        plt.plot(ydelta_nonRL, Rkk_nonRL, '--', color='tab:blue',  label=r"non-RL")
+        plt.plot(ydelta_RL,    Rkk_RL,    ':',  color='tab:green', label=r"RL")
         plt.xlim([0.0, 1.0])
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"Reynolds Stress Trace $R_{kk}$")
         plt.grid(axis="y")
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
-        plt.legend(loc='upper right')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
@@ -819,7 +817,7 @@ class ChannelVisualizer():
         plt.ylabel(r"barycentric coordinates $x_i$")
         plt.grid(axis="y")
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
-        plt.legend(loc='upper right')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
@@ -833,11 +831,10 @@ class ChannelVisualizer():
         plt.close()
         return frames
 
-
 # ------------------- anisotropy tensor eigenvalues 'lambda_i' -------------------
 
-    def build_anisotropy_tensor_eigenvalues_fig(self, ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, avg_time_RL, avg_time_nonRL, global_step):
-        
+    def build_anisotropy_tensor_eigenvalues_fig(self, ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, \
+                                                avg_time_RL, avg_time_nonRL, global_step):
         fig, ax = plt.subplots()
         plt.plot(ydelta_ref,   eigval_ref[:,0],   '-',  color='black',    label=r"Reference $\lambda_0$")
         plt.plot(ydelta_ref,   eigval_ref[:,1],   '-',  color='tab:blue', label=r"Reference $\lambda_1$")
@@ -845,9 +842,9 @@ class ChannelVisualizer():
         plt.plot(ydelta_nonRL, eigval_nonRL[:,0], '--', color='black',    label=r"non-RL $\lambda_0$")
         plt.plot(ydelta_nonRL, eigval_nonRL[:,1], '--', color='tab:blue', label=r"non-RL $\lambda_1$")
         plt.plot(ydelta_nonRL, eigval_nonRL[:,2], '--', color='tab:green',label=r"non-RL $\lambda_2$")
-        plt.plot(ydelta_RL,    eigval_RL[:,0],    ':',  color='black',    label=r"non-RL $\lambda_0$")
-        plt.plot(ydelta_RL,    eigval_RL[:,1],    ':',  color='tab:blue', label=r"non-RL $\lambda_1$")
-        plt.plot(ydelta_RL,    eigval_RL[:,2],    ':',  color='tab:green',label=r"non-RL $\lambda_2$")
+        plt.plot(ydelta_RL,    eigval_RL[:,0],    ':',  color='black',    label=r"RL $\lambda_0$")
+        plt.plot(ydelta_RL,    eigval_RL[:,1],    ':',  color='tab:blue', label=r"RL $\lambda_1$")
+        plt.plot(ydelta_RL,    eigval_RL[:,2],    ':',  color='tab:green',label=r"RL $\lambda_2$")
 
         plt.xlim([0.0, 1.0])
         plt.ylim([-0.5, 1.0])
@@ -856,14 +853,13 @@ class ChannelVisualizer():
         plt.ylabel(r"anisotropy tensor eigenvalues $\lambda_i$")
         plt.grid(axis="y")
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
-        plt.legend(loc='upper right')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
     
     def build_anisotropy_tensor_eigenvalues_frame(self, frames, ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, \
                                                   avg_time_RL, avg_time_nonRL, global_step):
-        
         fig = self.build_anisotropy_tensor_eigenvalues_fig(ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, avg_time_RL, avg_time_nonRL, global_step)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
@@ -891,7 +887,7 @@ class ChannelVisualizer():
             plt.ylabel("Action " + action_dict[i_act], fontsize=16)
             plt.grid(axis="y")
             plt.title(f"RL step = {global_step}", fontsize=16)
-            plt.legend(loc='upper right', ncol = 2, fontsize=11)
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             plt.tight_layout()
             figs_dict[i_act] = fig
             plt.close()
@@ -925,7 +921,7 @@ class ChannelVisualizer():
             plt.xlabel("Action " + action_dict[i_act], fontsize=16)
             plt.ylabel("PDF", fontsize=16)
             plt.title(f"RL step = {global_step}", fontsize=16)
-            plt.legend(loc='upper right', ncol = 2, fontsize=11)
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             plt.tight_layout()
             figs_dict[i_act] = fig
             plt.close()
@@ -986,12 +982,12 @@ class ChannelVisualizer():
     
 # ------------------------------------------------------------------------
 
-    def build_main_gifs_from_frames(self, frames_dict, iteration=None):
+    def build_main_gifs_from_frames(self, frames_dict):
       
         for k,v in frames_dict.items():
             frames_name = k
             frames_list = v
-            filename = os.path.join(self.postRlzDir, f"{frames_name}_global_steps_{iteration}.gif")
+            filename = os.path.join(self.postRlzDir, f"{frames_name}_vs_global_steps.gif")
             print(f"\nMAKING GIF {frames_name} for RUNTIME calculations along TRAINING GLOBAL STEPS in {filename}" )
             frames_list[0].save(filename, save_all=True, append_images=frames_list[1:], duration=100, loop=0)    
 
@@ -1329,7 +1325,7 @@ class ChannelVisualizer():
         plt.xlabel('Realization Id.')
         plt.ylabel(f'Error {error_name}')
         if nrlz < 20:
-            plt.legend(frameon=True, fontsize=10)
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         plt.savefig(filename)
         plt.close()
@@ -1385,7 +1381,7 @@ class ChannelVisualizer():
         plt.xlabel(r'$t^{+}$')
         plt.ylabel(info['ylabel'])
         if nrlz < 15:
-            plt.legend()
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         plt.savefig(filename)
         plt.close()
@@ -1591,10 +1587,43 @@ class ChannelVisualizer():
         plt.ylabel(r"$E_{uu}^+$")
         plt.xscale('log')
         plt.grid(True)
-        plt.legend()
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         title_str = r"$t_{avg}^+=$" + rf"${tavg0:.0f}$"
         plt.title(title_str)
         plt.tight_layout()
         plt.savefig(fname)
         print(f"\nPlot KEuu+ vs. k+: {fname}")
-            
+
+    
+    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig(self, avg_y_plus, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, avg_time_RL, avg_time_nonRL, global_step):
+        colors = ['black','tab:blue','tab:green','tab:orange']
+        n_avg_probes = len(avg_y_plus)
+        fig, ax = plt.subplots()
+        # Plot Euu vs kplus
+        plt.figure(figsize=(12, 6))
+        for i in range(n_avg_probes):
+            plt.loglog(avg_k_plus_ref[i],   avg_Euu_plus_ref[i],   color=colors[i], linestyle='-',  lw=2, label=rf"Reference, $y^+={avg_y_plus[i]:.2f}$")
+            plt.loglog(avg_k_plus_nonRL[i], avg_Euu_plus_nonRL[i], color=colors[i], linestyle='--', lw=2, label=rf"non-RL, $y^+={avg_y_plus[i]:.2f}$")
+            plt.loglog(avg_k_plus_RL[i],    avg_Euu_plus_RL[i],    color=colors[i], linestyle=':',  lw=2, label=rf"RL, $y^+={avg_y_plus[i]:.2f}$")
+        # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
+        k_plus_slope   = np.linspace(10**(-3.0), 10**(-1.9), 50)
+        Euu_plus_slope = 1e-6*k_plus_slope**(-5.0/3.0)
+        plt.loglog(k_plus_slope, Euu_plus_slope, '-.', color="tab:gray", lw=2)
+        plt.text(10**(-2.0), 10**(-2.2), r"$\sim k_x^{+(-5/3)}$", fontsize=18)
+        # plot parameters
+        plt.xlabel(r"$k_x^+$")      #plt.xlabel(r"Wavenumber, $k_x$")
+        plt.ylabel(r"$E_{uu}^+$")   #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+        plt.xscale('log')
+        plt.grid(True)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.tight_layout()
+        return fig
+
+    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(self, frames, avg_y_plus, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, avg_time_RL, avg_time_nonRL, global_step):
+        fig = self.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig(avg_y_plus, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, avg_time_RL, avg_time_nonRL, global_step)
+        fig.canvas.draw()
+        img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        frames.append(img)
+        plt.close()
+        return frames

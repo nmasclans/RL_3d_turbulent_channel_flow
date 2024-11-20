@@ -239,37 +239,42 @@ params = {
 # - Transform 3-d spatial snapshot (at specific time, for all domain grid points (x,y,z)) 
 # into 1-d probelines temporal data (at specific (x,y,z), increasing time) 
 # - Build plots
+frames = []
 
 # > Reference
-filename     = filename_ref
-file_details = file_details_ref
-probes_filepath_list = build_probelines_from_snapshot_h5(filename, file_details_ref, probelinesDir, params)
-tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
-    = process_probelines_list(probes_filepath_list, file_details_ref, params)
-visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
-    file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
-# > RL
+probes_filepath_list_ref = build_probelines_from_snapshot_h5(filename_ref, file_details_ref, probelinesDir, params)
+tavg0_ref, avg_y_ref, avg_y_plus_ref, avg_k_ref, avg_k_plus_ref, avg_lambda_ref, avg_lambda_plus_ref, avg_Euu_ref, avg_Euu_plus_ref \
+    = process_probelines_list(probes_filepath_list_ref, file_details_ref, params)
+
 for i in range(n_RL):
-    filename     = filename_RL_list[i]
-    file_details = file_details_RL[i]
-    probes_filepath_list = build_probelines_from_snapshot_h5(filename, file_details, probelinesDir, params)
-    tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
-        = process_probelines_list(probes_filepath_list, file_details_ref, params)
-    visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
-        file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
-# > non-RL
-for i in range(n_nonRL):
-    filename     = filename_nonRL_list[i]
-    file_details = file_details_nonRL[i]
-    probes_filepath_list = build_probelines_from_snapshot_h5(filename, file_details, probelinesDir, params)
-    tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus \
-        = process_probelines_list(probes_filepath_list, file_details_ref, params)
-    visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
-        file_details, tavg0, avg_y, avg_y_plus, avg_k, avg_k_plus, avg_lambda, avg_lambda_plus, avg_Euu, avg_Euu_plus)
+    # > RL
+    probes_filepath_list_RL = build_probelines_from_snapshot_h5(filename_RL_list[i], file_details_RL[i], probelinesDir, params)
+    tavg0_RL, avg_y_RL, avg_y_plus_RL, avg_k_RL, avg_k_plus_RL, avg_lambda_RL, avg_lambda_plus_RL, avg_Euu_RL, avg_Euu_plus_RL \
+        = process_probelines_list(probes_filepath_list_RL, file_details_RL[i], params)
+    # > non-RL
+    probes_filepath_list_nonRL = build_probelines_from_snapshot_h5(filename_nonRL_list[i], file_details_nonRL[i], probelinesDir, params)
+    tavg0_nonRL, avg_y_nonRL, avg_y_plus_nonRL, avg_k_nonRL, avg_k_plus_nonRL, avg_lambda_nonRL, avg_lambda_plus_nonRL, avg_Euu_nonRL, avg_Euu_plus_nonRL \
+        = process_probelines_list(probes_filepath_list_nonRL, file_details_nonRL[i], params)
 
+    # Plot spectrum for each specific global step 
+    ###visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+    ###    file_details_RL[i], tavg0_RL, avg_y_RL, avg_y_plus_RL, avg_k_RL, avg_k_plus_RL, avg_lambda_RL, avg_lambda_plus_RL, avg_Euu_RL, avg_Euu_plus_RL)
+    ###visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+    ###    file_details_nonRL[i], tavg0_nonRL, avg_y_nonRL, avg_y_plus_nonRL, avg_k_nonRL, avg_k_plus_nonRL, avg_lambda_nonRL, avg_lambda_plus_nonRL, avg_Euu_nonRL, avg_Euu_plus_nonRL)
+    
+    # Check probes y+ are equal for all RL, non-RL, ref
+    for i_probe in range(n_probes):
+        assert np.isclose(avg_y_plus_ref[i_probe], avg_y_plus_RL[i_probe]) & np.isclose(avg_y_plus_ref[i_probe], avg_y_plus_nonRL[i_probe])
+    
+    # Build frame for each specific global step
+    frames = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
+        frames, avg_y_plus_ref, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, tavg0_RL, tavg0_nonRL, global_step_num_list[i],
+    )
 
-
-
+print("\nSave gifs from frames...")
+frames_dict = {'spectral_Euu+_vs_k+':frames}
+visualizer.build_main_gifs_from_frames(frames_dict)
+print("Gifs plotted successfully!")
 
 """
 def plot_colormap(directory, resolution):

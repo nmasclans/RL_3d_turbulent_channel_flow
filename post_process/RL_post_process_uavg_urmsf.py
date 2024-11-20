@@ -525,7 +525,7 @@ for i_RL in range(n_RL):
 
 print("Building gifs from frames...")
 frames_dict = {'avg_u':frames_avg_u, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
-visualizer.build_main_gifs_from_frames(frames_dict, iteration)
+visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")
 
 
