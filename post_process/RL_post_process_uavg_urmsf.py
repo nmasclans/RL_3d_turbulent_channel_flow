@@ -44,7 +44,7 @@ if not os.path.exists(postDir):
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
-
+iteration_max_nonRL = 4000000
 max_length_legend_RL = 10
 
 # RL parameters
@@ -119,10 +119,25 @@ n_nonRL = len(train_step_list)
 print("\nnon-RL files:")
 for i_nonRL in range(n_nonRL):
     print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
-assert n_nonRL == n_RL
 
 # --- non-RL converged reference filename ---
 filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
+
+# --- Discard non-RL (and corresponding RL) snapshots if not available
+assert n_nonRL == n_RL
+filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
+n_nonRL_is_available = sum(filename_nonRL_is_available)
+print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", n_nonRL - n_nonRL_is_available)
+filename_RL_list_available = []
+filename_nonRL_list_available = []
+for i in range(n_RL):
+    if filename_nonRL_is_available[i]:
+        filename_RL_list_available.append(filename_RL_list[i])
+        filename_nonRL_list_available.append(filename_nonRL_list[i])
+filename_RL_list    = filename_RL_list_available
+filename_nonRL_list = filename_nonRL_list_available
+n_RL = len(filename_RL_list); n_nonRL = n_RL
+print(f"Datasets RL and non-RL have now {n_RL} files each")
 
 # ----------- Get RL and non-RL data ------------
 
@@ -487,21 +502,26 @@ plt.clf()
 
 print("Building gif frames for u-avg and u,v,w-rmsf profiles...")
 from ChannelVisualizer import ChannelVisualizer
-visualizer = ChannelVisualizer(postDir)
+visualizer   = ChannelVisualizer(postDir)
 frames_avg_u = []; frames_rmsf_u = []; frames_rmsf_v = []; frames_rmsf_w = []
 avg_u_max    = 20.0
 rmsf_u_max   = int(np.max([np.max(rmsf_u_plus_RL), np.max(rmsf_u_plus_nonRL), np.max(rmsf_u_plus_ref)]))+1
 rmsf_v_max   = int(np.max([np.max(rmsf_v_plus_RL), np.max(rmsf_v_plus_nonRL), np.max(rmsf_v_plus_ref)]))+1
 rmsf_w_max   = int(np.max([np.max(rmsf_w_plus_RL), np.max(rmsf_w_plus_nonRL), np.max(rmsf_w_plus_ref)]))+1
+ylim_avg_u   = [0.0, avg_u_max]
+ylim_rmsf_u  = [0.0, rmsf_u_max]
+ylim_rmsf_v  = [0.0, rmsf_v_max]
+ylim_rmsf_w  = [0.0, rmsf_w_max]
+print("ylim lists:", ylim_avg_u, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
 for i_RL in range(n_RL):
     # log progress
     if i_RL % (n_RL//10 or 1) == 0:
         print(f"{i_RL/n_RL*100:.0f}%")
     # Build frames
-    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL, y_plus_nonRL, y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_RL],  avg_u_plus_ref,  averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=[0.0, avg_u_max],  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL, y_plus_nonRL, y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_RL], rmsf_u_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=[0.0, rmsf_u_max], x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL, y_plus_nonRL, y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_RL], rmsf_v_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='v', ylim=[0.0, rmsf_v_max], x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL, y_plus_nonRL, y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_RL], rmsf_w_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='w', ylim=[0.0, rmsf_w_max], x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_RL],  avg_u_plus_ref,  averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_RL], rmsf_u_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_RL], rmsf_v_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_RL], rmsf_w_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
 
 print("Building gifs from frames...")
 frames_dict = {'avg_u':frames_avg_u, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}

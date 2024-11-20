@@ -63,6 +63,7 @@ if not os.path.exists(postDir):
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
+iteration_max_nonRL = 4000000
 
 if np.isclose(Re_tau, 100, atol=1e-8):
     Re_tau_theoretical = 100.0
@@ -135,10 +136,25 @@ n_nonRL = len(train_step_list)
 print("\nnon-RL files:")
 for i_nonRL in range(n_nonRL):
     print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
-assert n_nonRL == n_RL
 
 # --- non-RL converged reference filename ---
 filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
+
+# --- Discard non-RL (and corresponding RL) snapshots if not available
+assert n_nonRL == n_RL
+filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
+n_nonRL_is_available = sum(filename_nonRL_is_available)
+print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", n_nonRL - n_nonRL_is_available)
+filename_RL_list_available = []
+filename_nonRL_list_available = []
+for i in range(n_RL):
+    if filename_nonRL_is_available[i]:
+        filename_RL_list_available.append(filename_RL_list[i])
+        filename_nonRL_list_available.append(filename_nonRL_list[i])
+filename_RL_list    = filename_RL_list_available
+filename_nonRL_list = filename_nonRL_list_available
+n_RL = len(filename_RL_list); n_nonRL = n_RL
+print(f"Datasets RL and non-RL have now {n_RL} files each")
 
 # ----------- Get RL and non-RL data ------------
 
@@ -344,29 +360,36 @@ print("Fields averaged successfully!")
 # ----------- Decompose Rij into d.o.f --------------
 
 print("Decomposing Rij into Rij dof...")
-Rkk_RL     = np.zeros([n_RL, num_points_y_half]);    Rkk_nonRL     = np.zeros(num_points_y_half);      Rkk_ref     = np.zeros(num_points_y_half)
-lambda1_RL = np.zeros([n_RL, num_points_y_half]);    lambda1_nonRL = np.zeros(num_points_y_half);      lambda1_ref = np.zeros(num_points_y_half)
-lambda2_RL = np.zeros([n_RL, num_points_y_half]);    lambda2_nonRL = np.zeros(num_points_y_half);      lambda2_ref = np.zeros(num_points_y_half)
-lambda3_RL = np.zeros([n_RL, num_points_y_half]);    lambda3_nonRL = np.zeros(num_points_y_half);      lambda3_ref = np.zeros(num_points_y_half)
-xmap1_RL   = np.zeros([n_RL, num_points_y_half]);    xmap1_nonRL   = np.zeros(num_points_y_half);      xmap1_ref   = np.zeros(num_points_y_half)
-xmap2_RL   = np.zeros([n_RL, num_points_y_half]);    xmap2_nonRL   = np.zeros(num_points_y_half);      xmap2_ref   = np.zeros(num_points_y_half)
-eigval_RL  = np.zeros([n_RL, num_points_y_half,3]);  eigval_nonRL  = np.zeros([num_points_y_half,3]);  eigval_ref  = np.zeros([num_points_y_half,3])
+Rkk_RL     = np.zeros([n_RL, num_points_y_half]);    Rkk_nonRL     = np.zeros([n_nonRL, num_points_y_half]);    Rkk_ref     = np.zeros(num_points_y_half)
+lambda1_RL = np.zeros([n_RL, num_points_y_half]);    lambda1_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda1_ref = np.zeros(num_points_y_half)
+lambda2_RL = np.zeros([n_RL, num_points_y_half]);    lambda2_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda2_ref = np.zeros(num_points_y_half)
+lambda3_RL = np.zeros([n_RL, num_points_y_half]);    lambda3_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda3_ref = np.zeros(num_points_y_half)
+xmap1_RL   = np.zeros([n_RL, num_points_y_half]);    xmap1_nonRL   = np.zeros([n_nonRL, num_points_y_half]);    xmap1_ref   = np.zeros(num_points_y_half)
+xmap2_RL   = np.zeros([n_RL, num_points_y_half]);    xmap2_nonRL   = np.zeros([n_nonRL, num_points_y_half]);    xmap2_ref   = np.zeros(num_points_y_half)
+eigval_RL  = np.zeros([n_RL, num_points_y_half,3]);  eigval_nonRL  = np.zeros([n_nonRL, num_points_y_half,3]);  eigval_ref  = np.zeros([num_points_y_half,3])
 
 # RL data
 for i_RL in range(n_RL):
     ( Rkk_RL[i_RL], lambda1_RL[i_RL], lambda2_RL[i_RL], lambda3_RL[i_RL], xmap1_RL[i_RL], xmap2_RL[i_RL] ) \
         = compute_reynolds_stress_dof( favre_uffuff_RL[i_RL], favre_uffvff_RL[i_RL], favre_uffwff_RL[i_RL], favre_vffvff_RL[i_RL], favre_vffwff_RL[i_RL], favre_wffwff_RL[i_RL], verbose=verbose )
-    eigval_RL[i_RL,:,0] = lambda1_RL[i_RL];     eigval_RL[i_RL,:,1] = lambda2_RL[i_RL];     eigval_RL[i_RL,:,2] = lambda3_RL[i_RL]  
+    eigval_RL[i_RL,:,0] = lambda1_RL[i_RL]
+    eigval_RL[i_RL,:,1] = lambda2_RL[i_RL]
+    eigval_RL[i_RL,:,2] = lambda3_RL[i_RL]  
 
 # non-RL non-converged data
-( Rkk_nonRL, lambda1_nonRL, lambda2_nonRL, lambda3_nonRL, xmap1_nonRL, xmap2_nonRL ) \
-    = compute_reynolds_stress_dof( favre_uffuff_nonRL, favre_uffvff_nonRL, favre_uffwff_nonRL, favre_vffvff_nonRL, favre_vffwff_nonRL, favre_wffwff_nonRL, verbose=verbose )
-eigval_nonRL[:,0] = lambda1_nonRL;     eigval_nonRL[:,1] = lambda2_nonRL;     eigval_nonRL[:,2] = lambda3_nonRL
+for i_nonRL in range(n_nonRL):
+    ( Rkk_nonRL[i_nonRL], lambda1_nonRL[i_nonRL], lambda2_nonRL[i_nonRL], lambda3_nonRL[i_nonRL], xmap1_nonRL[i_nonRL], xmap2_nonRL[i_nonRL] ) \
+        = compute_reynolds_stress_dof( favre_uffuff_nonRL[i_nonRL], favre_uffvff_nonRL[i_nonRL], favre_uffwff_nonRL[i_nonRL], favre_vffvff_nonRL[i_nonRL], favre_vffwff_nonRL[i_nonRL], favre_wffwff_nonRL[i_nonRL], verbose=verbose )
+    eigval_nonRL[i_nonRL,:,0] = lambda1_nonRL[i_nonRL]
+    eigval_nonRL[i_nonRL,:,1] = lambda2_nonRL[i_nonRL]
+    eigval_nonRL[i_nonRL,:,2] = lambda3_nonRL[i_nonRL]
 
 # non-RL converged reference data
 ( Rkk_ref, lambda1_ref, lambda2_ref, lambda3_ref, xmap1_ref, xmap2_ref ) \
     = compute_reynolds_stress_dof( favre_uffuff_ref, favre_uffvff_ref, favre_uffwff_ref, favre_vffvff_ref, favre_vffwff_ref, favre_wffwff_ref, verbose=verbose )
-eigval_ref[:,0] = lambda1_ref;     eigval_ref[:,1] = lambda2_ref;     eigval_ref[:,2] = lambda3_ref
+eigval_ref[:,0] = lambda1_ref
+eigval_ref[:,1] = lambda2_ref
+eigval_ref[:,2] = lambda3_ref
 
 print("Rij decomposed successfully!")
 
@@ -379,23 +402,23 @@ print("Rij decomposed successfully!")
 print("Building triangle barycentric map plots...")
 #for i_RL in range(n_RL):
 #    visualizer.build_anisotropy_tensor_barycentric_xmap_triang(y_delta_RL,    xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_RL, f"anisotropy_tensor_barycentric_map_RL_{file_details_list[i_RL]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_nonRL, xmap1_nonRL,    xmap2_nonRL,    averaging_time_RL, f"anisotropy_tensor_barycentric_map_nonRL_{iteration}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_ref,   xmap1_ref,      xmap2_ref,      averaging_time_ref,     "anisotropy_tensor_barycentric_map_ref")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL[0], xmap1_nonRL[0], xmap2_nonRL[0], averaging_time_nonRL[0], f"anisotropy_tensor_barycentric_map_nonRL_{iteration_nonRL_list[0]}")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_ref,      xmap1_ref,      xmap2_ref,      averaging_time_ref,       "anisotropy_tensor_barycentric_map_ref")
 print("Triangle barycentric map plotted successfully!")
 
 # ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
 
 print("Building gif frames...")
 frames_rkk = []; frames_eig = []; frames_xmap_coord = []; frames_xmap_triang = []; 
-for i_RL in range(n_RL):
+for i in range(n_RL):
     # log progress
-    if i_RL % (n_RL//10 or 1) == 0:
-        print(f"{i_RL/n_RL*100:.0f}%")
+    if i % (n_RL//10 or 1) == 0:
+        print(f"{i/n_RL*100:.0f}%")
     # Build frames
-    frames_rkk         = visualizer.build_reynolds_stress_tensor_trace_frame( frames_rkk, y_delta_RL, y_delta_ref, Rkk_RL[i_RL],    Rkk_ref, averaging_time_RL, global_step_list[i_RL])
-    frames_eig         = visualizer.build_anisotropy_tensor_eigenvalues_frame(frames_eig, y_delta_RL, y_delta_ref, eigval_RL[i_RL], eigval_ref, averaging_time_RL, global_step_list[i_RL])
-    frames_xmap_coord  = visualizer.build_anisotropy_tensor_barycentric_xmap_coord_frame( frames_xmap_coord,  y_delta_RL, y_delta_ref, xmap1_RL[i_RL], xmap2_RL[i_RL], xmap1_ref, xmap2_ref, averaging_time_RL, global_step_list[i_RL])
-    frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_RL, global_step_list[i_RL])
+    frames_rkk         = visualizer.build_reynolds_stress_tensor_trace_frame(             frames_rkk,         y_delta_RL, y_delta_nonRL, y_delta_ref, Rkk_RL[i],    Rkk_nonRL[i],    Rkk_ref,    averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
+    frames_eig         = visualizer.build_anisotropy_tensor_eigenvalues_frame(            frames_eig,         y_delta_RL, y_delta_nonRL, y_delta_ref, eigval_RL[i], eigval_nonRL[i], eigval_ref, averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
+    frames_xmap_coord  = visualizer.build_anisotropy_tensor_barycentric_xmap_coord_frame( frames_xmap_coord,  y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref,     averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
+    frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref,     averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
 
 print("Building gifs from frames...")
 frames_dict = {'anisotropy_tensor_Rkk':frames_rkk, 'anisotropy_tensor_eigenvalues':frames_eig, 'anisotropy_tensor_barycentric_map':frames_xmap_coord, 'anisotropy_tensor_barycentric_map_triangle':frames_xmap_triang}

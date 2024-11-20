@@ -47,6 +47,7 @@ if not os.path.exists(probelinesDir):
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
+iteration_max_nonRL = 4000000
 
 # Custom colormap
 cmap = plt.get_cmap('RdBu_r')  # Replace with your desired colormap
@@ -172,7 +173,22 @@ n_nonRL = len(train_step_list)
 print("\nnon-RL files:")
 for i_nonRL in range(n_nonRL):
     print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
+
+# --- Discard non-RL (and corresponding RL) snapshots if not available
 assert n_nonRL == n_RL
+filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
+n_nonRL_is_available = sum(filename_nonRL_is_available)
+print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", n_nonRL - n_nonRL_is_available)
+filename_RL_list_available = []
+filename_nonRL_list_available = []
+for i in range(n_RL):
+    if filename_nonRL_is_available[i]:
+        filename_RL_list_available.append(filename_RL_list[i])
+        filename_nonRL_list_available.append(filename_nonRL_list[i])
+filename_RL_list    = filename_RL_list_available
+filename_nonRL_list = filename_nonRL_list_available
+n_RL = len(filename_RL_list); n_nonRL = n_RL
+print(f"Datasets RL and non-RL have now {n_RL} files each")
 
 # --- Get averaging time of 'Reference', 'non-RL' and 'RL' and build 'file_details' information ---
 # > Reference

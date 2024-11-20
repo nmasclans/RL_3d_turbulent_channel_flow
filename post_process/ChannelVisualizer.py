@@ -600,7 +600,7 @@ class ChannelVisualizer():
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(rf"$\overline{{{vel_name}}}^{{+}}$")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\nRL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.yticks([0.0, 5.0, 10.0, 15.0, 20.0])
         plt.legend(loc='lower right')
         plt.tight_layout()
@@ -611,7 +611,7 @@ class ChannelVisualizer():
     def build_vel_avg_frame(self, frames, yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, 
                        vel_name='u', ylim=None, x_actuator_boundaries=None):
         
-        fig = self.build_um_fig(yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, ylim, x_actuator_boundaries)
+        fig = self.build_vel_avg_fig(yplus_RL, yplus_nonRL, yplus_ref, vel_avg_RL, vel_avg_nonRL, vel_avg_ref, avg_time_RL, avg_time_nonRL, global_step, vel_name, ylim, x_actuator_boundaries)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -641,7 +641,7 @@ class ChannelVisualizer():
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(rf"${vel_name}^{{+}}_{{\textrm{{rmsf}}}}$")
         plt.grid(axis="y")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\nRL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.legend(loc='lower right', ncol = 2, fontsize=12)
         plt.tight_layout()
         #fig = plt.gcf()
@@ -729,8 +729,8 @@ class ChannelVisualizer():
         plt.savefig(filepath)
 
 
-    def build_anisotropy_tensor_barycentric_xmap_triang_frame(self, frames, y_delta, bar_map_x, bar_map_y, avg_time, global_step):
-
+    def build_anisotropy_tensor_barycentric_xmap_triang_frame(self, frames, ydelta_RL, ydelta_nonRL, ydelta_ref, xmap1_RL,  xmap1_nonRL,  xmap1_ref,  xmap2_RL, xmap2_nonRL, xmap2_ref, \
+                                                              avg_time_RL, avg_time_nonRL, global_step):
         plt.figure()
 
         # Plot markers Barycentric map
@@ -739,7 +739,9 @@ class ChannelVisualizer():
         norm  = colors.Normalize(vmin = 0, vmax = 1.0)
 
         # Plot data into the barycentric map
-        plt.scatter( bar_map_x, bar_map_y, c = y_delta, cmap = cmap, norm=norm, zorder = 3, marker = 'o', s = 85, edgecolor = 'black', linewidth = 0.8 )
+        plt.scatter( xmap1_ref,   xmap2_ref,   c = ydelta_ref,   cmap = cmap, norm = norm, zorder = 3, marker = 'o', s = 85, edgecolor = 'black', linewidth = 0.8, label="Reference" )
+        plt.scatter( xmap1_nonRL, xmap2_nonRL, c = ydelta_nonRL, cmap = cmap, norm = norm, zorder = 3, marker = 's', s = 85, edgecolor = 'black', linewidth = 0.8, label="non-RL" )
+        plt.scatter( xmap1_RL,    xmap2_RL,    c = ydelta_RL,    cmap = cmap, norm = norm, zorder = 3, marker = '^', s = 85, edgecolor = 'black', linewidth = 0.8, label="RL" )
 
         # Plot barycentric map lines
         plt.plot( [self.x1c[0], self.x2c[0]],[self.x1c[1], self.x2c[1]], zorder = 1, color = 'black', linestyle = '-', linewidth = 2 )
@@ -757,13 +759,10 @@ class ChannelVisualizer():
         plt.text( 0.4850, 0.9000, r'$\textbf{x}_{3_{c}}$' )
         cbar = plt.colorbar()
         cbar.set_label( r'$y/\delta$' )
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.legend(loc='upper right')
         plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
         ###plt.clim( 0.0, 20.0 )
-
-        # ------ save figure ------
-        #filename = os.path.join(self.postRlzDir, f"anisotropy_tensor_barycentric_map_odt_avgTime_{avg_time:.0f}")
-        #print(f"\nMAKING PLOT OF BARYCENTRIC MAP OF ANISOTROPY TENSOR from ODT data at Averaging Time = {avg_time:.2f}, in filename: {filename}" )
-        #plt.savefig(filename)
 
         # ------ gif frame by pillow ---------
         # Save the current figure as an image frame
@@ -778,34 +777,25 @@ class ChannelVisualizer():
 
 # ------------------- anisotropy tensor barycentric map coordinates 'xmap_i' -------------------
     
-    def build_reynolds_stress_tensor_trace_fig(self, ydelta_odt, ydelta_ref, Rkk_odt, Rkk_ref, avg_time, global_step):
-        
+    def build_reynolds_stress_tensor_trace_fig(self, ydelta_RL, ydelta_nonRL, ydelta_ref, Rkk_RL, Rkk_nonRL, Rkk_ref, \
+                                               avg_time_RL, avg_time_nonRL, global_step):
         fig, ax = plt.subplots()
-        plt.plot(ydelta_odt, Rkk_odt, '-',  color='black', label=r"RL")
-        plt.plot(ydelta_ref, Rkk_ref, '--', color='tab:green', label=r"Reference")
+        plt.plot(ydelta_ref, Rkk_ref,   '-',  color='black',     label=r"Reference")
+        plt.plot(ydelta_odt, Rkk_nonRL, '--', color='tab:blue',  label=r"non-RL")
+        plt.plot(ydelta_odt, Rkk_RL,    ':',  color='tab:green', label=r"RL")
         plt.xlim([0.0, 1.0])
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"Reynolds Stress Trace $R_{kk}$")
         plt.grid(axis="y")
-        plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
-        plt.legend(loc='upper right', ncol = 2, fontsize=12)
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.legend(loc='upper right')
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
     
-
-    def build_reynolds_stress_tensor_trace(self, ydelta_odt, ydelta_ref, Rkk_odt, Rkk_ref, avg_time):
-        
-        filename = os.path.join(self.postRlzDir, "reynolds_stress_tensor_trace")
-        print(f"\nMAKING PLOT OF Reynolds Stress tensor Trace at tavg = {avg_time} in {filename}")
-        fig = self.build_reynolds_stress_tensor_trace_fig(ydelta_odt, ydelta_ref, Rkk_odt, Rkk_ref, avg_time)
-        fig.savefig(filename)
-        plt.close()
-
-
-    def build_reynolds_stress_tensor_trace_frame(self, frames, ydelta_odt, ydelta_ref, Rkk_odt, Rkk_ref, avg_time, global_step):
-        
-        fig = self.build_reynolds_stress_tensor_trace_fig(ydelta_odt, ydelta_ref, Rkk_odt, Rkk_ref, avg_time, global_step)
+    def build_reynolds_stress_tensor_trace_frame(self, frames, ydelta_RL, ydelta_nonRL, ydelta_ref, Rkk_RL, Rkk_nonRL, Rkk_ref, \
+                                                 avg_time_RL, avg_time_nonRL, global_step):        
+        fig = self.build_reynolds_stress_tensor_trace_fig(ydelta_RL, ydelta_nonRL, ydelta_ref, Rkk_RL, Rkk_nonRL, Rkk_ref, avg_time_RL, avg_time_nonRL, global_step)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -814,35 +804,29 @@ class ChannelVisualizer():
 
 # ------------------- anisotropy tensor barycentric map coordinates 'xmap_i' -------------------
 
-    def build_anisotropy_tensor_barycentric_xmap_coord_fig(self, ydelta_odt, ydelta_ref, xmap1_odt, xmap2_odt, xmap1_ref, xmap2_ref, avg_time, global_step):
-        
+    def build_anisotropy_tensor_barycentric_xmap_coord_fig(self, ydelta_RL, ydelta_nonRL, ydelta_ref, xmap1_RL, xmap1_nonRL, xmap1_ref, xmap2_RL, xmap2_nonRL, xmap2_ref, \
+                                                           avg_time_RL, avg_time_nonRL, global_step):
         fig, ax = plt.subplots()
-        plt.plot(ydelta_odt, xmap1_odt, '-k', label=r"RL $x_1$")
-        plt.plot(ydelta_odt, xmap2_odt, '-b', label=r"RL $x_2$")
-        plt.plot(ydelta_ref, xmap1_ref, '--k', label=r"Reference $x_1$")
-        plt.plot(ydelta_ref, xmap2_ref, '--b', label=r"Reference $x_2$")
+        plt.plot(ydelta_ref,   xmap1_ref,   '-',  color='black',    label=r"Reference $x_1$")
+        plt.plot(ydelta_ref,   xmap2_ref,   '-',  color='tab:blue', label=r"Reference $x_2$")
+        plt.plot(ydelta_nonRL, xmap1_nonRL, '--', color='black',    label=r"non-RL $x_1$")
+        plt.plot(ydelta_nonRL, xmap2_nonRL, '--', color='tab:blue', label=r"non-RL $x_2$")
+        plt.plot(ydelta_RL,    xmap1_RL,    ':',  color='black',    label=r"RL $x_1$")
+        plt.plot(ydelta_RL,    xmap2_RL,    ':',  color='tab:blue', label=r"RL $x_2$")
         plt.xlim([0.0, 1.0])
         plt.ylim([0.0, 1.0])
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"barycentric coordinates $x_i$")
         plt.grid(axis="y")
-        plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
-        plt.legend(loc='upper right', ncol = 2, fontsize=12)
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.legend(loc='upper right')
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
 
-    def build_anisotropy_tensor_barycentric_xmap_coord(self, ydelta_odt, ydelta_ref, xmap1_odt, xmap2_odt, xmap1_ref, xmap2_ref, avg_time):
-        filename = os.path.join(self.postRlzDir, "anisotropy_tensor_barycentric_map_coord")
-        print(f"\nMAKING PLOT OF Anisotropy Tensor Barycentric Coordinates at tavg = {avg_time} in {filename}")
-        fig = self.build_anisotropy_tensor_barycentric_xmap_coord_fig(ydelta_odt, ydelta_ref, xmap1_odt, xmap2_odt, xmap1_ref, xmap2_ref, avg_time)
-        fig.savefig(filename)
-        plt.close()
-
-
-    def build_anisotropy_tensor_barycentric_xmap_coord_frame(self, frames, ydelta_odt, ydelta_ref, xmap1_odt, xmap2_odt, xmap1_ref, xmap2_ref, avg_time, global_step):
-        
-        fig = self.build_anisotropy_tensor_barycentric_xmap_coord_fig(ydelta_odt, ydelta_ref, xmap1_odt, xmap2_odt, xmap1_ref, xmap2_ref, avg_time, global_step)
+    def build_anisotropy_tensor_barycentric_xmap_coord_frame(self, frames, ydelta_RL, ydelta_nonRL, ydelta_ref, xmap1_RL, xmap1_nonRL, xmap1_ref, xmap2_RL, xmap2_nonRL, xmap2_ref, \
+                                                             avg_time_RL, avg_time_nonRL, global_step):
+        fig = self.build_anisotropy_tensor_barycentric_xmap_coord_fig(ydelta_RL, ydelta_nonRL, ydelta_ref, xmap1_RL, xmap1_nonRL, xmap1_ref, xmap2_RL, xmap2_nonRL, xmap2_ref, avg_time_RL, avg_time_nonRL, global_step)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -852,39 +836,35 @@ class ChannelVisualizer():
 
 # ------------------- anisotropy tensor eigenvalues 'lambda_i' -------------------
 
-    def build_anisotropy_tensor_eigenvalues_fig(self, ydelta_odt, ydelta_ref, eigenvalues_odt, eigenvalues_ref, avg_time, global_step):
+    def build_anisotropy_tensor_eigenvalues_fig(self, ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, avg_time_RL, avg_time_nonRL, global_step):
         
         fig, ax = plt.subplots()
-        plt.plot(ydelta_odt, eigenvalues_odt[:,0], '-k', label=r"RL $\lambda_0$")
-        plt.plot(ydelta_odt, eigenvalues_odt[:,1], '-b', label=r"RL $\lambda_1$")
-        plt.plot(ydelta_odt, eigenvalues_odt[:,2], '-r', label=r"RL $\lambda_2$")
-        plt.plot(ydelta_ref, eigenvalues_ref[:,0], '--k', label=r"Reference $\lambda_0$")
-        plt.plot(ydelta_ref, eigenvalues_ref[:,1], '--b', label=r"Reference $\lambda_1$")
-        plt.plot(ydelta_ref, eigenvalues_ref[:,2], '--r', label=r"Reference $\lambda_2$")
+        plt.plot(ydelta_ref,   eigval_ref[:,0],   '-',  color='black',    label=r"Reference $\lambda_0$")
+        plt.plot(ydelta_ref,   eigval_ref[:,1],   '-',  color='tab:blue', label=r"Reference $\lambda_1$")
+        plt.plot(ydelta_ref,   eigval_ref[:,2],   '-',  color='tab:green',label=r"Reference $\lambda_2$")
+        plt.plot(ydelta_nonRL, eigval_nonRL[:,0], '--', color='black',    label=r"non-RL $\lambda_0$")
+        plt.plot(ydelta_nonRL, eigval_nonRL[:,1], '--', color='tab:blue', label=r"non-RL $\lambda_1$")
+        plt.plot(ydelta_nonRL, eigval_nonRL[:,2], '--', color='tab:green',label=r"non-RL $\lambda_2$")
+        plt.plot(ydelta_RL,    eigval_RL[:,0],    ':',  color='black',    label=r"non-RL $\lambda_0$")
+        plt.plot(ydelta_RL,    eigval_RL[:,1],    ':',  color='tab:blue', label=r"non-RL $\lambda_1$")
+        plt.plot(ydelta_RL,    eigval_RL[:,2],    ':',  color='tab:green',label=r"non-RL $\lambda_2$")
+
         plt.xlim([0.0, 1.0])
         plt.ylim([-0.5, 1.0])
         plt.yticks([-2/3, -1/3, 0, 1/3, 2/3], labels = ["-2/3", "-1/3", "0", "1/3", "2/3"])
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"anisotropy tensor eigenvalues $\lambda_i$")
         plt.grid(axis="y")
-        plt.title(rf"$tavg^+ = {avg_time:.2f}$, RL step = {global_step}")
-        plt.legend(loc='upper right', ncol = 2, fontsize=12)
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.legend(loc='upper right')
         plt.tight_layout()
         #fig = plt.gcf()
         return fig
     
-
-    def build_anisotropy_tensor_eigenvalues(self, ydelta_odt, ydelta_ref, eigenvalues_odt, eigenvalues_ref, avg_time):
-
-        filename = os.path.join(self.postRlzDir, "anisotropy_tensor_eigenvalues")
-        print(f"\nMAKING PLOT OF Anisotropy Tensor Eigenvalues at tavg = {avg_time} in {filename}")
-        fig = self.build_anisotropy_tensor_eigenvalues_fig(ydelta_odt, ydelta_ref, eigenvalues_odt, eigenvalues_ref, avg_time)
-        fig.savefig(filename)
-        plt.close()
-    
-    def build_anisotropy_tensor_eigenvalues_frame(self, frames, ydelta_odt, ydelta_ref, eigenvalues_odt, eigenvalues_ref, avg_time, global_step):
+    def build_anisotropy_tensor_eigenvalues_frame(self, frames, ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, \
+                                                  avg_time_RL, avg_time_nonRL, global_step):
         
-        fig = self.build_anisotropy_tensor_eigenvalues_fig(ydelta_odt, ydelta_ref, eigenvalues_odt, eigenvalues_ref, avg_time, global_step)
+        fig = self.build_anisotropy_tensor_eigenvalues_fig(ydelta_RL, ydelta_nonRL, ydelta_ref, eigval_RL, eigval_nonRL, eigval_ref, avg_time_RL, avg_time_nonRL, global_step)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
@@ -1008,7 +988,7 @@ class ChannelVisualizer():
 
     def build_main_gifs_from_frames(self, frames_dict, iteration=None):
       
-        for k,v in frames_dict:
+        for k,v in frames_dict.items():
             frames_name = k
             frames_list = v
             filename = os.path.join(self.postRlzDir, f"{frames_name}_global_steps_{iteration}.gif")
