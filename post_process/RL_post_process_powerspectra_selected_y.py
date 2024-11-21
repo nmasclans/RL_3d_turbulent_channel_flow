@@ -239,7 +239,7 @@ params = {
 # - Transform 3-d spatial snapshot (at specific time, for all domain grid points (x,y,z)) 
 # into 1-d probelines temporal data (at specific (x,y,z), increasing time) 
 # - Build plots
-frames = []
+frames_spectral = []
 
 # > Reference
 probes_filepath_list_ref = build_probelines_from_snapshot_h5(filename_ref, file_details_ref, probelinesDir, params)
@@ -267,12 +267,12 @@ for i in range(n_RL):
         assert np.isclose(avg_y_plus_ref[i_probe], avg_y_plus_RL[i_probe]) & np.isclose(avg_y_plus_ref[i_probe], avg_y_plus_nonRL[i_probe])
     
     # Build frame for each specific global step
-    frames = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
-        frames, avg_y_plus_ref, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, tavg0_RL, tavg0_nonRL, global_step_num_list[i],
+    frames_spectral = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
+        frames_spectral, avg_y_plus_ref, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, tavg0_RL, tavg0_nonRL, global_step_num_list[i],
     )
 
 print("\nSave gifs from frames...")
-frames_dict = {'spectral_Euu+_vs_k+':frames}
+frames_dict = {'spectral_Euu+_vs_k+':frames_spectral}
 visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")
 
