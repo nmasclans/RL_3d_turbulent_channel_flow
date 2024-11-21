@@ -1595,7 +1595,7 @@ class ChannelVisualizer():
         print(f"\nPlot KEuu+ vs. k+: {fname}")
 
     
-    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig(self, avg_y_plus, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, avg_time_RL, avg_time_nonRL, global_step):
+    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig(self, avg_y_plus, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, avg_time_RL, avg_time_nonRL, global_step, ylim=[10**(-7.5),1.0]):
         colors = ['black','tab:blue','tab:green','tab:orange']
         n_avg_probes = len(avg_y_plus)
         # Plot Euu vs kplus
@@ -1612,6 +1612,7 @@ class ChannelVisualizer():
         # plot parameters
         plt.xlabel(r"$k_x^+$")      #plt.xlabel(r"Wavenumber, $k_x$")
         plt.ylabel(r"$E_{uu}^+$")   #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+        plt.ylim(ylim)
         plt.xscale('log')
         plt.grid(True)
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
