@@ -974,11 +974,11 @@ class ChannelVisualizer():
             # scatter gif
             filename = os.path.join(self.postRlzDir, f"action{i_act}_scatter_vs_global_steps.gif")
             print(f"\nMAKING GIF SCATTER action {i_act} along RL GLOBAL STEPS in {filename}" )
-            frames_dict_scatter[i_act][0].save(filename, save_all=True, append_images=frames_dict_scatter[i_act][1:], duration=100, loop=0)    
+            frames_dict_scatter[i_act][0].save(filename, save_all=True, append_images=frames_dict_scatter[i_act][1:], duration=500, loop=0)    
             # pdf gif
             filename = os.path.join(self.postRlzDir, f"action{i_act}_pdf_vs_global_steps.gif")
             print(f"\nMAKING GIF PDF action {i_act} along RL GLOBAL STEPS in {filename}" )
-            frames_dict_pdf[i_act][0].save(filename, save_all=True, append_images=frames_dict_pdf[i_act][1:], duration=100, loop=0)    
+            frames_dict_pdf[i_act][0].save(filename, save_all=True, append_images=frames_dict_pdf[i_act][1:], duration=500, loop=0)    
     
 # ------------------------------------------------------------------------
 

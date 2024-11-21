@@ -342,7 +342,7 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u+')
 plt.grid(which='both',  axis='x')
 plt.grid(which='major', axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -377,9 +377,8 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'u_rms+' )
 plt.grid(which='both', axis='x')
 plt.grid(which='major', axis='y')
-#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.text( 1.05, 1.0, 'u_rms+' )
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -414,9 +413,8 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'v_rms+' )
 plt.grid(which='both', axis='x')
 plt.grid(which='major', axis='y')
-#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.text( 17.5, 0.2, 'v_rms+' )
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -451,9 +449,8 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'w_rms+' )
 plt.grid(which='both', axis='x')
 plt.grid(which='major', axis='y')
-#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.text( 17.5, 0.2, 'w_rms+' )
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -488,9 +485,8 @@ plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labe
 plt.ylabel( 'TKE+' )
 plt.grid(which='both', axis='x')
 plt.grid(which='major', axis='y')
-#legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
 plt.text( 17.5, 0.2, 'TKE+' )
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/tke_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -701,7 +697,7 @@ plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_RL, linestyle=':', mark
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L1 Error' )
 plt.grid(which='both',axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/L1_error_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -720,7 +716,7 @@ plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_RL, linestyle=':', mark
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L2 Error' )
 plt.grid(which='both',axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/L2_error_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -739,7 +735,7 @@ plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL, linestyle=':', ma
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'Linf Error' )
 plt.grid(which='both',axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/Linf_error_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -754,7 +750,7 @@ plt.plot( averaging_time_nonRL, L1_error_rmsf_w_plus_RL / L1_error_rmsf_w_plus_n
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L1 Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/L1_error_ratio_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -769,7 +765,7 @@ plt.plot( averaging_time_nonRL, L2_error_rmsf_w_plus_RL / L2_error_rmsf_w_plus_n
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L2 Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/L2_error_ratio_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
@@ -784,7 +780,7 @@ plt.plot( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL / Linf_error_rmsf_w_pl
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'Linf Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
-legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='lower right' )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/Linf_error_ratio_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
