@@ -669,6 +669,7 @@ class RheaEnv(py_environment.PyEnvironment):
         action_aux = np.zeros([self.cfd_n_envs, self.rl_n_envs, self.action_dim])
         action = action * self.action_bounds[1] if self.mode == "collect" else action # TODO: check! shouldn't actions be always scaled, ALSO in testing/training?
         action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
+        logger.debug(f"[RheEnv] action: \n{action}")
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 single_action = action[i * self.rl_n_envs + j, :]
@@ -677,7 +678,7 @@ class RheaEnv(py_environment.PyEnvironment):
         for i in range(self.cfd_n_envs):
             # self._action shape: np.zeros(self.n_action, dtype=self.rhea_dtype))
             self.client.put_tensor(self.action_key[i], self._action[i, ...].astype(self.rhea_dtype)) # "..." is a shorthand for 'all remaining directions'
-            logger.debug(f"[Env {i}] (Written) Action: {self._action[i, :]}")
+            logger.debug(f"[RheaEnv] [Env {i}] (Written) Action: \n{self._action[i, :]}")
 
 
     def _dump_rl_data(self):
