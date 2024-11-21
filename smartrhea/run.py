@@ -23,8 +23,8 @@ from tf_agents.policies import policy_saver
 from smartsim.log import get_logger
 from socket import gethostname
 
-sys.path.append(os.environ['RL_CASE_PATH'])
-from params import params, env_params  # params.py in directory $RL_CASE_DIR
+sys.path.append(os.environ['RL_CASE_PATH'])     # to import modules from directory $RL_CASE_DIR
+from params import params, env_params           # params.py in directory $RL_CASE_DIR
 from smartrhea.history import History
 from smartrhea.init_smartsim import init_smartsim
 from smartrhea.utils import print_params, deactivate_tf_gpus, numpy_str, params_str, params_html_table, bcolors
@@ -420,7 +420,6 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
                 policy_checkpointer.save(global_step_val)
                 saved_model_path = os.path.join(saved_model_dir, 'policy_' + ('%d' % global_step_val).zfill(9))
                 saved_model.save(saved_model_path)
-                    
 
             if global_step_val % params["log_interval"] == 0:
                 logger.info(f"{bcolors.OKCYAN}Training stats:{bcolors.ENDC}")
