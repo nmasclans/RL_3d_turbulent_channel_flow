@@ -2042,8 +2042,8 @@ void myRHEA::calculateReward() {
     reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous ) \
                                    + ( l2_d_avg_v / l2_avg_v_previous ) \
                                    + ( l2_d_avg_w / l2_avg_w_previous ) \
-                                   + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \ 
-                                   + ( l2_d_rmsf_v / l2_rmsf_v_previous ) \ 
+                                   + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \
+                                   + ( l2_d_rmsf_v / l2_rmsf_v_previous ) \
                                    + ( l2_d_rmsf_w / l2_rmsf_w_previous ) ) ) * std::pow(current_time - begin_actuation_time, 2.0);
 
     /// Debugging
