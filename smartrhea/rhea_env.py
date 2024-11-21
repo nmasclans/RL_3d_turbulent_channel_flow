@@ -240,8 +240,10 @@ class RheaEnv(py_environment.PyEnvironment):
         self.witness_xyz = get_witness_xyz(witness_filepath)
         num_witness_points = n_witness_points(witness_filepath)
         assert np.prod(self.witness_xyz) == num_witness_points
-        self.n_state = num_witness_points * self.state_dim
-        self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs))
+        self.n_state_wit    = num_witness_points
+        self.n_state        = self.n_state_wit * self.state_dim
+        self.n_state_wit_rl = int((2 * self.rl_neighbors + 1) * (self.n_state_wit / self.rl_n_envs))
+        self.n_state_rl     = self.n_state_wit_rl * self.state_dim
         assert self.n_state % self.rl_n_envs == 0, f"ERROR: number of witness points ({self.n_state}) must be multiple of number of rl environments ({self.rl_n_envs}), so that each environment has the same number of witness points"
         
         # Actions
@@ -254,7 +256,9 @@ class RheaEnv(py_environment.PyEnvironment):
             self.n_action = n_cubes(control_cubes_filepath) * self.action_dim
 
         # create and allocate array objects
+        self.__state       = np.zeros((self.cfd_n_envs, self.n_state_wit, self.state_dim), dtype=self.model_dtype)
         self._state        = np.zeros((self.cfd_n_envs, self.n_state), dtype=self.model_dtype)
+        self.__state_rl    = np.zeros((self.n_envs, self.n_state_wit_rl, self.state_dim), dtype=self.model_dtype)
         self._state_rl     = np.zeros((self.n_envs, self.n_state_rl), dtype=self.model_dtype)
         self._action       = np.zeros((self.cfd_n_envs, self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
         self._action_znmf  = np.zeros((self.cfd_n_envs, 2 * self.n_action * self.rl_n_envs), dtype=self.rhea_dtype)
@@ -334,7 +338,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self._get_time()            # updates self._time
 
         # Transform state and reward: redistribute & standarize
-        self._redistribute_state()      # updates self._state_rl
+        self._redistribute_state()       # updates self._state_rl
         #self._min_max_scaling_state()   # updates self._state_rl    
         #self._min_max_scaling_reward()  # updates self._reward
 
@@ -447,9 +451,10 @@ class RheaEnv(py_environment.PyEnvironment):
                 try:
                     self.client.poll_tensor(self.state_key[i], self.poll_freq_ms, self.poll_n_tries)
                     # self._state shape: [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
-                    self._state[i, :] = self.client.get_tensor(self.state_key[i])
+                    self._state[i, :]   = self.client.get_tensor(self.state_key[i])
+                    self.__state[i,:,:] = self._state[i, :].reshape(self.n_state_wit, self.state_dim)
                     self.client.delete_tensor(self.state_key[i])
-                    logger.debug(f"[Env {i}] (Read) State '{self.state_key[i]}': {self._state[i,:]}")
+                    logger.debug(f"[Env {i}] (Read) State '{self.state_key[i]}': \n{self._state[i,:]}") # \n{self.__state[i,:,:]}")
                 except Exception as exc:
                     raise Warning(f"Could not read state from key: {self.state_key[i]}") from exc
 
@@ -464,22 +469,26 @@ class RheaEnv(py_environment.PyEnvironment):
 
         Additional info:
         state_extended array is used for accessing neighbouring blocks of witness points; each rl env has self.rl_neighbors neighboring envs 
-        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 
-                                                                    self.n_state_rl = int((2 * self.rl_neighbors + 1) * (self.n_state / self.rl_n_envs));
-        self._state shape:    [self.cfd_n_envs, self.n_state], where self.n_state = num. witness points in single cfd env
-        state_extended shape: [self.cfd_n_nevs, self.n_state * 3]
+        self._state_rl shape:  [self.n_envs,     self.n_state_rl],                      where self.n_envs = cfd_n_envs * rl_n_envs, 
+        self.__state_rl shape: [self.n_envs,     self.n_state_wit_rl,  self.state_dim], where self.n_state_rl = n_state_wit_rl * self.state_dim 
+        self._state shape:     [self.cfd_n_envs, self.n_state],                         where self.n_state = num. witness points in single cfd env
+        self.__state shape:    [self.cfd_n_envs, self.n_state_wit,     self.state_dim], where self.n_state = self.n_state_wit * self.state_dim
+        state_extended shape:  [self.cfd_n_nevs, self.n_state_wit * 3, self.state_dim]
         """
         # Concatenate self._state array 3 times along columns, used for building self._state_rl which include the state of neighbouring rl environments
-        state_extended = np.concatenate((self._state, self._state, self._state), axis=1)
+        state_extended = np.concatenate((self.__state, self.__state, self.__state), axis=1)
         plane_wit = self.witness_xyz[0] * self.witness_xyz[2]                   # num. witness points in x-z plane
         block_wit = int(plane_wit * (self.witness_xyz[1] / self.rl_n_envs))     # rl_n_envs distributed along 2nd coordinate y
         assert self.witness_xyz[1] % self.rl_n_envs == 0, f"Number of witness points in the y-direction is not multiple to the number of rl environments, with self.witness_xyz[1] = {self.witness_xyz[1]} and self.rl_n_envs = {self.rl_n_envs}"
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
-                self._state_rl[i * self.rl_n_envs + j,:] = state_extended[i, block_wit * (j - self.rl_neighbors) + \
-                    self.n_state:block_wit * (j + self.rl_neighbors + 1) + self.n_state]
-                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] State: {self._state_rl[i * self.rl_n_envs + j,:]}")
-        # -> _redistribute_state has been CHECKED, the state information is distributed successfully along rl env., including the neighboring rl env.  
+                self.__state_rl[i * self.rl_n_envs + j,:,:] = state_extended[
+                    i, 
+                    block_wit * (j - self.rl_neighbors) + self.n_state_wit:block_wit * (j + self.rl_neighbors + 1) + self.n_state_wit,
+                    :,
+                ]
+                self._state_rl[i * self.rl_n_envs + j,:] = self.__state_rl[i * self.rl_n_envs + j,:,:].reshape(self.n_state_rl)
+                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] State: \n{self._state_rl[i * self.rl_n_envs + j,:]}") # \n{self.__state_rl[i * self.rl_n_envs + j,:,:]}")
 
 
     def _get_reward(self):
@@ -536,22 +545,22 @@ class RheaEnv(py_environment.PyEnvironment):
 #        for i in range(self.cfd_n_envs):
 #            for j in range(self.rl_n_envs):
 #                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized State: {self._state_rl[i * self.rl_n_envs + j,:]}")
-
-    # Min-max-scaling of state to range [0,1] 
-    def _min_max_scaling_state(self):
-        flattened_state_rl = self._state_rl.flatten()
-        min_value = np.min(flattened_state_rl)
-        max_value = np.max(flattened_state_rl)
-        self._state_running_min = np.min([min_value, self._state_running_min])
-        self._state_running_max = np.max([max_value, self._state_running_max])
-        self._state_rl = ( self._state_rl - self._state_running_min ) / ( self._state_running_max - self._state_running_min + EPS )
-        # Logging
-        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with input data (min, max) = ({min_value}, {max_value}) and running (min, max) = ({self._state_running_min}, {self._state_running_max})")
-        for i in range(self.cfd_n_envs):
-            for j in range(self.rl_n_envs):
-                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled State: {self._state_rl[i * self.rl_n_envs + j,:]}")
-
-
+#
+#    # Min-max-scaling of state to range [0,1] 
+#    def _min_max_scaling_state(self):
+#        flattened_state_rl = self._state_rl.flatten()
+#        min_value = np.min(flattened_state_rl)
+#        max_value = np.max(flattened_state_rl)
+#        self._state_running_min = np.min([min_value, self._state_running_min])
+#        self._state_running_max = np.max([max_value, self._state_running_max])
+#        self._state_rl = ( self._state_rl - self._state_running_min ) / ( self._state_running_max - self._state_running_min + EPS )
+#        # Logging
+#        logger.debug(f"[RheaEnv::_min_max_scaling_state] State Scaling, with input data (min, max) = ({min_value}, {max_value}) and running (min, max) = ({self._state_running_min}, {self._state_running_max})")
+#        for i in range(self.cfd_n_envs):
+#            for j in range(self.rl_n_envs):
+#                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Scaled State: {self._state_rl[i * self.rl_n_envs + j,:]}")
+#
+#
 # TODO: remove if not used, and remove also only-used-here variables: self._reward_running_mean, self._reward_running_var, self._reward, self._reward_running_counter
 #    def _standarize_reward(self):
 #        """
@@ -581,20 +590,20 @@ class RheaEnv(py_environment.PyEnvironment):
 #        for i in range(self.cfd_n_envs):
 #            for j in range(self.rl_n_envs):
 #                logger.debug(f"[Cfd Env {i} - Pseudo Env {j}] Standarized Reward: {self._reward[i * self.rl_n_envs + j]}")
-    
-    # Min-Max scaling reward to range [0,1]
-    def _min_max_scaling_reward(self):
-        min_value = np.min(self._reward)
-        max_value = np.max(self._reward)
-        self._reward_running_min = np.min([min_value, self._reward_running_min])
-        self._reward_running_max = np.max([max_value, self._reward_running_max])
-        self._reward = ( self._reward - self._reward_running_min ) / ( self._reward_running_max - self._reward_running_min + EPS )
-        # Logging
-        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with input data (min, max) = ({min_value}, {max_value}), running (min, max) = ({self._reward_running_min}, {self._reward_running_max})")
-        for i in range(self.cfd_n_envs):
-            for j in range(self.rl_n_envs):
-                logger.debug(f"[Cfd Env {i}] Scaled Reward: {self._reward[i*self.rl_n_envs:(i+1)*self.rl_n_envs]}")
-
+#    
+#    # Min-Max scaling reward to range [0,1]
+#    def _min_max_scaling_reward(self):
+#        min_value = np.min(self._reward)
+#        max_value = np.max(self._reward)
+#        self._reward_running_min = np.min([min_value, self._reward_running_min])
+#        self._reward_running_max = np.max([max_value, self._reward_running_max])
+#        self._reward = ( self._reward - self._reward_running_min ) / ( self._reward_running_max - self._reward_running_min + EPS )
+#        # Logging
+#        logger.debug(f"[RheaEnv::_min_max_scaling_reward] Reward Scaling, with input data (min, max) = ({min_value}, {max_value}), running (min, max) = ({self._reward_running_min}, {self._reward_running_max})")
+#        for i in range(self.cfd_n_envs):
+#            for j in range(self.rl_n_envs):
+#                logger.debug(f"[Cfd Env {i}] Scaled Reward: {self._reward[i*self.rl_n_envs:(i+1)*self.rl_n_envs]}")
+#
 
     def _get_time(self):
         logger.debug("Reading time...")
@@ -778,12 +787,12 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # Poll new state, reward and time
         # poll command waits for the RHEA to finish the action period and send the state and reward data
-        self._get_state()           # updates self._state
-        self._get_reward()          # updates self._reward
-        self._get_time()            # updates self._time
+        self._get_state()                # updates self._state
+        self._get_reward()               # updates self._reward
+        self._get_time()                 # updates self._time
 
         # Pre-processing state & reward: redistribute & standarize
-        self._redistribute_state()      # updates self._state_rl
+        self._redistribute_state()       # updates self._state_rl
         #self._min_max_scaling_state()   # updates self._state_rl    
         #self._min_max_scaling_reward()  # updates self._reward
 
