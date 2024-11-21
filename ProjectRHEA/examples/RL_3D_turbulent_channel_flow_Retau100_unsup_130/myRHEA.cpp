@@ -604,16 +604,13 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
                                         DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 3];
                                         DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 4];
-                                    } else if (action_dim == 6) {
+                                    } else { /// action_dim == 6:
                                         DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
                                         DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
                                         DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
                                         DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
                                         DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
                                         DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-                                    } else {
-                                        cerr << "[myRHEA::calculateSourceTerms] new action calculation not implemented for action_dim != 5 or 6" << endl;
-                                        MPI_Abort( MPI_COMM_WORLD, 1);
                                     }
                                     
                                     /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
