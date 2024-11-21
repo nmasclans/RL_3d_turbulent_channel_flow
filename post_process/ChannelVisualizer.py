@@ -995,7 +995,7 @@ class ChannelVisualizer():
 
     def plot_line(self, xdata, ydata, xlim, ylim, xlabel, ylabel, title):
 
-        filename = os.path.join(self.postRlzDir, f"{title}")gifs_from
+        filename = os.path.join(self.postRlzDir, f"{title}")
         print(f"\nMAKING PLOT of {xlabel} vs. {ylabel} in {filename}" )
 
         fig, ax = plt.subplots()
