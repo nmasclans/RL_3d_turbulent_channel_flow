@@ -72,7 +72,7 @@ const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 const vector<double> reg_lambda_vect = {0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.55, 0.55};    /// TODO: add check somewhere, length must correspond to num. nodes total, and num. nodes along y-axis
 #endif
 
-int action_dim = 6;
+int action_dim = 5;
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
 /* Baricentric map coordinates, source: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
@@ -516,8 +516,8 @@ void myRHEA::calculateSourceTerms() {
             /// Check if new action is needed
             if (current_time - previous_actuation_time >= actuation_period) {
 
-                if ( action_dim != 6 ) {
-                    cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 6, but action_dim = " << action_dim << endl;
+                if ( action_dim != 6 && action_dim != 5 ) {
+                    cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 5 or 6, but action_dim = " << action_dim << endl;
                     MPI_Abort( MPI_COMM_WORLD, 1);
                 }
 
@@ -597,12 +597,24 @@ void myRHEA::calculateSourceTerms() {
 
                                     /// Get perturbation values from RL agent
                                     actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
-                                    DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-                                    DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
-                                    DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
-                                    DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
-                                    DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
-                                    DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
+                                    if (action_dim == 5) {
+                                        DeltaRkk    = 0.0;
+                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
+                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
+                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
+                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 3];
+                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 4];
+                                    } else if (action_dim == 6) {
+                                        DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
+                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
+                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
+                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
+                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
+                                    } else {
+                                        cerr << "[myRHEA::calculateSourceTerms] new action calculation not implemented for action_dim != 5 or 6" << endl;
+                                        MPI_Abort( MPI_COMM_WORLD, 1);
+                                    }
                                     
                                     /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
                                     isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);

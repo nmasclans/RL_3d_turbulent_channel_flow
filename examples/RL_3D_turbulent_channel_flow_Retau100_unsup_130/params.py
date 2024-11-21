@@ -57,7 +57,7 @@ params = {
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-2.0, 2.0),
-    "action_dim": 6,
+    "action_dim": 5,
     "state_dim": 3,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
