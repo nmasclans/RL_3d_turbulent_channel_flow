@@ -1618,7 +1618,6 @@ class ChannelVisualizer():
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
         plt.tight_layout()
-        plt.savefig(f'spectra_{avg_time_nonRL:.0f}.jpg')
         return fig
 
     def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(self, frames, avg_y_plus, avg_k_plus_RL, avg_k_plus_nonRL, avg_k_plus_ref, avg_Euu_plus_RL, avg_Euu_plus_nonRL, avg_Euu_plus_ref, avg_time_RL, avg_time_nonRL, global_step):
