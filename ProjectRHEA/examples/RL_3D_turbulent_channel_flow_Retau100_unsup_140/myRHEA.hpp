@@ -66,10 +66,11 @@ class myRHEA : public FlowSolverRHEA {
         ///DistributedArray rmsf_v_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         ///DistributedArray rmsf_w_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         DistributedArray avg_u_previous_field;         /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray avg_v_previous_field;         /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray avg_w_previous_field;         /// only if _RL_CONTROL_IS_SUPERVISED_ 0
         DistributedArray rmsf_u_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
-        ///DistributedArray rmsf_v_previous_field;     /// only if _RL_CONTROL_IS_SUPERVISED_ 0
-        ///DistributedArray rmsf_w_previous_field;     /// only if _RL_CONTROL_IS_SUPERVISED_ 0
-
+        DistributedArray rmsf_v_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray rmsf_w_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
 
         /// Witness points
         std::string witness_file;
