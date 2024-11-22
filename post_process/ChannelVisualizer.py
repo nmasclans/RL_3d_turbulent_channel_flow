@@ -600,7 +600,6 @@ class ChannelVisualizer():
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(rf"$\overline{{{vel_name}}}^{{+}}$")
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
-        plt.yticks([0.0, 5.0, 10.0, 15.0, 20.0])
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()

@@ -536,6 +536,7 @@ ylim_avg_w   = [0.0, avg_w_max]
 ylim_rmsf_u  = [0.0, rmsf_u_max]
 ylim_rmsf_v  = [0.0, rmsf_v_max]
 ylim_rmsf_w  = [0.0, rmsf_w_max]
+print("Gifs y-limits:", ylim_avg_u, ylim_avg_v, ylim_avg_w, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
 for i in range(N):
     # log progress
     if i % (N//10 or 1) == 0:
