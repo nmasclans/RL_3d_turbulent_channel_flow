@@ -270,7 +270,9 @@ print("Data imported successfully!")
 
 ### Allocate averaged variables
 y_plus_RL      = np.zeros( [N, int( 0.5*num_points_y )] ); y_plus_nonRL      = np.zeros( [N, int( 0.5*num_points_y )] );  y_plus_ref      = np.zeros( int( 0.5*num_points_y ) )
-avg_u_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_u_plus_ref  = np.zeros( int( 0.5*num_points_y ) ); 
+avg_u_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_u_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
+avg_v_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_v_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_v_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
+avg_w_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_w_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_w_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
 rmsf_u_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_u_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_u_plus_ref = np.zeros( int( 0.5*num_points_y ) )
 rmsf_v_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_v_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_v_plus_ref = np.zeros( int( 0.5*num_points_y ) )
 rmsf_w_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_w_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_w_plus_ref = np.zeros( int( 0.5*num_points_y ) )
@@ -294,6 +296,8 @@ for j in range( 0, num_points_y ):
                 else:                                       # bottom-wall
                     y_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[n,k,j,i]*( u_tau/nu_ref )
                 avg_u_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[n,k,j,i]*( 1.0/u_tau )
+                avg_v_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*avg_v_data_RL[n,k,j,i]*( 1.0/u_tau )
+                avg_w_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*avg_w_data_RL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_u_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_v_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_w_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[n,k,j,i]*( 1.0/u_tau )
@@ -304,6 +308,8 @@ for j in range( 0, num_points_y ):
                 else:                                       # bottom-wall
                     y_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[n,k,j,i]*( u_tau/nu_ref )
                 avg_u_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[n,k,j,i]*( 1.0/u_tau )
+                avg_v_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*avg_v_data_nonRL[n,k,j,i]*( 1.0/u_tau )
+                avg_w_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*avg_w_data_nonRL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_u_plus_nonRL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_v_plus_nonRL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_w_plus_nonRL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[n,k,j,i]*( 1.0/u_tau )
@@ -313,6 +319,8 @@ for j in range( 0, num_points_y ):
             else:                                       # bottom-wall
                 y_plus_ref[aux_j]  += ( 0.5/num_points_xz )*y_data_ref[k,j,i]*( u_tau/nu_ref )
             avg_u_plus_ref[aux_j]  += ( 0.5/num_points_xz )*avg_u_data_ref[k,j,i]*( 1.0/u_tau )
+            avg_v_plus_ref[aux_j]  += ( 0.5/num_points_xz )*avg_v_data_ref[k,j,i]*( 1.0/u_tau )
+            avg_w_plus_ref[aux_j]  += ( 0.5/num_points_xz )*avg_w_data_ref[k,j,i]*( 1.0/u_tau )
             rmsf_u_plus_ref[aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_ref[k,j,i]*( 1.0/u_tau )
             rmsf_v_plus_ref[aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_ref[k,j,i]*( 1.0/u_tau )
             rmsf_w_plus_ref[aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_ref[k,j,i]*( 1.0/u_tau )
@@ -515,28 +523,33 @@ TKE_ref   = 0.5 * ( rmsf_u_plus_ref**2   + rmsf_v_plus_ref**2   + rmsf_w_plus_re
 print("Building gif frames for u-avg and u,v,w-rmsf profiles...")
 from ChannelVisualizer import ChannelVisualizer
 visualizer   = ChannelVisualizer(postDir)
-frames_avg_u = []; frames_rmsf_u = []; frames_rmsf_v = []; frames_rmsf_w = []
+frames_avg_u = []; frames_avg_v = []; frames_avg_w = []; frames_rmsf_u = []; frames_rmsf_v = []; frames_rmsf_w = []
 avg_u_max    = 20.0
+avg_v_max    = 1.0
+avg_w_max    = 1.0
 rmsf_u_max   = int(np.max([np.max(rmsf_u_plus_RL), np.max(rmsf_u_plus_nonRL), np.max(rmsf_u_plus_ref)]))+1
 rmsf_v_max   = int(np.max([np.max(rmsf_v_plus_RL), np.max(rmsf_v_plus_nonRL), np.max(rmsf_v_plus_ref)]))+1
 rmsf_w_max   = int(np.max([np.max(rmsf_w_plus_RL), np.max(rmsf_w_plus_nonRL), np.max(rmsf_w_plus_ref)]))+1
 ylim_avg_u   = [0.0, avg_u_max]
+ylim_avg_v   = [0.0, avg_v_max]
+ylim_avg_w   = [0.0, avg_w_max]
 ylim_rmsf_u  = [0.0, rmsf_u_max]
 ylim_rmsf_v  = [0.0, rmsf_v_max]
 ylim_rmsf_w  = [0.0, rmsf_w_max]
-print("ylim lists:", ylim_avg_u, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
 for i in range(N):
     # log progress
     if i % (N//10 or 1) == 0:
         print(f"{i/N*100:.0f}%")
     # Build frames
     frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_u_plus_RL[i],  avg_u_plus_nonRL[i],  avg_u_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_avg_v  = visualizer.build_vel_avg_frame( frames_avg_v,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_v_plus_RL[i],  avg_v_plus_nonRL[i],  avg_v_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='v', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_avg_w  = visualizer.build_vel_avg_frame( frames_avg_w,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_w_plus_RL[i],  avg_w_plus_nonRL[i],  avg_w_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='w', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
     frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_u_plus_RL[i], rmsf_u_plus_nonRL[i], rmsf_u_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
     frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_v_plus_RL[i], rmsf_v_plus_nonRL[i], rmsf_v_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
     frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_w_plus_RL[i], rmsf_w_plus_nonRL[i], rmsf_w_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
 
 print("Building gifs from frames...")
-frames_dict = {'avg_u':frames_avg_u, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
+frames_dict = {'avg_u':frames_avg_u, 'avg_v':frames_avg_v, 'avg_w':frames_avg_w, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
 visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")
 
@@ -562,22 +575,29 @@ y_plus = np.concatenate([[0.0],y_plus_ref,[delta]])
 print("\nCalculating L1, L2, Linf errors...")
 # Absolute error 
 abs_error_avg_u_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_u_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
+abs_error_avg_v_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_v_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
+abs_error_avg_w_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_w_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
 abs_error_rmsf_u_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_u_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
 abs_error_rmsf_v_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_v_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
 abs_error_rmsf_w_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_w_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
 for i in range(N):
-    abs_error_avg_u_plus_RL[i,:]  = np.abs( avg_u_plus_RL[i,:]  - avg_u_plus_ref )
-    abs_error_rmsf_u_plus_RL[i,:] = np.abs( rmsf_u_plus_RL[i,:] - rmsf_u_plus_ref )
-    abs_error_rmsf_v_plus_RL[i,:] = np.abs( rmsf_v_plus_RL[i,:] - rmsf_v_plus_ref )
-    abs_error_rmsf_w_plus_RL[i,:] = np.abs( rmsf_w_plus_RL[i,:] - rmsf_w_plus_ref )
-for i_nonRL in range(N):
-    abs_error_avg_u_plus_nonRL[i_nonRL,:]  = np.abs( avg_u_plus_nonRL[i_nonRL,:]  - avg_u_plus_ref )
-    abs_error_rmsf_u_plus_nonRL[i_nonRL,:] = np.abs( rmsf_u_plus_nonRL[i_nonRL,:] - rmsf_u_plus_ref )
-    abs_error_rmsf_v_plus_nonRL[i_nonRL,:] = np.abs( rmsf_v_plus_nonRL[i_nonRL,:] - rmsf_v_plus_ref )
-    abs_error_rmsf_w_plus_nonRL[i_nonRL,:] = np.abs( rmsf_w_plus_nonRL[i_nonRL,:] - rmsf_w_plus_ref )
+    abs_error_avg_u_plus_RL[i,:]     = np.abs( avg_u_plus_RL[i,:]    - avg_u_plus_ref )
+    abs_error_avg_v_plus_RL[i,:]     = np.abs( avg_v_plus_RL[i,:]    - avg_v_plus_ref )
+    abs_error_avg_w_plus_RL[i,:]     = np.abs( avg_w_plus_RL[i,:]    - avg_w_plus_ref )
+    abs_error_rmsf_u_plus_RL[i,:]    = np.abs( rmsf_u_plus_RL[i,:]   - rmsf_u_plus_ref )
+    abs_error_rmsf_v_plus_RL[i,:]    = np.abs( rmsf_v_plus_RL[i,:]   - rmsf_v_plus_ref )
+    abs_error_rmsf_w_plus_RL[i,:]    = np.abs( rmsf_w_plus_RL[i,:]   - rmsf_w_plus_ref )
+    abs_error_avg_u_plus_nonRL[i,:]  = np.abs( avg_u_plus_nonRL[i,:]  - avg_u_plus_ref )
+    abs_error_avg_v_plus_nonRL[i,:]  = np.abs( avg_v_plus_nonRL[i,:]  - avg_v_plus_ref )
+    abs_error_avg_w_plus_nonRL[i,:]  = np.abs( avg_w_plus_nonRL[i,:]  - avg_w_plus_ref )
+    abs_error_rmsf_u_plus_nonRL[i,:] = np.abs( rmsf_u_plus_nonRL[i,:] - rmsf_u_plus_ref )
+    abs_error_rmsf_v_plus_nonRL[i,:] = np.abs( rmsf_v_plus_nonRL[i,:] - rmsf_v_plus_ref )
+    abs_error_rmsf_w_plus_nonRL[i,:] = np.abs( rmsf_w_plus_nonRL[i,:] - rmsf_w_plus_ref )
 
 # L1 Error
 L1_error_avg_u_plus_RL  = np.zeros(N); L1_error_avg_u_plus_nonRL  = np.zeros(N)
+L1_error_avg_v_plus_RL  = np.zeros(N); L1_error_avg_v_plus_nonRL  = np.zeros(N)
+L1_error_avg_w_plus_RL  = np.zeros(N); L1_error_avg_w_plus_nonRL  = np.zeros(N)
 L1_error_rmsf_u_plus_RL = np.zeros(N); L1_error_rmsf_u_plus_nonRL = np.zeros(N)
 L1_error_rmsf_v_plus_RL = np.zeros(N); L1_error_rmsf_v_plus_nonRL = np.zeros(N)
 L1_error_rmsf_w_plus_RL = np.zeros(N); L1_error_rmsf_w_plus_nonRL = np.zeros(N)
@@ -586,25 +606,35 @@ for j in range(ny):
     dy = np.abs(0.5 * (y_plus[j+2]-y_plus[j]))
     ylength += dy
     for i in range(N):
-        L1_error_avg_u_plus_RL[i]     += abs_error_avg_u_plus_RL[i,j]  * dy
-        L1_error_rmsf_u_plus_RL[i]    += abs_error_rmsf_u_plus_RL[i,j] * dy
-        L1_error_rmsf_v_plus_RL[i]    += abs_error_rmsf_v_plus_RL[i,j] * dy
-        L1_error_rmsf_w_plus_RL[i]    += abs_error_rmsf_w_plus_RL[i,j] * dy
+        L1_error_avg_u_plus_RL[i]     += abs_error_avg_u_plus_RL[i,j]     * dy
+        L1_error_avg_v_plus_RL[i]     += abs_error_avg_v_plus_RL[i,j]     * dy
+        L1_error_avg_w_plus_RL[i]     += abs_error_avg_w_plus_RL[i,j]     * dy
+        L1_error_rmsf_u_plus_RL[i]    += abs_error_rmsf_u_plus_RL[i,j]    * dy
+        L1_error_rmsf_v_plus_RL[i]    += abs_error_rmsf_v_plus_RL[i,j]    * dy
+        L1_error_rmsf_w_plus_RL[i]    += abs_error_rmsf_w_plus_RL[i,j]    * dy
         L1_error_avg_u_plus_nonRL[i]  += abs_error_avg_u_plus_nonRL[i,j]  * dy
+        L1_error_avg_v_plus_nonRL[i]  += abs_error_avg_v_plus_nonRL[i,j]  * dy
+        L1_error_avg_w_plus_nonRL[i]  += abs_error_avg_w_plus_nonRL[i,j]  * dy
         L1_error_rmsf_u_plus_nonRL[i] += abs_error_rmsf_u_plus_nonRL[i,j] * dy
         L1_error_rmsf_v_plus_nonRL[i] += abs_error_rmsf_v_plus_nonRL[i,j] * dy
         L1_error_rmsf_w_plus_nonRL[i] += abs_error_rmsf_w_plus_nonRL[i,j] * dy
 L1_error_avg_u_plus_RL     /= ylength     
+L1_error_avg_v_plus_RL     /= ylength     
+L1_error_avg_w_plus_RL     /= ylength     
 L1_error_rmsf_u_plus_RL    /= ylength     
 L1_error_rmsf_v_plus_RL    /= ylength     
 L1_error_rmsf_w_plus_RL    /= ylength     
 L1_error_avg_u_plus_nonRL  /= ylength         
+L1_error_avg_v_plus_nonRL  /= ylength         
+L1_error_avg_w_plus_nonRL  /= ylength         
 L1_error_rmsf_u_plus_nonRL /= ylength         
 L1_error_rmsf_v_plus_nonRL /= ylength         
 L1_error_rmsf_w_plus_nonRL /= ylength         
 
 # L2 Error (RMS Error)
 L2_error_avg_u_plus_RL  = np.zeros(N); L2_error_avg_u_plus_nonRL  = np.zeros(N)
+L2_error_avg_v_plus_RL  = np.zeros(N); L2_error_avg_v_plus_nonRL  = np.zeros(N)
+L2_error_avg_w_plus_RL  = np.zeros(N); L2_error_avg_w_plus_nonRL  = np.zeros(N)
 L2_error_rmsf_u_plus_RL = np.zeros(N); L2_error_rmsf_u_plus_nonRL = np.zeros(N)
 L2_error_rmsf_v_plus_RL = np.zeros(N); L2_error_rmsf_v_plus_nonRL = np.zeros(N)
 L2_error_rmsf_w_plus_RL = np.zeros(N); L2_error_rmsf_w_plus_nonRL = np.zeros(N)
@@ -614,33 +644,47 @@ for j in range(ny):
     ylength += dy
     for i in range(N):
         L2_error_avg_u_plus_RL[i]     += ( ( avg_u_plus_RL[i,j]     - avg_u_plus_ref[j] )**2 )  * dy
+        L2_error_avg_v_plus_RL[i]     += ( ( avg_v_plus_RL[i,j]     - avg_v_plus_ref[j] )**2 )  * dy
+        L2_error_avg_w_plus_RL[i]     += ( ( avg_w_plus_RL[i,j]     - avg_w_plus_ref[j] )**2 )  * dy
         L2_error_rmsf_u_plus_RL[i]    += ( ( rmsf_u_plus_RL[i,j]    - rmsf_u_plus_ref[j] )**2 ) * dy 
         L2_error_rmsf_v_plus_RL[i]    += ( ( rmsf_v_plus_RL[i,j]    - rmsf_v_plus_ref[j] )**2 ) * dy 
         L2_error_rmsf_w_plus_RL[i]    += ( ( rmsf_w_plus_RL[i,j]    - rmsf_w_plus_ref[j] )**2 ) * dy 
         L2_error_avg_u_plus_nonRL[i]  += ( ( avg_u_plus_nonRL[i,j]  - avg_u_plus_ref[j])**2 )   * dy
+        L2_error_avg_v_plus_nonRL[i]  += ( ( avg_v_plus_nonRL[i,j]  - avg_v_plus_ref[j])**2 )   * dy
+        L2_error_avg_w_plus_nonRL[i]  += ( ( avg_w_plus_nonRL[i,j]  - avg_w_plus_ref[j])**2 )   * dy
         L2_error_rmsf_u_plus_nonRL[i] += ( ( rmsf_u_plus_nonRL[i,j] - rmsf_u_plus_ref[j])**2 )  * dy
         L2_error_rmsf_v_plus_nonRL[i] += ( ( rmsf_v_plus_nonRL[i,j] - rmsf_v_plus_ref[j])**2 )  * dy
         L2_error_rmsf_w_plus_nonRL[i] += ( ( rmsf_w_plus_nonRL[i,j] - rmsf_w_plus_ref[j])**2 )  * dy
 L2_error_avg_u_plus_RL     = np.sqrt( L2_error_avg_u_plus_RL / ylength )      
+L2_error_avg_v_plus_RL     = np.sqrt( L2_error_avg_v_plus_RL / ylength )      
+L2_error_avg_w_plus_RL     = np.sqrt( L2_error_avg_w_plus_RL / ylength )      
 L2_error_rmsf_u_plus_RL    = np.sqrt( L2_error_rmsf_u_plus_RL / ylength )      
 L2_error_rmsf_v_plus_RL    = np.sqrt( L2_error_rmsf_v_plus_RL / ylength )      
 L2_error_rmsf_w_plus_RL    = np.sqrt( L2_error_rmsf_w_plus_RL / ylength )      
 L2_error_avg_u_plus_nonRL  = np.sqrt( L2_error_avg_u_plus_nonRL / ylength )          
+L2_error_avg_v_plus_nonRL  = np.sqrt( L2_error_avg_v_plus_nonRL / ylength )          
+L2_error_avg_w_plus_nonRL  = np.sqrt( L2_error_avg_w_plus_nonRL / ylength )          
 L2_error_rmsf_u_plus_nonRL = np.sqrt( L2_error_rmsf_u_plus_nonRL / ylength )          
 L2_error_rmsf_v_plus_nonRL = np.sqrt( L2_error_rmsf_v_plus_nonRL / ylength )          
 L2_error_rmsf_w_plus_nonRL = np.sqrt( L2_error_rmsf_w_plus_nonRL / ylength )          
 
 # Linf Error
 Linf_error_avg_u_plus_RL  = np.zeros(N); Linf_error_avg_u_plus_nonRL  = np.zeros(N)
+Linf_error_avg_v_plus_RL  = np.zeros(N); Linf_error_avg_v_plus_nonRL  = np.zeros(N)
+Linf_error_avg_w_plus_RL  = np.zeros(N); Linf_error_avg_w_plus_nonRL  = np.zeros(N)
 Linf_error_rmsf_u_plus_RL = np.zeros(N); Linf_error_rmsf_u_plus_nonRL = np.zeros(N)
 Linf_error_rmsf_v_plus_RL = np.zeros(N); Linf_error_rmsf_v_plus_nonRL = np.zeros(N)
 Linf_error_rmsf_w_plus_RL = np.zeros(N); Linf_error_rmsf_w_plus_nonRL = np.zeros(N)
 for i in range(N):
     Linf_error_avg_u_plus_RL[i]     = np.max(abs_error_avg_u_plus_RL[i,:])
+    Linf_error_avg_v_plus_RL[i]     = np.max(abs_error_avg_v_plus_RL[i,:])
+    Linf_error_avg_w_plus_RL[i]     = np.max(abs_error_avg_w_plus_RL[i,:])
     Linf_error_rmsf_u_plus_RL[i]    = np.max(abs_error_rmsf_u_plus_RL[i,:])
     Linf_error_rmsf_v_plus_RL[i]    = np.max(abs_error_rmsf_v_plus_RL[i,:])
     Linf_error_rmsf_w_plus_RL[i]    = np.max(abs_error_rmsf_w_plus_RL[i,:])
     Linf_error_avg_u_plus_nonRL[i]  = np.max(abs_error_avg_u_plus_nonRL[i,:])
+    Linf_error_avg_v_plus_nonRL[i]  = np.max(abs_error_avg_v_plus_nonRL[i,:])
+    Linf_error_avg_w_plus_nonRL[i]  = np.max(abs_error_avg_w_plus_nonRL[i,:])
     Linf_error_rmsf_u_plus_nonRL[i] = np.max(abs_error_rmsf_u_plus_nonRL[i,:])
     Linf_error_rmsf_v_plus_nonRL[i] = np.max(abs_error_rmsf_v_plus_nonRL[i,:])
     Linf_error_rmsf_w_plus_nonRL[i] = np.max(abs_error_rmsf_w_plus_nonRL[i,:])
@@ -661,6 +705,24 @@ with open(error_log_filename, "w") as file:
     file.write(f"\nL2 Error nonRL (RMS): {L2_error_avg_u_plus_nonRL}")
     file.write(f"\n\nLinf Error RL: {Linf_error_avg_u_plus_RL}")
     file.write(f"\nLinf Error nonRL: {Linf_error_avg_u_plus_nonRL}")
+    # avg_v errors:
+    file.write("\n\n------------------------------------------------")
+    file.write("\nConvergence errors of avg_v:")
+    file.write(f"\n\nL1 Error RL: {L1_error_avg_v_plus_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_avg_v_plus_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_avg_v_plus_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_avg_v_plus_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_avg_v_plus_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_avg_v_plus_nonRL}")
+    # avg_w errors:
+    file.write("\n\n------------------------------------------------")
+    file.write("\nConvergence errors of avg_w:")
+    file.write(f"\n\nL1 Error RL: {L1_error_avg_w_plus_RL}")
+    file.write(f"\nL1 Error nonRL: {L1_error_avg_w_plus_nonRL}")
+    file.write(f"\n\nL2 Error RL (RMS): {L2_error_avg_w_plus_RL}")
+    file.write(f"\nL2 Error nonRL (RMS): {L2_error_avg_w_plus_nonRL}")
+    file.write(f"\n\nLinf Error RL: {Linf_error_avg_w_plus_RL}")
+    file.write(f"\nLinf Error nonRL: {Linf_error_avg_w_plus_nonRL}")
     # rmsf_u errors:
     file.write("\n\n------------------------------------------------")
     file.write("\nConvergence errors of rmsf_u:")
@@ -701,12 +763,16 @@ print("\nBuilding error plots...")
 # L1-Error plot
 plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
 plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_avg_v_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_avg_v_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_avg_w_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_avg_w_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L1 Error' )
 plt.grid(which='both',axis='y')
@@ -720,12 +786,16 @@ print(f"Build plot: '{filename}'")
 # L2-Error plot
 plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
 plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_avg_v_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_avg_v_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_avg_w_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_avg_w_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L2 Error' )
 plt.grid(which='both',axis='y')
@@ -739,12 +809,16 @@ print(f"Build plot: '{filename}'")
 # Linf-Error plot
 plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
 plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_avg_v_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_avg_v_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_avg_w_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_avg_w_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'Linf Error' )
 plt.grid(which='both',axis='y')
@@ -757,9 +831,11 @@ print(f"Build plot: '{filename}'")
 
 # L1-Error plot, RATIO RL / non-RL
 plt.plot( averaging_time_nonRL, L1_error_avg_u_plus_RL  / L1_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_u_plus_RL / L1_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_v_plus_RL / L1_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_w_plus_RL / L1_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_avg_v_plus_RL  / L1_error_avg_v_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_avg_w_plus_RL  / L1_error_avg_w_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_rmsf_u_plus_RL / L1_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_rmsf_v_plus_RL / L1_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_rmsf_w_plus_RL / L1_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$' )
 plt.xlabel( r'Accumulated averaging time $t_{\textrm{avg}}^{+}$' )
 plt.ylabel( 'L1 Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
@@ -772,9 +848,11 @@ print(f"Build plot: '{filename}'")
 
 # L2-Error plot, RATIO RL / non-RL
 plt.plot( averaging_time_nonRL, L2_error_avg_u_plus_RL  / L2_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_u_plus_RL / L2_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_v_plus_RL / L2_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_w_plus_RL / L2_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_avg_v_plus_RL  / L2_error_avg_v_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_avg_w_plus_RL  / L2_error_avg_w_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_rmsf_u_plus_RL / L2_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_rmsf_v_plus_RL / L2_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_rmsf_w_plus_RL / L2_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L2 Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
@@ -787,9 +865,11 @@ print(f"Build plot: '{filename}'")
 
 # Linf-Error plot, RATIO RL / non-RL
 plt.plot( averaging_time_nonRL, Linf_error_avg_u_plus_RL  / Linf_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL / Linf_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL / Linf_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL / Linf_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_avg_v_plus_RL  / Linf_error_avg_v_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_avg_w_plus_RL  / Linf_error_avg_w_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL / Linf_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL / Linf_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL / Linf_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'Linf Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
