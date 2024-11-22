@@ -108,36 +108,52 @@ if matching_files:
         print(f"Filename: {base_filename}, File details: {file_details}, Step number: {step_num}")
 else:
     print(f"No files found matching the pattern: {pattern}")
-n_RL = len(filename_RL_list)
 global_step_num_list = step_num_list
+N = len(filename_RL_list)
 
 # --- non-RL filenames ---
 train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
 iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
-n_nonRL = len(train_step_list)
+assert N == len(train_step_list)
 print("\nnon-RL files:")
-for i_nonRL in range(n_nonRL):
-    print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
+for i in range(N):
+    print("Filename:", filename_nonRL_list[i], ", Iteration:", iteration_nonRL_list[i])
 
 # --- non-RL converged reference filename ---
 filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 
+# --- non-RL restart data file
+filename_rst = f"{compareDatasetDir}/3d_turbulent_channel_flow_{iteration_restart_data_file}.h5"
+
+# Append restart data file to RL & non-RL files list
+# > RL lists:
+filename_RL_list.insert(0,filename_rst)
+file_details_list.insert(0,'restart')
+step_num_list.insert(0,'000000') 
+global_step_num_list.insert(0,'000000') 
+N = len(filename_RL_list)   # update N
+# > non-RL lists:
+filename_nonRL_list.insert(0,filename_rst)
+train_step_list.insert(0,0)
+iteration_nonRL_list.insert(0,iteration_restart_data_file)
+assert N == len(filename_nonRL_list)
+
 # --- Discard non-RL (and corresponding RL) snapshots if not available
-assert n_nonRL == n_RL
 filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
 n_nonRL_is_available = sum(filename_nonRL_is_available)
-print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", n_nonRL - n_nonRL_is_available)
+print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", N - n_nonRL_is_available)
 filename_RL_list_available = []
 filename_nonRL_list_available = []
-for i in range(n_RL):
+for i in range(N):
     if filename_nonRL_is_available[i]:
         filename_RL_list_available.append(filename_RL_list[i])
         filename_nonRL_list_available.append(filename_nonRL_list[i])
 filename_RL_list    = filename_RL_list_available
 filename_nonRL_list = filename_nonRL_list_available
-n_RL = len(filename_RL_list); n_nonRL = n_RL
-print(f"Datasets RL and non-RL have now {n_RL} files each")
+N = len(filename_RL_list)   # update N
+print(f"Datasets RL and non-RL have now {N} files each")
+
 
 # ----------- Get RL and non-RL data ------------
 
@@ -159,8 +175,8 @@ if not os.path.isfile(filename_ref):
 print("\nImporting data from files...")
 
 print("\nImporting data from RL files:")
-for i_RL in range(n_RL):
-    filename_RL = filename_RL_list[i_RL]
+for i in range(N):
+    filename_RL = filename_RL_list[i]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
         averaging_time_RL_aux = data_file.attrs["AveragingTime"][0] - dt_phys
@@ -172,37 +188,34 @@ for i_RL in range(n_RL):
         rmsf_v_data_RL_aux = data_file['rmsf_v'][1:-1,1:-1,1:-1]
         rmsf_w_data_RL_aux = data_file['rmsf_w'][1:-1,1:-1,1:-1]
     # Initialize allocation arrays
-    if i_RL == 0:
+    if i == 0:
         num_points_x      = avg_u_data_RL_aux[0,0,:].size
         num_points_y      = avg_u_data_RL_aux[0,:,0].size
         num_points_z      = avg_u_data_RL_aux[:,0,0].size
         num_points_xz     = num_points_x*num_points_z
-        averaging_time_RL = averaging_time_RL_aux
-        y_data_RL         = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_RL     = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        avg_v_data_RL     = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        avg_w_data_RL     = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        rmsf_u_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
-        rmsf_v_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
-        rmsf_w_data_RL    = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
+        averaging_time_RL = np.zeros(N)
+        y_data_RL         = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        avg_v_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        avg_w_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        rmsf_u_data_RL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        rmsf_v_data_RL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        rmsf_w_data_RL    = np.zeros([N, num_points_z, num_points_y, num_points_x])  
     # Fill allocation arrays
-    y_data_RL[i_RL,:,:,:]      = y_data_RL_aux
-    avg_u_data_RL[i_RL,:,:,:]  = avg_u_data_RL_aux
-    avg_v_data_RL[i_RL,:,:,:]  = avg_v_data_RL_aux
-    avg_w_data_RL[i_RL,:,:,:]  = avg_w_data_RL_aux
-    rmsf_u_data_RL[i_RL,:,:,:] = rmsf_u_data_RL_aux
-    rmsf_v_data_RL[i_RL,:,:,:] = rmsf_v_data_RL_aux
-    rmsf_w_data_RL[i_RL,:,:,:] = rmsf_w_data_RL_aux
-    # Check same averaging time
-    if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
-        raise ValueError("Averaging time should be equal for all RL h5 files")
+    averaging_time_RL[i]    = averaging_time_RL_aux
+    y_data_RL[i,:,:,:]      = y_data_RL_aux
+    avg_u_data_RL[i,:,:,:]  = avg_u_data_RL_aux
+    avg_v_data_RL[i,:,:,:]  = avg_v_data_RL_aux
+    avg_w_data_RL[i,:,:,:]  = avg_w_data_RL_aux
+    rmsf_u_data_RL[i,:,:,:] = rmsf_u_data_RL_aux
+    rmsf_v_data_RL[i,:,:,:] = rmsf_v_data_RL_aux
+    rmsf_w_data_RL[i,:,:,:] = rmsf_w_data_RL_aux
     # Logging
-    print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL:.6f}")
-averaging_time_nonConv = averaging_time_RL
+    print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL_aux:.6f}")
 
 print("\nImporting data from non-RL files:")
-for i_nonRL in range(n_nonRL):
-    filename_nonRL = filename_nonRL_list[i_nonRL]
+for i in range(N):
+    filename_nonRL = filename_nonRL_list[i]
     with h5py.File( filename_nonRL, 'r' ) as data_file:
         #list( data_file.keys() )
         averaging_time_nonRL_aux = data_file.attrs["AveragingTime"][0]
@@ -214,31 +227,31 @@ for i_nonRL in range(n_nonRL):
         rmsf_v_data_nonRL_aux = data_file['rmsf_v'][1:-1,1:-1,1:-1]
         rmsf_w_data_nonRL_aux = data_file['rmsf_w'][1:-1,1:-1,1:-1]
     # Initialize allocation arrays
-    if i_nonRL == 0:
+    if i == 0:
         num_points_x      = avg_u_data_nonRL_aux[0,0,:].size
         num_points_y      = avg_u_data_nonRL_aux[0,:,0].size
         num_points_z      = avg_u_data_nonRL_aux[:,0,0].size
         num_points_xz     = num_points_x*num_points_z
-        averaging_time_nonRL = np.zeros(n_nonRL)
-        y_data_nonRL         = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_nonRL     = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        avg_v_data_nonRL     = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        avg_w_data_nonRL     = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        rmsf_u_data_nonRL    = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])            
-        rmsf_v_data_nonRL    = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])            
-        rmsf_w_data_nonRL    = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])  
+        averaging_time_nonRL = np.zeros(N)
+        y_data_nonRL         = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        avg_v_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        avg_w_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        rmsf_u_data_nonRL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        rmsf_v_data_nonRL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        rmsf_w_data_nonRL    = np.zeros([N, num_points_z, num_points_y, num_points_x])  
     # Fill allocation arrays
-    averaging_time_nonRL[i_nonRL]    = averaging_time_nonRL_aux
-    y_data_nonRL[i_nonRL,:,:,:]      = y_data_nonRL_aux
-    avg_u_data_nonRL[i_nonRL,:,:,:]  = avg_u_data_nonRL_aux
-    avg_v_data_nonRL[i_nonRL,:,:,:]  = avg_v_data_nonRL_aux
-    avg_w_data_nonRL[i_nonRL,:,:,:]  = avg_w_data_nonRL_aux
-    rmsf_u_data_nonRL[i_nonRL,:,:,:] = rmsf_u_data_nonRL_aux
-    rmsf_v_data_nonRL[i_nonRL,:,:,:] = rmsf_v_data_nonRL_aux
-    rmsf_w_data_nonRL[i_nonRL,:,:,:] = rmsf_w_data_nonRL_aux
+    averaging_time_nonRL[i]    = averaging_time_nonRL_aux
+    y_data_nonRL[i,:,:,:]      = y_data_nonRL_aux
+    avg_u_data_nonRL[i,:,:,:]  = avg_u_data_nonRL_aux
+    avg_v_data_nonRL[i,:,:,:]  = avg_v_data_nonRL_aux
+    avg_w_data_nonRL[i,:,:,:]  = avg_w_data_nonRL_aux
+    rmsf_u_data_nonRL[i,:,:,:] = rmsf_u_data_nonRL_aux
+    rmsf_v_data_nonRL[i,:,:,:] = rmsf_v_data_nonRL_aux
+    rmsf_w_data_nonRL[i,:,:,:] = rmsf_w_data_nonRL_aux
     print(f"non-RL non-converged data imported from file '{filename_nonRL}' - averaging time: {averaging_time_nonRL_aux:.6f}")
 
-# --- Get non-RL converged reference data from h5 file ---
+print("\nImporting reference data (non-RL):")
 with h5py.File( filename_ref, 'r' ) as data_file:
     averaging_time_ref = data_file.attrs["AveragingTime"][0]
     y_data_ref      = data_file['y'][1:-1,1:-1,1:-1]
@@ -248,18 +261,19 @@ with h5py.File( filename_ref, 'r' ) as data_file:
     rmsf_u_data_ref = data_file['rmsf_u'][1:-1,1:-1,1:-1]
     rmsf_v_data_ref = data_file['rmsf_v'][1:-1,1:-1,1:-1]
     rmsf_w_data_ref = data_file['rmsf_w'][1:-1,1:-1,1:-1]
-assert averaging_time_ref > averaging_time_nonConv, f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging time {averaging_time_nonConv:.6f}"
+assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging time {averaging_time_nonConv:.6f}"
 print(f"\nNon-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
 print("Data imported successfully!")
+
 
 # -------------- Averaging fields using XZ symmetries --------------
 
 ### Allocate averaged variables
-y_plus_RL      = np.zeros( [n_RL, int( 0.5*num_points_y )] ); y_plus_nonRL      = np.zeros( [n_nonRL, int( 0.5*num_points_y )] );  y_plus_ref      = np.zeros( int( 0.5*num_points_y ) )
-avg_u_plus_RL  = np.zeros( [n_RL, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( [n_nonRL, int( 0.5*num_points_y )] );  avg_u_plus_ref  = np.zeros( int( 0.5*num_points_y ) ); 
-rmsf_u_plus_RL = np.zeros( [n_RL, int( 0.5*num_points_y )] ); rmsf_u_plus_nonRL = np.zeros( [n_nonRL, int( 0.5*num_points_y )] );  rmsf_u_plus_ref = np.zeros( int( 0.5*num_points_y ) )
-rmsf_v_plus_RL = np.zeros( [n_RL, int( 0.5*num_points_y )] ); rmsf_v_plus_nonRL = np.zeros( [n_nonRL, int( 0.5*num_points_y )] );  rmsf_v_plus_ref = np.zeros( int( 0.5*num_points_y ) )
-rmsf_w_plus_RL = np.zeros( [n_RL, int( 0.5*num_points_y )] ); rmsf_w_plus_nonRL = np.zeros( [n_nonRL, int( 0.5*num_points_y )] );  rmsf_w_plus_ref = np.zeros( int( 0.5*num_points_y ) )
+y_plus_RL      = np.zeros( [N, int( 0.5*num_points_y )] ); y_plus_nonRL      = np.zeros( [N, int( 0.5*num_points_y )] );  y_plus_ref      = np.zeros( int( 0.5*num_points_y ) )
+avg_u_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_u_plus_ref  = np.zeros( int( 0.5*num_points_y ) ); 
+rmsf_u_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_u_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_u_plus_ref = np.zeros( int( 0.5*num_points_y ) )
+rmsf_v_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_v_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_v_plus_ref = np.zeros( int( 0.5*num_points_y ) )
+rmsf_w_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_w_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_w_plus_ref = np.zeros( int( 0.5*num_points_y ) )
 
 ### Average variables in space
 print("\nAveraging variables in space...")
@@ -274,25 +288,25 @@ for j in range( 0, num_points_y ):
             if( j > ( int( 0.5*num_points_y ) - 1 ) ):      # top-wall
                 aux_j = num_points_y - j - 1
             # RL data:
-            for i_RL in range(n_RL):
+            for n in range(N):
                 if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
-                    y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*( 2.0 - y_data_RL[i_RL,k,j,i] )*( u_tau/nu_ref )
+                    y_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*( 2.0 - y_data_RL[n,k,j,i] )*( u_tau/nu_ref )
                 else:                                       # bottom-wall
-                    y_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]*( u_tau/nu_ref )
-                avg_u_plus_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                rmsf_u_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                rmsf_v_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
-                rmsf_w_plus_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[i_RL,k,j,i]*( 1.0/u_tau )
+                    y_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[n,k,j,i]*( u_tau/nu_ref )
+                avg_u_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_RL[n,k,j,i]*( 1.0/u_tau )
+                rmsf_u_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_RL[n,k,j,i]*( 1.0/u_tau )
+                rmsf_v_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[n,k,j,i]*( 1.0/u_tau )
+                rmsf_w_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[n,k,j,i]*( 1.0/u_tau )
             # non-RL non-conv data:
-            for i_nonRL in range(n_nonRL):
+            for n in range(N):
                 if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
-                    y_plus_nonRL[i_nonRL,aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_nonRL[i_nonRL,k,j,i])*( u_tau/nu_ref )
+                    y_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_nonRL[n,k,j,i])*( u_tau/nu_ref )
                 else:                                       # bottom-wall
-                    y_plus_nonRL[i_nonRL,aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[i_nonRL,k,j,i]*( u_tau/nu_ref )
-                avg_u_plus_nonRL[i_nonRL,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[i_nonRL,k,j,i]*( 1.0/u_tau )
-                rmsf_u_plus_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[i_nonRL,k,j,i]*( 1.0/u_tau )
-                rmsf_v_plus_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[i_nonRL,k,j,i]*( 1.0/u_tau )
-                rmsf_w_plus_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[i_nonRL,k,j,i]*( 1.0/u_tau )
+                    y_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[n,k,j,i]*( u_tau/nu_ref )
+                avg_u_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*avg_u_data_nonRL[n,k,j,i]*( 1.0/u_tau )
+                rmsf_u_plus_nonRL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_u_data_nonRL[n,k,j,i]*( 1.0/u_tau )
+                rmsf_v_plus_nonRL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_nonRL[n,k,j,i]*( 1.0/u_tau )
+                rmsf_w_plus_nonRL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_nonRL[n,k,j,i]*( 1.0/u_tau )
             # non-RL converged reference data
             if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
                 y_plus_ref[aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_ref[k,j,i])*( u_tau/nu_ref )
@@ -309,190 +323,192 @@ TKE_RL    = 0.5 * ( rmsf_u_plus_RL**2    + rmsf_v_plus_RL**2    + rmsf_w_plus_RL
 TKE_nonRL = 0.5 * ( rmsf_u_plus_nonRL**2 + rmsf_v_plus_nonRL**2 + rmsf_w_plus_nonRL**2 )
 TKE_ref   = 0.5 * ( rmsf_u_plus_ref**2   + rmsf_v_plus_ref**2   + rmsf_w_plus_ref**2   )
 
-# -------------- Build plots avg-u and rmsf-u,v,w profiles --------------
 
-print("\nBuilding plots...")
+# # -------------- Build plots avg-u and rmsf-u,v,w profiles --------------
+# 
+# print("\nBuilding plots...")
+# 
+# ### Plot u+ vs. y+
+# xmin = 1.0; xmax = 2.0e2
+# ymin = 0.0; ymax = 20.0
+# # Clear plot
+# plt.clf()
+# # RL Actuators boundaries
+# for i in range(len(y_plus_actuators_boundaries)):
+#     plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
+# # Plot data
+# plt.plot( y_plus_ref, avg_u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+# for i in range(N):
+#     if N < max_length_legend_RL:
+#         plt.plot( y_plus_RL[i], avg_u_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i]}, Avg. time {averaging_time_nonConv:.2f}s' )
+#     else:
+#         plt.plot( y_plus_RL[i], avg_u_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+# plt.plot( y_plus_nonRL[0], avg_u_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
+# # Configure plot
+# plt.xlim( xmin, xmax )
+# plt.xticks( np.arange( xmin, xmax + 0.1, 1.0 ) )
+# plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+# plt.xscale( 'log' )
+# plt.xlabel( 'y+' )
+# plt.ylim( ymin, ymax )
+# plt.yticks( np.arange( ymin, ymax + 0.1, 5.0 ) )
+# plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+# #plt.yscale( 'log' )
+# plt.ylabel( 'u+')
+# plt.grid(which='both',  axis='x')
+# plt.grid(which='major', axis='y')
+# plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# plt.tick_params( axis = 'both', pad = 7.5 )
+# filename = f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+# plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+# print("Done plot:", filename)
+# # Clear plot
+# plt.clf()
+# 
+# ### Plot u-rmsf 
+# xmin = 1.0; xmax = 2.0e2
+# ymin = 0.0; ymax = 3.0
+# # RL Actuators boundaries
+# for i in range(len(y_plus_actuators_boundaries)):
+#     plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
+# # Read & Plot data
+# plt.plot( y_plus_ref, rmsf_u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label=f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+# for i in range(N):
+#     if N < max_length_legend_RL:
+#         plt.plot( y_plus_RL[i], rmsf_u_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i]}, Avg. time {averaging_time_nonConv:.2f}s' )
+#     else:
+#         plt.plot( y_plus_RL[i], rmsf_u_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+# plt.plot( y_plus_nonRL[0], rmsf_u_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
+# # Configure plot
+# plt.xlim( xmin, xmax )
+# plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
+# plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+# plt.xscale( 'log' )
+# plt.xlabel( 'y+' )
+# plt.ylim( ymin, ymax )
+# plt.yticks( np.arange( ymin, ymax+0.1, 0.5 ) )
+# plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+# #plt.yscale( 'log' )
+# plt.ylabel( 'u_rms+' )
+# plt.grid(which='both', axis='x')
+# plt.grid(which='major', axis='y')
+# plt.text( 1.05, 1.0, 'u_rms+' )
+# plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# plt.tick_params( axis = 'both', pad = 7.5 )
+# filename = f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+# plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+# print("Done plot:", filename)
+# # Clear plot
+# plt.clf()
+# 
+# ### Plot v-rmsf
+# xmin = 1.0; xmax = 2.0e2
+# ymin = 0.0; ymax = 1.0
+# # RL Actuators boundaries
+# for i in range(len(y_plus_actuators_boundaries)):
+#     plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
+# # Read & Plot data
+# plt.plot( y_plus_ref, rmsf_v_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+# for i in range(N):
+#     if N < max_length_legend_RL:
+#         plt.plot( y_plus_RL[i], rmsf_v_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i]}, Avg. time {averaging_time_nonConv:.2f}s' )
+#     else:
+#         plt.plot( y_plus_RL[i], rmsf_v_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+# plt.plot( y_plus_nonRL[0], rmsf_v_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
+# # Configure plot
+# plt.xlim( xmin, xmax )
+# plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
+# plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+# plt.xscale( 'log' )
+# plt.xlabel( 'y+' )
+# plt.ylim( ymin, ymax )
+# plt.yticks( np.arange( ymin, ymax+0.1, 0.5 ) )
+# plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+# #plt.yscale( 'log' )
+# plt.ylabel( 'v_rms+' )
+# plt.grid(which='both', axis='x')
+# plt.grid(which='major', axis='y')
+# plt.text( 17.5, 0.2, 'v_rms+' )
+# plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# plt.tick_params( axis = 'both', pad = 7.5 )
+# filename = f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+# plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+# print("Done plot:", filename)
+# # Clear plot
+# plt.clf()
+# 
+# ### Plot w-rmsf
+# xmin = 1.0; xmax = 2.0e2
+# ymin = 0.0; ymax = 1.0
+# # RL Actuators boundaries
+# for i in range(len(y_plus_actuators_boundaries)):
+#     plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
+# # Read & Plot data
+# plt.plot( y_plus_ref, rmsf_w_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+# for i in range(N):
+#     if N < max_length_legend_RL:
+#         plt.plot( y_plus_RL[i], rmsf_w_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i]}, Avg. time {averaging_time_nonConv:.2f}s' )
+#     else:
+#         plt.plot( y_plus_RL[i], rmsf_w_plus_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+# plt.plot( y_plus_nonRL[0], rmsf_w_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
+# # Configure plot
+# plt.xlim( xmin, xmax )
+# plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
+# plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+# plt.xscale( 'log' )
+# plt.xlabel( 'y+' )
+# plt.ylim( ymin, ymax )
+# plt.yticks( np.arange( ymin, ymax+0.1, 0.5 ) )
+# plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+# #plt.yscale( 'log' )
+# plt.ylabel( 'w_rms+' )
+# plt.grid(which='both', axis='x')
+# plt.grid(which='major', axis='y')
+# plt.text( 17.5, 0.2, 'w_rms+' )
+# plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# plt.tick_params( axis = 'both', pad = 7.5 )
+# filename = f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+# plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+# print("Done plot:", filename)
+# # Clear plot
+# plt.clf()
+# 
+# ### Plot TKE
+# xmin = 1.0; xmax = 2.0e2
+# ymin = 0.0; ymax = 4.0
+# # RL Actuators boundaries
+# for i in range(len(y_plus_actuators_boundaries)):
+#     plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
+# # Read & Plot data
+# plt.plot( y_plus_ref, TKE_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+# for i in range(N):
+#     if N < max_length_legend_RL:
+#         plt.plot( y_plus_RL[i], TKE_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i]}, Avg. time {averaging_time_nonConv:.2f}s' )
+#     else:
+#         plt.plot( y_plus_RL[i], TKE_RL[i], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+# plt.plot( y_plus_nonRL[0], TKE_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
+# # Configure plot
+# plt.xlim( xmin, xmax )
+# plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
+# plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+# plt.xscale( 'log' )
+# plt.xlabel( 'y+' )
+# plt.ylim( ymin, ymax )
+# plt.yticks( np.arange( ymin, ymax+0.1, 1.0 ) )
+# plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+# #plt.yscale( 'log' )
+# plt.ylabel( 'TKE+' )
+# plt.grid(which='both', axis='x')
+# plt.grid(which='major', axis='y')
+# plt.text( 17.5, 0.2, 'TKE+' )
+# plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# plt.tick_params( axis = 'both', pad = 7.5 )
+# filename = f'{postDir}/tke_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
+# plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+# print("Done plot:", filename)
+# # Clear plot
+# plt.clf()
 
-### Plot u+ vs. y+
-xmin = 1.0; xmax = 2.0e2
-ymin = 0.0; ymax = 20.0
-# Clear plot
-plt.clf()
-# RL Actuators boundaries
-for i in range(len(y_plus_actuators_boundaries)):
-    plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
-# Plot data
-plt.plot( y_plus_ref, avg_u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
-for i_RL in range(n_RL):
-    if n_RL < max_length_legend_RL:
-        plt.plot( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
-    else:
-        plt.plot( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
-plt.plot( y_plus_nonRL[0], avg_u_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
-# Configure plot
-plt.xlim( xmin, xmax )
-plt.xticks( np.arange( xmin, xmax + 0.1, 1.0 ) )
-plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
-plt.xscale( 'log' )
-plt.xlabel( 'y+' )
-plt.ylim( ymin, ymax )
-plt.yticks( np.arange( ymin, ymax + 0.1, 5.0 ) )
-plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
-#plt.yscale( 'log' )
-plt.ylabel( 'u+')
-plt.grid(which='both',  axis='x')
-plt.grid(which='major', axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/u_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-print("Done plot:", filename)
-# Clear plot
-plt.clf()
-
-### Plot u-rmsf 
-xmin = 1.0; xmax = 2.0e2
-ymin = 0.0; ymax = 3.0
-# RL Actuators boundaries
-for i in range(len(y_plus_actuators_boundaries)):
-    plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
-# Read & Plot data
-plt.plot( y_plus_ref, rmsf_u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label=f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
-for i_RL in range(n_RL):
-    if n_RL < max_length_legend_RL:
-        plt.plot( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
-    else:
-        plt.plot( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
-plt.plot( y_plus_nonRL[0], rmsf_u_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
-# Configure plot
-plt.xlim( xmin, xmax )
-plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
-plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
-plt.xscale( 'log' )
-plt.xlabel( 'y+' )
-plt.ylim( ymin, ymax )
-plt.yticks( np.arange( ymin, ymax+0.1, 0.5 ) )
-plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
-#plt.yscale( 'log' )
-plt.ylabel( 'u_rms+' )
-plt.grid(which='both', axis='x')
-plt.grid(which='major', axis='y')
-plt.text( 1.05, 1.0, 'u_rms+' )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/u_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-print("Done plot:", filename)
-# Clear plot
-plt.clf()
-
-### Plot v-rmsf
-xmin = 1.0; xmax = 2.0e2
-ymin = 0.0; ymax = 1.0
-# RL Actuators boundaries
-for i in range(len(y_plus_actuators_boundaries)):
-    plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
-# Read & Plot data
-plt.plot( y_plus_ref, rmsf_v_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
-for i_RL in range(n_RL):
-    if n_RL < max_length_legend_RL:
-        plt.plot( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
-    else:
-        plt.plot( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
-plt.plot( y_plus_nonRL[0], rmsf_v_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
-# Configure plot
-plt.xlim( xmin, xmax )
-plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
-plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
-plt.xscale( 'log' )
-plt.xlabel( 'y+' )
-plt.ylim( ymin, ymax )
-plt.yticks( np.arange( ymin, ymax+0.1, 0.5 ) )
-plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
-#plt.yscale( 'log' )
-plt.ylabel( 'v_rms+' )
-plt.grid(which='both', axis='x')
-plt.grid(which='major', axis='y')
-plt.text( 17.5, 0.2, 'v_rms+' )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/v_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-print("Done plot:", filename)
-# Clear plot
-plt.clf()
-
-### Plot w-rmsf
-xmin = 1.0; xmax = 2.0e2
-ymin = 0.0; ymax = 1.0
-# RL Actuators boundaries
-for i in range(len(y_plus_actuators_boundaries)):
-    plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
-# Read & Plot data
-plt.plot( y_plus_ref, rmsf_w_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
-for i_RL in range(n_RL):
-    if n_RL < max_length_legend_RL:
-        plt.plot( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
-    else:
-        plt.plot( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
-plt.plot( y_plus_nonRL[0], rmsf_w_plus_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
-# Configure plot
-plt.xlim( xmin, xmax )
-plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
-plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
-plt.xscale( 'log' )
-plt.xlabel( 'y+' )
-plt.ylim( ymin, ymax )
-plt.yticks( np.arange( ymin, ymax+0.1, 0.5 ) )
-plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
-#plt.yscale( 'log' )
-plt.ylabel( 'w_rms+' )
-plt.grid(which='both', axis='x')
-plt.grid(which='major', axis='y')
-plt.text( 17.5, 0.2, 'w_rms+' )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/w_rms_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-print("Done plot:", filename)
-# Clear plot
-plt.clf()
-
-### Plot TKE
-xmin = 1.0; xmax = 2.0e2
-ymin = 0.0; ymax = 4.0
-# RL Actuators boundaries
-for i in range(len(y_plus_actuators_boundaries)):
-    plt.vlines(y_plus_actuators_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
-# Read & Plot data
-plt.plot( y_plus_ref, TKE_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
-for i_RL in range(n_RL):
-    if n_RL < max_length_legend_RL:
-        plt.plot( y_plus_RL[i_RL], TKE_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
-    else:
-        plt.plot( y_plus_RL[i_RL], TKE_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
-plt.plot( y_plus_nonRL[0], TKE_nonRL[0], linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
-# Configure plot
-plt.xlim( xmin, xmax )
-plt.xticks( np.arange( xmin, xmax+0.1, 1.0 ) )
-plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
-plt.xscale( 'log' )
-plt.xlabel( 'y+' )
-plt.ylim( ymin, ymax )
-plt.yticks( np.arange( ymin, ymax+0.1, 1.0 ) )
-plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
-#plt.yscale( 'log' )
-plt.ylabel( 'TKE+' )
-plt.grid(which='both', axis='x')
-plt.grid(which='major', axis='y')
-plt.text( 17.5, 0.2, 'TKE+' )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/tke_plus_vs_y_plus_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-print("Done plot:", filename)
-# Clear plot
-plt.clf()
 
 # ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
 
@@ -509,15 +525,15 @@ ylim_rmsf_u  = [0.0, rmsf_u_max]
 ylim_rmsf_v  = [0.0, rmsf_v_max]
 ylim_rmsf_w  = [0.0, rmsf_w_max]
 print("ylim lists:", ylim_avg_u, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
-for i_RL in range(n_RL):
+for i in range(N):
     # log progress
-    if i_RL % (n_RL//10 or 1) == 0:
-        print(f"{i_RL/n_RL*100:.0f}%")
+    if i % (N//10 or 1) == 0:
+        print(f"{i/N*100:.0f}%")
     # Build frames
-    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_RL],  avg_u_plus_ref,  averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_RL], rmsf_u_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_RL], rmsf_v_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i_RL], y_plus_nonRL[i_RL], y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_RL], rmsf_w_plus_ref, averaging_time_RL, averaging_time_nonRL[i_RL], train_step_list[i_RL], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_u_plus_RL[i],  avg_u_plus_nonRL[i],  avg_u_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_u_plus_RL[i], rmsf_u_plus_nonRL[i], rmsf_u_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_v_plus_RL[i], rmsf_v_plus_nonRL[i], rmsf_v_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_w_plus_RL[i], rmsf_w_plus_nonRL[i], rmsf_w_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
 
 print("Building gifs from frames...")
 frames_dict = {'avg_u':frames_avg_u, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
@@ -545,40 +561,39 @@ y_plus = np.concatenate([[0.0],y_plus_ref,[delta]])
 
 print("\nCalculating L1, L2, Linf errors...")
 # Absolute error 
-abs_error_avg_u_plus_RL  = np.zeros( [n_RL, y_plus_ref.size] ); abs_error_avg_u_plus_nonRL  = np.zeros( [n_nonRL, y_plus_ref.size] )
-abs_error_rmsf_u_plus_RL = np.zeros( [n_RL, y_plus_ref.size] ); abs_error_rmsf_u_plus_nonRL = np.zeros( [n_nonRL, y_plus_ref.size] )
-abs_error_rmsf_v_plus_RL = np.zeros( [n_RL, y_plus_ref.size] ); abs_error_rmsf_v_plus_nonRL = np.zeros( [n_nonRL, y_plus_ref.size] )
-abs_error_rmsf_w_plus_RL = np.zeros( [n_RL, y_plus_ref.size] ); abs_error_rmsf_w_plus_nonRL = np.zeros( [n_nonRL, y_plus_ref.size] )
-for i_RL in range(n_RL):
-    abs_error_avg_u_plus_RL[i_RL,:]  = np.abs( avg_u_plus_RL[i_RL,:]  - avg_u_plus_ref )
-    abs_error_rmsf_u_plus_RL[i_RL,:] = np.abs( rmsf_u_plus_RL[i_RL,:] - rmsf_u_plus_ref )
-    abs_error_rmsf_v_plus_RL[i_RL,:] = np.abs( rmsf_v_plus_RL[i_RL,:] - rmsf_v_plus_ref )
-    abs_error_rmsf_w_plus_RL[i_RL,:] = np.abs( rmsf_w_plus_RL[i_RL,:] - rmsf_w_plus_ref )
-for i_nonRL in range(n_nonRL):
+abs_error_avg_u_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_u_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
+abs_error_rmsf_u_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_u_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
+abs_error_rmsf_v_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_v_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
+abs_error_rmsf_w_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_w_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
+for i in range(N):
+    abs_error_avg_u_plus_RL[i,:]  = np.abs( avg_u_plus_RL[i,:]  - avg_u_plus_ref )
+    abs_error_rmsf_u_plus_RL[i,:] = np.abs( rmsf_u_plus_RL[i,:] - rmsf_u_plus_ref )
+    abs_error_rmsf_v_plus_RL[i,:] = np.abs( rmsf_v_plus_RL[i,:] - rmsf_v_plus_ref )
+    abs_error_rmsf_w_plus_RL[i,:] = np.abs( rmsf_w_plus_RL[i,:] - rmsf_w_plus_ref )
+for i_nonRL in range(N):
     abs_error_avg_u_plus_nonRL[i_nonRL,:]  = np.abs( avg_u_plus_nonRL[i_nonRL,:]  - avg_u_plus_ref )
     abs_error_rmsf_u_plus_nonRL[i_nonRL,:] = np.abs( rmsf_u_plus_nonRL[i_nonRL,:] - rmsf_u_plus_ref )
     abs_error_rmsf_v_plus_nonRL[i_nonRL,:] = np.abs( rmsf_v_plus_nonRL[i_nonRL,:] - rmsf_v_plus_ref )
     abs_error_rmsf_w_plus_nonRL[i_nonRL,:] = np.abs( rmsf_w_plus_nonRL[i_nonRL,:] - rmsf_w_plus_ref )
 
 # L1 Error
-L1_error_avg_u_plus_RL  = np.zeros(n_RL); L1_error_avg_u_plus_nonRL  = np.zeros(n_nonRL)
-L1_error_rmsf_u_plus_RL = np.zeros(n_RL); L1_error_rmsf_u_plus_nonRL = np.zeros(n_nonRL)
-L1_error_rmsf_v_plus_RL = np.zeros(n_RL); L1_error_rmsf_v_plus_nonRL = np.zeros(n_nonRL)
-L1_error_rmsf_w_plus_RL = np.zeros(n_RL); L1_error_rmsf_w_plus_nonRL = np.zeros(n_nonRL)
+L1_error_avg_u_plus_RL  = np.zeros(N); L1_error_avg_u_plus_nonRL  = np.zeros(N)
+L1_error_rmsf_u_plus_RL = np.zeros(N); L1_error_rmsf_u_plus_nonRL = np.zeros(N)
+L1_error_rmsf_v_plus_RL = np.zeros(N); L1_error_rmsf_v_plus_nonRL = np.zeros(N)
+L1_error_rmsf_w_plus_RL = np.zeros(N); L1_error_rmsf_w_plus_nonRL = np.zeros(N)
 ylength = 0.0
 for j in range(ny):
     dy = np.abs(0.5 * (y_plus[j+2]-y_plus[j]))
     ylength += dy
-    for i_RL in range(n_RL):
-        L1_error_avg_u_plus_RL[i_RL]  += abs_error_avg_u_plus_RL[i_RL,j]  * dy
-        L1_error_rmsf_u_plus_RL[i_RL] += abs_error_rmsf_u_plus_RL[i_RL,j] * dy
-        L1_error_rmsf_v_plus_RL[i_RL] += abs_error_rmsf_v_plus_RL[i_RL,j] * dy
-        L1_error_rmsf_w_plus_RL[i_RL] += abs_error_rmsf_w_plus_RL[i_RL,j] * dy
-    for i_nonRL in range(n_nonRL):
-        L1_error_avg_u_plus_nonRL[i_nonRL]  += abs_error_avg_u_plus_nonRL[i_nonRL,j]  * dy
-        L1_error_rmsf_u_plus_nonRL[i_nonRL] += abs_error_rmsf_u_plus_nonRL[i_nonRL,j] * dy
-        L1_error_rmsf_v_plus_nonRL[i_nonRL] += abs_error_rmsf_v_plus_nonRL[i_nonRL,j] * dy
-        L1_error_rmsf_w_plus_nonRL[i_nonRL] += abs_error_rmsf_w_plus_nonRL[i_nonRL,j] * dy
+    for i in range(N):
+        L1_error_avg_u_plus_RL[i]     += abs_error_avg_u_plus_RL[i,j]  * dy
+        L1_error_rmsf_u_plus_RL[i]    += abs_error_rmsf_u_plus_RL[i,j] * dy
+        L1_error_rmsf_v_plus_RL[i]    += abs_error_rmsf_v_plus_RL[i,j] * dy
+        L1_error_rmsf_w_plus_RL[i]    += abs_error_rmsf_w_plus_RL[i,j] * dy
+        L1_error_avg_u_plus_nonRL[i]  += abs_error_avg_u_plus_nonRL[i,j]  * dy
+        L1_error_rmsf_u_plus_nonRL[i] += abs_error_rmsf_u_plus_nonRL[i,j] * dy
+        L1_error_rmsf_v_plus_nonRL[i] += abs_error_rmsf_v_plus_nonRL[i,j] * dy
+        L1_error_rmsf_w_plus_nonRL[i] += abs_error_rmsf_w_plus_nonRL[i,j] * dy
 L1_error_avg_u_plus_RL     /= ylength     
 L1_error_rmsf_u_plus_RL    /= ylength     
 L1_error_rmsf_v_plus_RL    /= ylength     
@@ -589,24 +604,23 @@ L1_error_rmsf_v_plus_nonRL /= ylength
 L1_error_rmsf_w_plus_nonRL /= ylength         
 
 # L2 Error (RMS Error)
-L2_error_avg_u_plus_RL  = np.zeros(n_RL); L2_error_avg_u_plus_nonRL  = np.zeros(n_nonRL)
-L2_error_rmsf_u_plus_RL = np.zeros(n_RL); L2_error_rmsf_u_plus_nonRL = np.zeros(n_nonRL)
-L2_error_rmsf_v_plus_RL = np.zeros(n_RL); L2_error_rmsf_v_plus_nonRL = np.zeros(n_nonRL)
-L2_error_rmsf_w_plus_RL = np.zeros(n_RL); L2_error_rmsf_w_plus_nonRL = np.zeros(n_nonRL)
+L2_error_avg_u_plus_RL  = np.zeros(N); L2_error_avg_u_plus_nonRL  = np.zeros(N)
+L2_error_rmsf_u_plus_RL = np.zeros(N); L2_error_rmsf_u_plus_nonRL = np.zeros(N)
+L2_error_rmsf_v_plus_RL = np.zeros(N); L2_error_rmsf_v_plus_nonRL = np.zeros(N)
+L2_error_rmsf_w_plus_RL = np.zeros(N); L2_error_rmsf_w_plus_nonRL = np.zeros(N)
 ylength = 0.0
 for j in range(ny):
     dy = np.abs(0.5 * (y_plus[j+2]-y_plus[j]))
     ylength += dy
-    for i_RL in range(n_RL):
-        L2_error_avg_u_plus_RL[i_RL]  += ( ( avg_u_plus_RL[i_RL,j]  - avg_u_plus_ref[j] )**2 )  * dy
-        L2_error_rmsf_u_plus_RL[i_RL] += ( ( rmsf_u_plus_RL[i_RL,j] - rmsf_u_plus_ref[j] )**2 ) * dy 
-        L2_error_rmsf_v_plus_RL[i_RL] += ( ( rmsf_v_plus_RL[i_RL,j] - rmsf_v_plus_ref[j] )**2 ) * dy 
-        L2_error_rmsf_w_plus_RL[i_RL] += ( ( rmsf_w_plus_RL[i_RL,j] - rmsf_w_plus_ref[j] )**2 ) * dy 
-    for i_nonRL in range(n_nonRL):
-        L2_error_avg_u_plus_nonRL[i_nonRL]  += ( ( avg_u_plus_nonRL[i_nonRL,j]  - avg_u_plus_ref[j])**2 )  * dy
-        L2_error_rmsf_u_plus_nonRL[i_nonRL] += ( ( rmsf_u_plus_nonRL[i_nonRL,j] - rmsf_u_plus_ref[j])**2 ) * dy
-        L2_error_rmsf_v_plus_nonRL[i_nonRL] += ( ( rmsf_v_plus_nonRL[i_nonRL,j] - rmsf_v_plus_ref[j])**2 ) * dy
-        L2_error_rmsf_w_plus_nonRL[i_nonRL] += ( ( rmsf_w_plus_nonRL[i_nonRL,j] - rmsf_w_plus_ref[j])**2 ) * dy
+    for i in range(N):
+        L2_error_avg_u_plus_RL[i]     += ( ( avg_u_plus_RL[i,j]     - avg_u_plus_ref[j] )**2 )  * dy
+        L2_error_rmsf_u_plus_RL[i]    += ( ( rmsf_u_plus_RL[i,j]    - rmsf_u_plus_ref[j] )**2 ) * dy 
+        L2_error_rmsf_v_plus_RL[i]    += ( ( rmsf_v_plus_RL[i,j]    - rmsf_v_plus_ref[j] )**2 ) * dy 
+        L2_error_rmsf_w_plus_RL[i]    += ( ( rmsf_w_plus_RL[i,j]    - rmsf_w_plus_ref[j] )**2 ) * dy 
+        L2_error_avg_u_plus_nonRL[i]  += ( ( avg_u_plus_nonRL[i,j]  - avg_u_plus_ref[j])**2 )   * dy
+        L2_error_rmsf_u_plus_nonRL[i] += ( ( rmsf_u_plus_nonRL[i,j] - rmsf_u_plus_ref[j])**2 )  * dy
+        L2_error_rmsf_v_plus_nonRL[i] += ( ( rmsf_v_plus_nonRL[i,j] - rmsf_v_plus_ref[j])**2 )  * dy
+        L2_error_rmsf_w_plus_nonRL[i] += ( ( rmsf_w_plus_nonRL[i,j] - rmsf_w_plus_ref[j])**2 )  * dy
 L2_error_avg_u_plus_RL     = np.sqrt( L2_error_avg_u_plus_RL / ylength )      
 L2_error_rmsf_u_plus_RL    = np.sqrt( L2_error_rmsf_u_plus_RL / ylength )      
 L2_error_rmsf_v_plus_RL    = np.sqrt( L2_error_rmsf_v_plus_RL / ylength )      
@@ -617,20 +631,19 @@ L2_error_rmsf_v_plus_nonRL = np.sqrt( L2_error_rmsf_v_plus_nonRL / ylength )
 L2_error_rmsf_w_plus_nonRL = np.sqrt( L2_error_rmsf_w_plus_nonRL / ylength )          
 
 # Linf Error
-Linf_error_avg_u_plus_RL  = np.zeros(n_RL); Linf_error_avg_u_plus_nonRL  = np.zeros(n_nonRL)
-Linf_error_rmsf_u_plus_RL = np.zeros(n_RL); Linf_error_rmsf_u_plus_nonRL = np.zeros(n_nonRL)
-Linf_error_rmsf_v_plus_RL = np.zeros(n_RL); Linf_error_rmsf_v_plus_nonRL = np.zeros(n_nonRL)
-Linf_error_rmsf_w_plus_RL = np.zeros(n_RL); Linf_error_rmsf_w_plus_nonRL = np.zeros(n_nonRL)
-for i_RL in range(n_RL):
-    Linf_error_avg_u_plus_RL[i_RL]  = np.max(abs_error_avg_u_plus_RL[i_RL,:])
-    Linf_error_rmsf_u_plus_RL[i_RL] = np.max(abs_error_rmsf_u_plus_RL[i_RL,:])
-    Linf_error_rmsf_v_plus_RL[i_RL] = np.max(abs_error_rmsf_v_plus_RL[i_RL,:])
-    Linf_error_rmsf_w_plus_RL[i_RL] = np.max(abs_error_rmsf_w_plus_RL[i_RL,:])
-for i_nonRL in range(n_nonRL):
-    Linf_error_avg_u_plus_nonRL[i_nonRL]  = np.max(abs_error_avg_u_plus_nonRL[i_nonRL,:])
-    Linf_error_rmsf_u_plus_nonRL[i_nonRL] = np.max(abs_error_rmsf_u_plus_nonRL[i_nonRL,:])
-    Linf_error_rmsf_v_plus_nonRL[i_nonRL] = np.max(abs_error_rmsf_v_plus_nonRL[i_nonRL,:])
-    Linf_error_rmsf_w_plus_nonRL[i_nonRL] = np.max(abs_error_rmsf_w_plus_nonRL[i_nonRL,:])
+Linf_error_avg_u_plus_RL  = np.zeros(N); Linf_error_avg_u_plus_nonRL  = np.zeros(N)
+Linf_error_rmsf_u_plus_RL = np.zeros(N); Linf_error_rmsf_u_plus_nonRL = np.zeros(N)
+Linf_error_rmsf_v_plus_RL = np.zeros(N); Linf_error_rmsf_v_plus_nonRL = np.zeros(N)
+Linf_error_rmsf_w_plus_RL = np.zeros(N); Linf_error_rmsf_w_plus_nonRL = np.zeros(N)
+for i in range(N):
+    Linf_error_avg_u_plus_RL[i]     = np.max(abs_error_avg_u_plus_RL[i,:])
+    Linf_error_rmsf_u_plus_RL[i]    = np.max(abs_error_rmsf_u_plus_RL[i,:])
+    Linf_error_rmsf_v_plus_RL[i]    = np.max(abs_error_rmsf_v_plus_RL[i,:])
+    Linf_error_rmsf_w_plus_RL[i]    = np.max(abs_error_rmsf_w_plus_RL[i,:])
+    Linf_error_avg_u_plus_nonRL[i]  = np.max(abs_error_avg_u_plus_nonRL[i,:])
+    Linf_error_rmsf_u_plus_nonRL[i] = np.max(abs_error_rmsf_u_plus_nonRL[i,:])
+    Linf_error_rmsf_v_plus_nonRL[i] = np.max(abs_error_rmsf_v_plus_nonRL[i,:])
+    Linf_error_rmsf_w_plus_nonRL[i] = np.max(abs_error_rmsf_w_plus_nonRL[i,:])
 print("Errors calculated successfully!")
 
 # --- Errors logging ---
@@ -686,14 +699,14 @@ with open(error_log_filename, "r") as file:
 print("\nBuilding error plots...")
 
 # L1-Error plot
-plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_nonRL*np.ones(n_RL), linestyle = '-',             linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_RL, linestyle=':', marker = '^', markersize = 2,  linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_nonRL*np.ones(n_RL), linestyle = '-',            linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L1 Error' )
 plt.grid(which='both',axis='y')
@@ -705,14 +718,14 @@ plt.clf()
 print(f"Build plot: '{filename}'")
 
 # L2-Error plot
-plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_nonRL, linestyle = '-',             linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_RL, linestyle=':', marker = '^', markersize = 2,  linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_nonRL, linestyle = '-',            linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_nonRL, linestyle = '-',            linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_nonRL, linestyle = '-',            linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L2 Error' )
 plt.grid(which='both',axis='y')
@@ -724,14 +737,14 @@ plt.clf()
 print(f"Build plot: '{filename}'")
 
 # Linf-Error plot
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_nonRL, linestyle = '-',             linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_RL, linestyle=':', marker = '^', markersize = 2,  linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_nonRL, linestyle = '-',            linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_nonRL, linestyle = '-',            linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf, RHEA RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_nonRL, linestyle = '-',            linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL, linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf, RHEA RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$ RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
+plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'Linf Error' )
 plt.grid(which='both',axis='y')
@@ -743,11 +756,11 @@ plt.clf()
 print(f"Build plot: '{filename}'")
 
 # L1-Error plot, RATIO RL / non-RL
-plt.plot( averaging_time_nonRL, L1_error_avg_u_plus_RL  / L1_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_u_plus_RL / L1_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_v_plus_RL / L1_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_w_plus_RL / L1_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
+plt.plot( averaging_time_nonRL, L1_error_avg_u_plus_RL  / L1_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_rmsf_u_plus_RL / L1_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_rmsf_v_plus_RL / L1_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L1_error_rmsf_w_plus_RL / L1_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$' )
+plt.xlabel( r'Accumulated averaging time $t_{\textrm{avg}}^{+}$' )
 plt.ylabel( 'L1 Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -758,10 +771,10 @@ plt.clf()
 print(f"Build plot: '{filename}'")
 
 # L2-Error plot, RATIO RL / non-RL
-plt.plot( averaging_time_nonRL, L2_error_avg_u_plus_RL  / L2_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_u_plus_RL / L2_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_v_plus_RL / L2_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_w_plus_RL / L2_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf' )
+plt.plot( averaging_time_nonRL, L2_error_avg_u_plus_RL  / L2_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_rmsf_u_plus_RL / L2_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_rmsf_v_plus_RL / L2_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, L2_error_rmsf_w_plus_RL / L2_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'L2 Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
@@ -773,10 +786,10 @@ plt.clf()
 print(f"Build plot: '{filename}'")
 
 # Linf-Error plot, RATIO RL / non-RL
-plt.plot( averaging_time_nonRL, Linf_error_avg_u_plus_RL  / Linf_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = 'u-avg' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL / Linf_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = 'u-rmsf' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL / Linf_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = 'v-rmsf' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL / Linf_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = 'w-rmsf' )
+plt.plot( averaging_time_nonRL, Linf_error_avg_u_plus_RL  / Linf_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL / Linf_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$u_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL / Linf_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$v_{\textrm{rms}}^{+}$' )
+plt.plot( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL / Linf_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$w_{\textrm{rms}}^{+}$' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( 'Linf Error Ratio (RL / non-RL)' )
 plt.grid(which='both',axis='y')
