@@ -524,18 +524,24 @@ print("Building gif frames for u-avg and u,v,w-rmsf profiles...")
 from ChannelVisualizer import ChannelVisualizer
 visualizer   = ChannelVisualizer(postDir)
 frames_avg_u = []; frames_avg_v = []; frames_avg_w = []; frames_rmsf_u = []; frames_rmsf_v = []; frames_rmsf_w = []
-avg_u_max    = 20.0
-avg_v_max    = 1.0
-avg_w_max    = 1.0
-rmsf_u_max   = int(np.max([np.max(rmsf_u_plus_RL), np.max(rmsf_u_plus_nonRL), np.max(rmsf_u_plus_ref)]))+1
-rmsf_v_max   = int(np.max([np.max(rmsf_v_plus_RL), np.max(rmsf_v_plus_nonRL), np.max(rmsf_v_plus_ref)]))+1
-rmsf_w_max   = int(np.max([np.max(rmsf_w_plus_RL), np.max(rmsf_w_plus_nonRL), np.max(rmsf_w_plus_ref)]))+1
-ylim_avg_u   = [0.0, avg_u_max]
-ylim_avg_v   = [0.0, avg_v_max]
-ylim_avg_w   = [0.0, avg_w_max]
-ylim_rmsf_u  = [0.0, rmsf_u_max]
-ylim_rmsf_v  = [0.0, rmsf_v_max]
-ylim_rmsf_w  = [0.0, rmsf_w_max]
+avg_u_min    = 0.0
+avg_v_min    = 0.0
+avg_w_min    = 0.0
+avg_u_max    = int(np.max([np.max(avg_u_plus_RL), np.max(avg_u_plus_nonRL), np.max(avg_u_plus_ref)]))+1
+avg_v_max    = int(np.max([np.max(avg_v_plus_RL), np.max(avg_v_plus_nonRL), np.max(avg_v_plus_ref)]))+1
+avg_w_max    = int(np.max([np.max(avg_w_plus_RL), np.max(avg_w_plus_nonRL), np.max(avg_w_plus_ref)]))+1
+rmsf_u_min   = - np.max([np.abs(rmsf_u_plus_RL), np.abs(rmsf_u_plus_nonRL), np.abs(rmsf_u_plus_ref)])
+rmsf_v_min   = - np.max([np.abs(rmsf_v_plus_RL), np.abs(rmsf_v_plus_nonRL), np.abs(rmsf_v_plus_ref)])
+rmsf_w_min   = - np.max([np.abs(rmsf_w_plus_RL), np.abs(rmsf_w_plus_nonRL), np.abs(rmsf_w_plus_ref)])
+rmsf_u_max   = + np.max([np.abs(rmsf_u_plus_RL), np.abs(rmsf_u_plus_nonRL), np.abs(rmsf_u_plus_ref)])
+rmsf_v_max   = + np.max([np.abs(rmsf_v_plus_RL), np.abs(rmsf_v_plus_nonRL), np.abs(rmsf_v_plus_ref)])
+rmsf_w_max   = + np.max([np.abs(rmsf_w_plus_RL), np.abs(rmsf_w_plus_nonRL), np.abs(rmsf_w_plus_ref)])
+ylim_avg_u   = [avg_u_min, avg_u_max]
+ylim_avg_v   = [avg_v_min, avg_v_max]
+ylim_avg_w   = [avg_w_min, avg_w_max]
+ylim_rmsf_u  = [rmsf_u_min, rmsf_u_max]
+ylim_rmsf_v  = [rmsf_v_min, rmsf_v_max]
+ylim_rmsf_w  = [rmsf_w_min, rmsf_w_max]
 print("Gifs y-limits:", ylim_avg_u, ylim_avg_v, ylim_avg_w, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
 for i in range(N):
     # log progress
