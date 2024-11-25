@@ -279,7 +279,7 @@ def build_probelines_from_snapshot_h5(
         rmsf_v_ = rmsf_v_probes[j_probe,:]
         rmsf_w_ = rmsf_w_probes[j_probe,:]
         # --- Save probeline data ---
-        # Save in .csv (only save 1 single value for x,y,z coordinates, which are constant for all probeline data of a specific probeline)
+        # Save in .h5 (only save 1 single value for x,y,z coordinates, which are constant for all probeline data of a specific probeline)
         fpath = os.path.join(output_probelines_directory, f'probeline{j_probe}_{file_details}.h5')
         with h5py.File(fpath,'w') as f:
             f.create_dataset("t", data=t_)
