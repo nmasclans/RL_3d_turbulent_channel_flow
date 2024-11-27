@@ -157,19 +157,20 @@ for probe in probes_name:
 n_train_episodes = check_uniform_dict(n_train_episodes_dict_RL)
 del n_train_episodes_dict_RL
 # Define episodes name
-episodes_name    = [f"episode_{ep}" for ep in np.arange(n_train_episodes)]
+episodes_id_RL   = [ep for ep in np.arange(n_train_episodes)]
+episodes_name_RL = [f"episode_{ep}" for ep in episodes_id_RL]
 # Re-structure RL dictionaries
-filename_dict_RL         = {probe: {episode: "" for episode in episodes_name} for probe in probes_name}
-global_step_dict_RL      = {probe: {episode: 0  for episode in episodes_name} for probe in probes_name}
+filename_dict_RL         = {probe: {episode: "" for episode in episodes_name_RL} for probe in probes_name}
+global_step_dict_RL      = {probe: {episode: 0  for episode in episodes_name_RL} for probe in probes_name}
 for p_i in range(n_probes):
     for e_i in range(n_train_episodes):
-        filename_dict_RL[probes_name[p_i]][episodes_name[e_i]]    = filename_dict_RL_[probes_name[p_i]][e_i]
-        global_step_dict_RL[probes_name[p_i]][episodes_name[e_i]] = global_step_dict_RL_[probes_name[p_i]][e_i]
+        filename_dict_RL[probes_name[p_i]][episodes_name_RL[e_i]]    = filename_dict_RL_[probes_name[p_i]][e_i]
+        global_step_dict_RL[probes_name[p_i]][episodes_name_RL[e_i]] = global_step_dict_RL_[probes_name[p_i]][e_i]
 # Debugging
-print(f"\nNumber of RL train episodes: {n_train_episodes}, with episodes name:\n{episodes_name}") 
+print(f"\nNumber of RL train episodes: {n_train_episodes}, with episodes name:\n{episodes_name_RL}") 
 print("\nRL probelines:")
 for probe in probes_name:
-    for episode in episodes_name:
+    for episode in episodes_name_RL:
         print(f"[Probe {probe}, Episode {episode}] Filename: {filename_dict_RL[probe][episode]}, global step: {global_step_dict_RL[probe][episode]}")
 
 # --- Check filenames exist ---
@@ -182,7 +183,7 @@ for probe in probes_name:
     if not os.path.isfile(file_nonRL):
         print(f"Error: File '{file_nonRL}' not found.")
         sys.exit(1)
-    for episode in episodes_name:
+    for episode in episodes_name_RL:
         file_RL = filename_dict_RL[probe][episode]
         if not os.path.isfile(file_RL):
             print(f"Error: File '{file_RL}' not found.")
@@ -191,8 +192,10 @@ print("\nAll files exist :)")
 
 #--------------------------------------------------------------------------------------------
 # --- Get probelines data ---
+print("\nImporting probelines data...")
 
 # --- Reference data ---
+print("\nImporting probelines reference data...")
 tavg_atEpStart_dict_ref = {}
 time_atEpStart_dict_ref = {}
 time_dict_ref   = {}
@@ -219,14 +222,17 @@ for probe in probes_name:
     rmsf_u_dict_ref[probe] = rmsf_u_data[is_train_episode]
 
 # --- RL data ---
-tavg_atEpStart_dict_RL = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-time_atEpStart_dict_RL = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-time_dict_RL           = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-y_dict_RL              = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-rho_dict_RL            = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-rmsf_u_dict_RL         = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-for probe in probes_name:
-    for episode in episodes_name:
+print("\nImporting probelines RL data...")
+tavg_atEpStart_dict_RL = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+time_atEpStart_dict_RL = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+time_dict_RL           = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+y_dict_RL              = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+rho_dict_RL            = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+rmsf_u_dict_RL         = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+for probe_idx in range(n_probes):
+    probe = probes_name[probe_idx]
+    print(f"{probe_idx / n_probes * 100:.0f}%")
+    for episode in episodes_name_RL:
         # Get data from csv file
         file = filename_dict_RL[probe][episode]
         data = pd.read_csv(file, usecols=vars_keys)
@@ -237,8 +243,8 @@ for probe in probes_name:
         # store data in allocation dicts for single train episode period
         time_relative_data  = time_data - time_data[0]     # only interested in relative values, dt
         is_train_episode    = time_relative_data <= t_episode_train
-        tavg_atEpStart_dict_RL[probe][episode] = time_data[0] - tavg0_ref
-        time_atEpStart_dict_RL[probe][episode] = time_data[0]
+        tavg_atEpStart_dict_RL[probe][episode] = float(time_data[0] - tavg0_RL)
+        time_atEpStart_dict_RL[probe][episode] = float(time_data[0])
         time_dict_RL[probe][episode]           = time_relative_data[is_train_episode]
         assert np.allclose(y_data, y_data[0])
         y_dict_RL[probe][episode] = float(y_data[0])
@@ -249,41 +255,50 @@ time_atEpStart_RL = check_uniform_nested_dict(time_atEpStart_dict_RL)
 del tavg_atEpStart_dict_RL, time_atEpStart_dict_RL
 
 # --- non-RL data ---
-tavg_atEpStart_dict_nonRL = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-time_atEpStart_dict_nonRL = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-time_dict_nonRL           = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-y_dict_nonRL              = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-rho_dict_nonRL            = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-rmsf_u_dict_nonRL         = {probe: {episode: 0.0 for episode in episodes_name} for probe in probes_name}
-exit()
-for probe in probes_name:
+print("\nImporting probelines non-RL data... (only required data from equivalent RL episodes)")
+tavg_atEpStart_dict_nonRL = {probe: {} for probe in probes_name}
+time_atEpStart_dict_nonRL = {probe: {} for probe in probes_name}
+time_dict_nonRL           = {probe: {} for probe in probes_name}
+y_dict_nonRL              = {probe: {} for probe in probes_name}
+rho_dict_nonRL            = {probe: {} for probe in probes_name}
+rmsf_u_dict_nonRL         = {probe: {} for probe in probes_name}
+for probe_idx in range(n_probes):
+    probe = probes_name[probe_idx]
+    print(f"{probe_idx / n_probes * 100:.0f}%")
     # Get data from csv file
     file = filename_dict_nonRL[probe]
     data = pd.read_csv(file, usecols=vars_keys)
     time_data   = data[time_key].to_numpy()
+    tavg_data   = time_data - tavg0_nonRL
     y_data      = data[y_key].to_numpy()
     rho_data    = data[rho_key].to_numpy()
     rmsf_u_data = data[rmsf_u_key].to_numpy()
-    # transform time
-    time_relative_data  = time_data - time_data[0]     # only interested in relative values, dt
-    # Distribute data for corresponding RL episodes
-    # TODO: wip!
-    exit()
-    #    # store data in allocation dicts for single train episode period
-    #    tavg_atEpStart_RL[probe][episode] = time_data[0] - tavg0_ref
-    #    time_atEpStart_RL[probe][episode] = time_data[0]
-    #    time_atEpEnd_RL[probe][episode]   = time_data[0] + t_episode_train
-    #    is_train_episode                  = time_relative_data <= t_episode_train
-    #    time_dict_RL[probe][episode]      = time_relative_data[is_train_episode]
-    #    assert np.allclose(y_data, y_data[0])
-    #    y_dict_RL[probe][episode] = float(y_data[0])
-    #    rho_dict_RL[probe]        = rho_data[is_train_episode]
-    #    rmsf_u_dict_RL[probe]     = rmsf_u_data[is_train_episode]
-
-
-
-
-
+    # Distribute data for corresponding RL episodes, create allocations dicts
+    episodes_id_data_nonRL = np.floor((time_data-time_atEpStart_RL)/t_episode_train).astype(int)
+    episodes_id_set_nonRL  = set(episodes_id_data_nonRL)
+    episodes_id_nonRL      = [int(ep) for ep in episodes_id_set_nonRL if ep <= max(episodes_id_RL)]
+    episodes_name_nonRL    = [f"episode_{ep}" for ep in episodes_id_nonRL]
+    #print(f"\n[Probe {probe}] Episodes name for non-RL case: \n{episodes_name_nonRL}")
+    tavg_atEpStart_dict_nonRL[probe] = {episode: 0.0 for episode in episodes_name_nonRL}
+    time_atEpStart_dict_nonRL[probe] = {episode: 0.0 for episode in episodes_name_nonRL}
+    time_dict_nonRL[probe]           = {episode: 0.0 for episode in episodes_name_nonRL}
+    y_dict_nonRL[probe]              = {episode: 0.0 for episode in episodes_name_nonRL}
+    rho_dict_nonRL[probe]            = {episode: 0.0 for episode in episodes_name_nonRL}
+    rmsf_u_dict_nonRL[probe]         = {episode: 0.0 for episode in episodes_name_nonRL}
+    # store data in allocation dicts for each episode period
+    n_episodes_nonRL = len(episodes_name_nonRL)
+    for ep in range(n_episodes_nonRL):
+        episode         = episodes_name_nonRL[ep]
+        episode_id      = episodes_id_nonRL[ep]
+        is_episode_idxs = np.where(episodes_id_data == episode_id)[0]
+        tavg_atEpStart_dict_nonRL[probe][episode] = float(time_data[is_episode_idxs[0]] - tavg0_RL)
+        time_atEpStart_dict_nonRL[probe][episode] = float(time_data[is_episode_idxs[0]])
+        time_dict_nonRL[probe][episode]           = time_data[is_episode_idxs] - time_data[is_episode_idxs[0]]
+        assert np.allclose(y_data[is_episode_idxs], y_data[is_episode_idxs[0]])
+        y_dict_nonRL[probe][episode]              = float(y_data[is_episode_idxs[0]])
+        rho_dict_nonRL[probe][episode]            = rho_data[is_episode_idxs]
+        rmsf_u_dict_nonRL[probe][episode]         = rmsf_u_data[is_episode_idxs]
+        #print(f"[Probe {probe}, Episode {episode}] Number of temporal data points: {len(is_episode_idxs)}")
 
 # # --- non-RL filenames ---
 # train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
