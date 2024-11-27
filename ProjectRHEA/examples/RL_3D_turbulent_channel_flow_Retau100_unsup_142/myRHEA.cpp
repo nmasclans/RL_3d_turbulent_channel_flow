@@ -12,7 +12,7 @@ using namespace std;
 
 ////////// COMPILATION DIRECTIVES //////////
 /// TODO: move these env parameters to an .h to be included by SmartRedisManager.cpp & .h files 
-#define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
+#define _FEEDBACK_LOOP_BODY_FORCE_ 1				/// Activate feedback loop for the body force moving the flow
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
