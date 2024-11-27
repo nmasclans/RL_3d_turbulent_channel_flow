@@ -450,3 +450,44 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     print("Averaged probes y+:", y_plus_data)
 
     return tavg0, y_data, y_plus_data, k_data, k_plus_data, lambda_data, lambda_plus_data, Euu_data, Euu_plus_data
+
+
+#-----------------------------------------------------------------------------------------
+#                                    Unique value dictionary
+#-----------------------------------------------------------------------------------------
+
+def check_uniform_dict(input_dict):
+    """
+    Check if all values in a dictionary are the same and return that value.
+    Args:
+        input_dict (dict): A dictionary with key-value pairs.
+    Returns:
+        Any: The common value if uniform, otherwise None.
+    """
+    # Use a set to determine if all values are the same
+    unique_values = set(input_dict.values())
+    if len(unique_values) == 1:
+        # Return the single value in the set
+        return unique_values.pop()
+    else:
+        # Return None if values are not uniform
+        return None
+
+def check_uniform_nested_dict(nested_dict):
+    """
+    Check if a dictionary of dictionaries has the same value everywhere and return that value.
+    Args:
+        nested_dict (dict): A dictionary containing other dictionaries.
+    Returns:
+        Any: The common value if uniform, otherwise None.
+    """
+    # Extract all values from the nested dictionaries
+    all_values = [value for subdict in nested_dict.values() for value in subdict.values()]
+    # Use a set to determine if all values are the same
+    unique_values = set(all_values)
+    if len(unique_values) == 1:
+        # Return the single value in the set
+        return unique_values.pop()
+    else:
+        # Return None if values are not uniform
+        return None
