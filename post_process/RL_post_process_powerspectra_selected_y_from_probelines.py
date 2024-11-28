@@ -18,7 +18,7 @@ from matplotlib.ticker import LogLocator, FuncFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter1d
 
-from utils import build_probelines_from_snapshot_h5, process_probeline_h5, process_probelines_list, check_uniform_dict, check_uniform_nested_dict
+from utils import check_uniform_dict, check_uniform_nested_dict, process_probeline_data
 from ChannelVisualizer import ChannelVisualizer
 
 #--------------------------------------------------------------------------------------------
@@ -116,10 +116,25 @@ time_key   = "# t [s]"
 y_key      = " y[m]"
 rho_key    = " rho [kg/m3]"
 rmsf_u_key = " rmsf_u [m/s]"
-vars_keys  = [time_key, y_key, rho_key, rmsf_u_key]
+avg_u_key  = " avg_u [m/s]"
+avg_v_key  = " avg_v [m/s]"
+avg_w_key  = " avg_w [m/s]"
+vars_keys  = [time_key, y_key, rho_key, rmsf_u_key, avg_u_key, avg_v_key, avg_w_key]
 
 # Initialize visualizer
 visualizer = ChannelVisualizer(postDir)
+
+# Params dictionary
+params = {
+    "rho0": rho0,
+    "mu0": mu0,
+    "u_tau": u_tau,
+    "delta": delta,
+    "gf_sigma": gf_sigma,
+    "sgf_window_length": sgf_window_length,
+    "sgf_polyorder": sgf_polyorder,
+    "wavelength_limit": wavelength_limit,
+}
 
 #--------------------------------------------------------------------------------------------
 
@@ -152,7 +167,7 @@ for probe in probes_name:
         global_step_dict_RL_[probe].append(global_step_num)
         n_train_episodes_dict_RL[probe] += 1
 
-# --- Update RL dictionary distinguishing by episodes
+# --- Update RL dictionary distinguishing by episodes ---
 # Check all probes have same number of episodes
 n_train_episodes = check_uniform_dict(n_train_episodes_dict_RL)
 del n_train_episodes_dict_RL
@@ -198,10 +213,12 @@ print("\nImporting probelines data...")
 print("\nImporting probelines reference data...")
 tavg_atEpStart_dict_ref = {}
 time_atEpStart_dict_ref = {}
-time_dict_ref   = {}
-y_dict_ref      = {}
-rho_dict_ref    = {}
-rmsf_u_dict_ref = {}
+time_dict_ref     = {}
+y_dict_ref        = {}
+y_plus_dict_ref   = {}
+rho_dict_ref      = {}
+rmsf_u_dict_ref   = {}
+vel_norm_dict_ref = {}
 for probe in probes_name:
     # Get data from csv file
     file = filename_dict_ref[probe]
@@ -210,16 +227,26 @@ for probe in probes_name:
     y_data      = data[y_key].to_numpy()
     rho_data    = data[rho_key].to_numpy()
     rmsf_u_data = data[rmsf_u_key].to_numpy()
+    avg_u_data  = data[avg_u_key].to_numpy()
+    avg_v_data  = data[avg_v_key].to_numpy()
+    avg_w_data  = data[avg_w_key].to_numpy()
     # store data in allocation dicts for single train episode period
-    time_relative_data  = time_data - time_data[0]     # only interested in relative values, dt, not absolute value
-    is_train_episode    = time_relative_data <= t_episode_train
+    time_relative_data   = time_data - time_data[0]     # only interested in relative values, dt, not absolute value
+    is_train_episode     = time_relative_data <= t_episode_train
     tavg_atEpStart_dict_ref[probe] = time_data[0] - tavg0_ref
     time_atEpStart_dict_ref[probe] = time_data[0]
-    time_dict_ref[probe]   = time_relative_data[is_train_episode]
+    time_dict_ref[probe] = time_relative_data[is_train_episode]
     assert np.allclose(y_data, y_data[0])
-    y_dict_ref[probe]      = float(y_data[0])
-    rho_dict_ref[probe]    = rho_data[is_train_episode]
-    rmsf_u_dict_ref[probe] = rmsf_u_data[is_train_episode]
+    y_value              = float(y_data[0])
+    y_dict_ref[probe]    = y_value
+    isBottomWall         = y_value < delta
+    if isBottomWall:
+        y_plus_dict_ref[probe] = y_value * rho0 * u_tau / mu0
+    else:
+        y_plus_dict_ref[probe] =  (2 * delta - y_value) * rho0 * u_tau / mu0
+    rho_dict_ref[probe]      = rho_data[is_train_episode]
+    rmsf_u_dict_ref[probe]   = rmsf_u_data[is_train_episode]
+    vel_norm_dict_ref[probe] = np.sqrt(avg_u_data[is_train_episode]**2 + avg_v_data[is_train_episode]**2 + avg_w_data[is_train_episode]**2)
 
 # --- RL data ---
 print("\nImporting probelines RL data...")
@@ -227,8 +254,10 @@ tavg_atEpStart_dict_RL = {probe: {episode: 0.0 for episode in episodes_name_RL} 
 time_atEpStart_dict_RL = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
 time_dict_RL           = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
 y_dict_RL              = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+y_plus_dict_RL         = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
 rho_dict_RL            = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
 rmsf_u_dict_RL         = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+vel_norm_dict_RL       = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
 for probe_idx in range(n_probes):
     probe = probes_name[probe_idx]
     print(f"{probe_idx / n_probes * 100:.0f}%")
@@ -240,6 +269,9 @@ for probe_idx in range(n_probes):
         y_data      = data[y_key].to_numpy()
         rho_data    = data[rho_key].to_numpy()
         rmsf_u_data = data[rmsf_u_key].to_numpy()
+        avg_u_data  = data[avg_u_key].to_numpy()
+        avg_v_data  = data[avg_v_key].to_numpy()
+        avg_w_data  = data[avg_w_key].to_numpy()
         # store data in allocation dicts for single train episode period
         time_relative_data  = time_data - time_data[0]     # only interested in relative values, dt
         is_train_episode    = time_relative_data <= t_episode_train
@@ -247,9 +279,16 @@ for probe_idx in range(n_probes):
         time_atEpStart_dict_RL[probe][episode] = float(time_data[0])
         time_dict_RL[probe][episode]           = time_relative_data[is_train_episode]
         assert np.allclose(y_data, y_data[0])
-        y_dict_RL[probe][episode] = float(y_data[0])
-        rho_dict_RL[probe]        = rho_data[is_train_episode]
-        rmsf_u_dict_RL[probe]     = rmsf_u_data[is_train_episode]
+        y_value                   = float(y_data[0])
+        y_dict_RL[probe][episode] = y_value
+        isBottomWall              = y_value < delta
+        if isBottomWall:
+            y_plus_dict_RL[probe][episode] = y_value * rho0 * u_tau / mu0
+        else:
+            y_plus_dict_RL[probe][episode] =  (2 * delta - y_value) * rho0 * u_tau / mu0
+        rho_dict_RL[probe][episode]        = rho_data[is_train_episode]
+        rmsf_u_dict_RL[probe][episode]     = rmsf_u_data[is_train_episode]
+        vel_norm_dict_RL[probe][episode]   = np.sqrt(avg_u_data[is_train_episode]**2 + avg_v_data[is_train_episode]**2 + avg_w_data[is_train_episode]**2)
 tavg_atEpStart_RL = check_uniform_nested_dict(tavg_atEpStart_dict_RL)
 time_atEpStart_RL = check_uniform_nested_dict(time_atEpStart_dict_RL)
 del tavg_atEpStart_dict_RL, time_atEpStart_dict_RL
@@ -260,8 +299,10 @@ tavg_atEpStart_dict_nonRL = {probe: {} for probe in probes_name}
 time_atEpStart_dict_nonRL = {probe: {} for probe in probes_name}
 time_dict_nonRL           = {probe: {} for probe in probes_name}
 y_dict_nonRL              = {probe: {} for probe in probes_name}
+y_plus_dict_nonRL         = {probe: {} for probe in probes_name}
 rho_dict_nonRL            = {probe: {} for probe in probes_name}
 rmsf_u_dict_nonRL         = {probe: {} for probe in probes_name}
+vel_norm_dict_nonRL       = {probe: {} for probe in probes_name}
 for probe_idx in range(n_probes):
     probe = probes_name[probe_idx]
     print(f"{probe_idx / n_probes * 100:.0f}%")
@@ -273,6 +314,9 @@ for probe_idx in range(n_probes):
     y_data      = data[y_key].to_numpy()
     rho_data    = data[rho_key].to_numpy()
     rmsf_u_data = data[rmsf_u_key].to_numpy()
+    avg_u_data  = data[avg_u_key].to_numpy()
+    avg_v_data  = data[avg_v_key].to_numpy()
+    avg_w_data  = data[avg_w_key].to_numpy()
     # Distribute data for corresponding RL episodes, create allocations dicts
     episodes_id_data_nonRL = np.floor((time_data-time_atEpStart_RL)/t_episode_train).astype(int)
     episodes_id_set_nonRL  = set(episodes_id_data_nonRL)
@@ -283,91 +327,125 @@ for probe_idx in range(n_probes):
     time_atEpStart_dict_nonRL[probe] = {episode: 0.0 for episode in episodes_name_nonRL}
     time_dict_nonRL[probe]           = {episode: 0.0 for episode in episodes_name_nonRL}
     y_dict_nonRL[probe]              = {episode: 0.0 for episode in episodes_name_nonRL}
+    y_plus_dict_nonRL[probe]         = {episode: 0.0 for episode in episodes_name_nonRL}
     rho_dict_nonRL[probe]            = {episode: 0.0 for episode in episodes_name_nonRL}
     rmsf_u_dict_nonRL[probe]         = {episode: 0.0 for episode in episodes_name_nonRL}
+    vel_norm_dict_nonRL[probe]       = {episode: 0.0 for episode in episodes_name_nonRL}
     # store data in allocation dicts for each episode period
     n_episodes_nonRL = len(episodes_name_nonRL)
     for ep in range(n_episodes_nonRL):
         episode         = episodes_name_nonRL[ep]
         episode_id      = episodes_id_nonRL[ep]
-        is_episode_idxs = np.where(episodes_id_data == episode_id)[0]
+        is_episode_idxs = np.where(episodes_id_data_nonRL == episode_id)[0]
         tavg_atEpStart_dict_nonRL[probe][episode] = float(time_data[is_episode_idxs[0]] - tavg0_RL)
         time_atEpStart_dict_nonRL[probe][episode] = float(time_data[is_episode_idxs[0]])
-        time_dict_nonRL[probe][episode]           = time_data[is_episode_idxs] - time_data[is_episode_idxs[0]]
+        time_dict_nonRL[probe][episode]    = time_data[is_episode_idxs] - time_data[is_episode_idxs[0]]
         assert np.allclose(y_data[is_episode_idxs], y_data[is_episode_idxs[0]])
-        y_dict_nonRL[probe][episode]              = float(y_data[is_episode_idxs[0]])
-        rho_dict_nonRL[probe][episode]            = rho_data[is_episode_idxs]
-        rmsf_u_dict_nonRL[probe][episode]         = rmsf_u_data[is_episode_idxs]
+        y_value                            = float(y_data[is_episode_idxs[0]])
+        y_dict_nonRL[probe][episode]       = y_value
+        isBottomWall                       = y_value < delta
+        if isBottomWall:
+            y_plus_dict_RL[probe][episode] = y_value * rho0 * u_tau / mu0
+        else:
+            y_plus_dict_RL[probe][episode] =  (2 * delta - y_value) * rho0 * u_tau / mu0
+        rho_dict_nonRL[probe][episode]     = rho_data[is_episode_idxs]
+        rmsf_u_dict_nonRL[probe][episode]  = rmsf_u_data[is_episode_idxs]
+        vel_norm_dict_RL[probe][episode]   = np.sqrt(avg_u_data[is_episode_idxs]**2 + avg_v_data[is_episode_idxs]**2 + avg_w_data[is_episode_idxs]**2)
         #print(f"[Probe {probe}, Episode {episode}] Number of temporal data points: {len(is_episode_idxs)}")
 
-# # --- non-RL filenames ---
-# train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
-# iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
-# filename_nonRL_list = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list]
-# n_nonRL = len(train_step_list)
-# print("\nnon-RL files:")
-# for i_nonRL in range(n_nonRL):
-#     print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
 
-# # --- Discard non-RL (and corresponding RL) snapshots if not available
-# assert n_nonRL == n_RL
-# filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
-# n_nonRL_is_available = sum(filename_nonRL_is_available)
-# print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", n_nonRL - n_nonRL_is_available)
-# filename_RL_list_available = []
-# filename_nonRL_list_available = []
-# for i in range(n_RL):
-#     if filename_nonRL_is_available[i]:
-#         filename_RL_list_available.append(filename_RL_list[i])
-#         filename_nonRL_list_available.append(filename_nonRL_list[i])
-# filename_RL_list    = filename_RL_list_available
-# filename_nonRL_list = filename_nonRL_list_available
-# n_RL = len(filename_RL_list); n_nonRL = n_RL
-# print(f"Datasets RL and non-RL have now {n_RL} files each")
+#--------------------------------------------------------------------------------------------
+# Calculate TKE spectra from probelines data
+print("\nProcess probelines data to calculate TKE spectra...")
 
-# # --- Get averaging time of 'Reference', 'non-RL' and 'RL' and build 'file_details' information ---
-# # > Reference
-# with h5py.File(filename_ref, 'r') as file:
-#     t_avg_ref = file.attrs['AveragingTime'][0]
-# file_details_ref = "Reference"
-# # > RL
-# t_avg_RL = []
-# file_details_RL = []
-# for i in range(n_RL):
-#     with h5py.File(filename_RL_list[i], 'r') as file:
-#         t_avg = file.attrs['AveragingTime'][0]
-#         t_avg_RL.append(int(t_avg))
-#         file_details_RL.append(f"RL_{global_step_num_list[i]:.0f}")
-# # > non-RL
-# t_avg_nonRL = []
-# file_details_nonRL = []
-# for i in range(n_nonRL):
-#     with h5py.File(filename_nonRL_list[i], 'r') as file:
-#         t_avg = np.round(file.attrs['AveragingTime'][0], 3)
-#         t_avg_nonRL.append(int(t_avg))
-#         file_details_nonRL.append(f"nonRL_{train_step_list[i]:.0f}")
-# print("\nAveraging Time: \n- Reference:", t_avg_ref, "\n- RL:", t_avg_RL, "\n- non-RL:", t_avg_nonRL)
-# print("\nFile details: \n- Reference:", file_details_ref, "\n- RL:", file_details_RL, "\n- non-RL:", file_details_nonRL)
+k_plus_dict_ref     = {probe: 0.0 for probe in probes_name}
+Euu_plus_dict_ref   = {probe: 0.0 for probe in probes_name}
+k_plus_dict_RL      = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+Euu_plus_dict_RL    = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+k_plus_dict_nonRL   = {probe: {episode: 0.0 for episode in episodes_name_nonRL} for probe in probes_name}
+Euu_plus_dict_nonRL = {probe: {episode: 0.0 for episode in episodes_name_nonRL} for probe in probes_name}
+for probe_idx in range(n_probes):
+    probe = probes_name[probe_idx]
+    print(f"{probe_idx / n_probes * 100:.0f}%")
+    
+    # --- Reference data ---
+    _, k_plus_dict_ref[probe], _, _, _, k_plus_dict_ref = \
+        process_probeline_data(time_dict_ref[probe], rho_dict_ref[probe], rmsf_u_dict_ref[probe], vel_norm_dict_ref[probe], params)
+    
+    # --- RL data ---
+    for episode in episodes_name_RL:
+        _, k_plus_dict_RL[probe][episode], _, _, _, Euu_plus_dict_RL[probe][episode] = \
+            process_probeline_data(time_dict_RL[probe][episode], rho_dict_RL[probe][episode], 
+                                   rmsf_u_dict_RL[probe][episode], vel_norm_dict_RL[probe][episode], params)
 
-# # --- Params dictionary ---
-# params = {
-#     "num_grid_x": num_grid_x, 
-#     "num_grid_y": num_grid_y,
-#     "num_grid_z": num_grid_z,
-#     "dt_dx": dt_dx,
-#     "n_probes": n_probes,
-#     "probes_y_desired": probes_y_coord,
-#     "rho0": rho0,
-#     "mu0": mu0,
-#     "u_tau": u_tau,
-#     "delta": delta,
-#     "delta_viscous": delta_viscous,
-#     "gf_sigma": gf_sigma,
-#     "sgf_window_length": sgf_window_length,
-#     "sgf_polyorder": sgf_polyorder,
-#     "wavelength_limit": wavelength_limit,
-#     "train_post_process_dir": postDir,
-# }
+    # --- nonRL data ---
+    for episode in episodes_name_nonRL:
+        _, k_plus_dict_nonRL[probe][episode], _, _, _, Euu_plus_dict_nonRL[probe][episode] = \
+            process_probeline_data(time_dict_nonRL[probe][episode], rho_dict_nonRL[probe][episode], 
+                                   rmsf_u_dict_nonRL[probe][episode], vel_norm_dict_nonRL[probe][episode], params)
+
+
+#--------------------------------------------------------------------------------------------
+# Average probelines spectral data for same y-coords (different z-coords)
+print("\nAveraging probelines spectral data...")
+
+avg_Euu_plus_dict_ref   = {y_coord: None for y_coord in y_coord_name_list}
+avg_Euu_plus_dict_RL    = {y_coord: {episode: None for episode in episodes_name_RL}    for y_coord in y_coord_name_list}
+avg_Euu_plus_dict_nonRL = {y_coord: {episode: None for episode in episodes_name_nonRL} for y_coord in y_coord_name_list}
+for y_coord in y_coord_name_list:
+    avg_probes   = y_coord_name_vs_probes_name_dict[y_coord]
+    n_avg_probes = 0
+    for probe in avg_probes:
+        if n_avg_probes == 0:
+            avg_Euu_plus_dict_ref[y_coord] = Euu_plus_dict_ref[probe]
+            for episode in episodes_name_RL:
+                avg_Euu_plus_dict_RL[y_coord][episode] = Euu_plus_dict_RL[probe][episode]
+            for episode in episodes_name_nonRL:
+                avg_Euu_plus_dict_nonRL[y_coord][episode] = Euu_plus_dict_nonRL[probe][episode]
+        else:
+            avg_Euu_plus_dict_ref[y_coord] += Euu_plus_dict_ref[probe]
+            for episode in episodes_name_RL:
+                avg_Euu_plus_dict_RL[y_coord][episode] += Euu_plus_dict_RL[probe][episode]
+            for episode in episodes_name_nonRL:
+                avg_Euu_plus_dict_nonRL[y_coord][episode] += Euu_plus_dict_nonRL[probe][episode]
+        n_avg_probes += 1
+    avg_Euu_plus_dict_ref[y_coord] /= n_avg_probes
+    for episode in episodes_name_RL:
+        avg_Euu_plus_dict_RL[y_coord][episode] /= n_avg_probes
+    for episode in episodes_name_nonRL:
+        avg_Euu_plus_dict_nonRL[y_coord][episode] /= n_avg_probes
+
+
+#--------------------------------------------------------------------------------------------
+# Plot TKE spectra
+print("\nBuild TKE spectra...")
+
+frames_spectral = []
+for probe in probes_name:
+    for episode in episodes_name_nonRL:
+        if episode in episodes_name_RL:
+            frames_spectral = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
+                    frames_spectral, y_plus_dict_ref[probe], 
+                    k_plus_dict_RL[probe][episode],         k_plus_dict_nonRL[probe][episode],         k_plus_dict_ref[probe],
+                    avg_Euu_plus_dict_RL[probe][episode],   avg_Euu_plus_dict_nonRL[probe][episode],   avg_Euu_plus_dict_ref[probe], 
+                    tavg_atEpStart_dict_RL[probe][episode], tavg_atEpStart_dict_nonRL[probe][episode], global_step_num_list[i],
+            )
+        else:
+            frames_spectral = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
+                    frames_spectral, y_plus_dict_ref[probe], 
+                    None  k_plus_dict_nonRL[probe][episode],       k_plus_dict_ref[probe],
+                    None  avg_Euu_plus_dict_nonRL[probe][episode], avg_Euu_plus_dict_ref[probe], 
+                    None, tavg_atEpStart_dict_nonRL[probe][episode],  global_step_num_list[i],
+            )
+
+
+###visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+###    file_details_RL[i], tavg0_RL, avg_y_RL, avg_y_plus_RL, avg_k_RL, avg_k_plus_RL, avg_lambda_RL, avg_lambda_plus_RL, avg_Euu_RL, avg_Euu_plus_RL)
+###visualizer.plot_spectral_turbulent_kinetic_energy_density_streamwise_velocity(
+###    file_details_nonRL[i], tavg0_nonRL, avg_y_nonRL, avg_y_plus_nonRL, avg_k_nonRL, avg_k_plus_nonRL, avg_lambda_nonRL, avg_lambda_plus_nonRL, avg_Euu_nonRL, avg_Euu_plus_nonRL)
+    
+# Build frame for each specific global step
+    
 
 # # --- 3d-spatial snapshots to 1d-temporal probelines & build plots---
 

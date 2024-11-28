@@ -452,6 +452,79 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     return tavg0, y_data, y_plus_data, k_data, k_plus_data, lambda_data, lambda_plus_data, Euu_data, Euu_plus_data
 
 
+def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, params):
+
+    # Problem parameters
+    rho0               = params["rho0"]
+    mu0                = params["mu0"]
+    u_tau              = params["u_tau"]
+    #gf_sigma          = params["gf_sigma"]
+    #sgf_window_length = params["sgf_window_length"]
+    #sgf_polyorder     = params["sgf_polyorder"]
+    wavelength_limit   = params["wavelength_limit"]
+
+    # Check Assumption 2: constant probeline time-step (required to calculate fft!)
+    if np.all(np.isclose(t_data[1:]-t_data[:-1], t_data[1]-t_data[0])):
+        dt = t_data[1] - t_data[0]
+    else:
+        raise ValueError(f"Assumption not satisfied: grid has stretching in x-direction (A_x>0) which transformed [3-D snapshot at spec. time] into [1-D probeline at spec. (x,y,z), increasing time] to have different dt along probeline evolution")
+        
+    # Direct Fast Fourier Transform (DFFT)
+    fft_rhoufuf = np.fft.fft(rho_data * rmsf_u_data * rmsf_u_data)  #  Spectral turbulent kinetic energy density of the streamwise velocity
+    fft_freq    = np.fft.fftfreq(len(t_data), dt)
+
+    # Filtering negative frequencies
+    positive_freq_indices = fft_freq > 0
+    fft_freq    = fft_freq[positive_freq_indices]               # frequency (f) [Hz=1/s]
+    fft_rhoufuf = fft_rhoufuf[positive_freq_indices]            # spectral TKE density [kg/(m·s^2)=J/m^3]
+    N           = len(fft_freq)
+
+    # Spatial wavelength and wavenumber, based on Taylor hypothesis
+    # Source: https://gibbs.science/efd/lectures/lecture_24.pdf
+    avg_velocity_norm = np.mean(velocity_norm_data)
+    print(f"Time-averaged averaged-velocity-norm: {avg_velocity_norm:.3f}")
+    spatial_wavenumber  = np.abs(fft_freq) / avg_velocity_norm  # spatial wavenumber (k) [1/m]
+    spatial_wavelength  = ( (2*np.pi) / spatial_wavenumber )    # spatial wavelength (lambda) [m]  
+    
+    # Spectral turbulent kinetic energy density of the streamwise velocity (Euu)
+    streamwise_spectrum = np.abs(fft_rhoufuf) / N
+    
+    # Sort all by increasing wavenumber / decreasing wavelength
+    sorted_indices      = np.argsort(spatial_wavenumber)
+    spatial_wavenumber  = spatial_wavenumber[sorted_indices]    # spatial wavenumber (k) [1/m]
+    spatial_wavelength  = spatial_wavelength[sorted_indices]    # spatial wavelength (lambda) [m]  
+    streamwise_spectrum = streamwise_spectrum[sorted_indices]   # spectral TKE density [kg/(m·s^2)=J/m^3]
+    
+    ### # 1st Smoothing: Apply smoothing by Gaussian filter
+    ### streamwise_spectrum = gaussian_filter1d(streamwise_spectrum, sigma=gf_sigma, mode='nearest')
+    ### #streamwise_spectrum = exponential_moving_average(streamwise_spectrum, alpha=0.3)
+    ### #streamwise_spectrum = low_pass_filter(streamwise_spectrum, cutoff_freq=0.2, sample_rate=1)
+    ### 
+    ### # Premultiplied spectra: k * fft(rhoufuf) (k*Euu)
+    ### streamwise_spectrum             = wavenumber * streamwise_spectrum
+    ### nonfiltered_streamwise_spectrum = wavenumber * nonfiltered_streamwise_spectrum
+    ### 
+    ### # 2nd Smoothing: Apply smoothing by Savitzky-Golay polynomial regression filter
+    ### premultiplied_streamwise_spectrum = savgol_filter(premultiplied_streamwise_spectrum, window_length=sgf_window_length, polyorder=sgf_polyorder)  
+    
+    # Truncate wavelengths below the grid cutoff
+    truncated_indices   = (spatial_wavelength >= wavelength_limit) 
+    spatial_wavenumber  = spatial_wavenumber[truncated_indices]             # spatial wavenumber (k) [1/m]
+    spatial_wavelength  = spatial_wavelength[truncated_indices]             # spatial wavelength (lambda) [m]  
+    streamwise_spectrum = streamwise_spectrum[truncated_indices]            # spectral TKE density (Euu) [kg/(m·s^2)]
+    
+    # Normalize in wall-units
+    # (rho0 * u_tau / mu0) = [1/m]
+    # (rho0 * u_tau**2) = [kg/(m·s^2)]
+    spatial_wavenumber_plus  = spatial_wavenumber / (rho0 * u_tau / mu0)    # normalized spatial wavenumber in wall units (k+) [-]
+    spatial_wavelength_plus  = spatial_wavelength * (rho0 * u_tau / mu0)    # normalized spatial wavelength in wall units (lambda+) [-]
+    streamwise_spectrum_plus = streamwise_spectrum / (rho0 * u_tau**2)      # normalized spectral TKE density (Euu+) [-]
+    return spatial_wavenumber, spatial_wavenumber_plus, spatial_wavelength, spatial_wavelength_plus, streamwise_spectrum, streamwise_spectrum_plus
+
+
+
+
+
 #-----------------------------------------------------------------------------------------
 #                                    Unique value dictionary
 #-----------------------------------------------------------------------------------------
