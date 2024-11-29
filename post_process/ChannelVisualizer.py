@@ -1626,3 +1626,39 @@ class ChannelVisualizer():
         frames.append(img)
         plt.close()
         return frames
+
+    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig_from_dicts(self, avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step, ylim=[10**(-7.5),1.0]):
+        y_coord_names_list = list(avg_y_plus_dict.keys()) 
+        n_y_coord          = len(y_coord_names_list)
+        colors_list        = ['black','tab:blue','tab:green','tab:orange']
+        assert n_y_coord == 4
+        colors_dict        = {y_coord_names_list[i]: colors_list[i] for i in range(n_y_coord)}
+        # Plot Euu vs kplus
+        fig, ax = plt.subplots(figsize=(12, 6))
+        for y_coord in y_coord_names_list:
+            plt.loglog(avg_k_plus_ref_dict[y_coord],   avg_Euu_plus_ref_dict[y_coord],   color=colors_dict[y_coord], linestyle='-',  lw=2, label=rf"Reference, $y^+={avg_y_plus_dict[y_coord]:.2f}$")
+            plt.loglog(avg_k_plus_nonRL_dict[y_coord], avg_Euu_plus_nonRL_dict[y_coord], color=colors_dict[y_coord], linestyle='--', lw=2, label=rf"non-RL, $y^+={avg_y_plus_dict[y_coord]:.2f}$")
+            plt.loglog(avg_k_plus_RL_dict[y_coord],    avg_Euu_plus_RL_dict[y_coord],    color=colors_dict[y_coord], linestyle=':',  lw=2, label=rf"RL, $y^+={avg_y_plus_dict[y_coord]:.2f}$")
+        # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
+        k_plus_slope   = np.linspace(10**(-3.0), 10**(-1.9), 50)
+        Euu_plus_slope = 1e-9*k_plus_slope**(-5.0/3.0)
+        plt.loglog(k_plus_slope, Euu_plus_slope, '-.', color="tab:gray", lw=2, label=r"$\sim k_x^{+(-5/3)}$")
+        ###plt.text(10**(-2.0), 10**(-2.2), r"$\sim k_x^{+(-5/3)}$", fontsize=18)
+        # plot parameters
+        plt.xlabel(r"$k_x^+$")      #plt.xlabel(r"Wavenumber, $k_x$")
+        plt.ylabel(r"$E_{uu}^+$")   #plt.ylabel(r"Premultiplied Spectral Turbulent Kinetic Energy Density of Streamwise Velocity, $k_x\,E_{uu}^+$")
+        plt.ylim(ylim)
+        plt.xscale('log')
+        plt.grid(True)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.tight_layout()
+        return fig
+
+    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame_from_dicts(self, frames, avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step):
+        fig = self.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig_from_dicts(avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step)
+        fig.canvas.draw()
+        img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        frames.append(img)
+        plt.close()
+        return frames

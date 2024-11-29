@@ -458,14 +458,15 @@ def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, pa
     rho0               = params["rho0"]
     mu0                = params["mu0"]
     u_tau              = params["u_tau"]
+    dt_phys            = params["dt_phys"]
     #gf_sigma          = params["gf_sigma"]
     #sgf_window_length = params["sgf_window_length"]
     #sgf_polyorder     = params["sgf_polyorder"]
     wavelength_limit   = params["wavelength_limit"]
 
     # Check Assumption 2: constant probeline time-step (required to calculate fft!)
-    if np.all(np.isclose(t_data[1:]-t_data[:-1], t_data[1]-t_data[0])):
-        dt = t_data[1] - t_data[0]
+    if np.allclose(t_data[1:]-t_data[:-1], dt_phys):
+        dt = dt_phys
     else:
         raise ValueError(f"Assumption not satisfied: grid has stretching in x-direction (A_x>0) which transformed [3-D snapshot at spec. time] into [1-D probeline at spec. (x,y,z), increasing time] to have different dt along probeline evolution")
         
@@ -482,7 +483,6 @@ def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, pa
     # Spatial wavelength and wavenumber, based on Taylor hypothesis
     # Source: https://gibbs.science/efd/lectures/lecture_24.pdf
     avg_velocity_norm = np.mean(velocity_norm_data)
-    print(f"Time-averaged averaged-velocity-norm: {avg_velocity_norm:.3f}")
     spatial_wavenumber  = np.abs(fft_freq) / avg_velocity_norm  # spatial wavenumber (k) [1/m]
     spatial_wavelength  = ( (2*np.pi) / spatial_wavenumber )    # spatial wavelength (lambda) [m]  
     
@@ -520,9 +520,6 @@ def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, pa
     spatial_wavelength_plus  = spatial_wavelength * (rho0 * u_tau / mu0)    # normalized spatial wavelength in wall units (lambda+) [-]
     streamwise_spectrum_plus = streamwise_spectrum / (rho0 * u_tau**2)      # normalized spectral TKE density (Euu+) [-]
     return spatial_wavenumber, spatial_wavenumber_plus, spatial_wavelength, spatial_wavelength_plus, streamwise_spectrum, streamwise_spectrum_plus
-
-
-
 
 
 #-----------------------------------------------------------------------------------------
