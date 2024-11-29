@@ -322,6 +322,8 @@ for probe_idx in range(n_probes):
     episodes_id_set_nonRL  = set(episodes_id_data_nonRL)
     episodes_id_nonRL      = [int(ep) for ep in episodes_id_set_nonRL if ep <= max(episodes_id_RL)]
     episodes_name_nonRL    = [f"episode_{ep}" for ep in episodes_id_nonRL]
+    n_episodes_nonRL       = len(episodes_name_nonRL)
+    episodes_name_id_dict_nonRL = {episodes_name_nonRL[i]:episodes_id_nonRL[i] for i in range(n_episodes_nonRL)} 
     #print(f"\n[Probe {probe}] Episodes name for non-RL case: \n{episodes_name_nonRL}")
     tavg_atEpStart_dict_nonRL[probe] = {episode: 0.0 for episode in episodes_name_nonRL}
     time_atEpStart_dict_nonRL[probe] = {episode: 0.0 for episode in episodes_name_nonRL}
@@ -332,25 +334,23 @@ for probe_idx in range(n_probes):
     rmsf_u_dict_nonRL[probe]         = {episode: 0.0 for episode in episodes_name_nonRL}
     vel_norm_dict_nonRL[probe]       = {episode: 0.0 for episode in episodes_name_nonRL}
     # store data in allocation dicts for each episode period
-    n_episodes_nonRL = len(episodes_name_nonRL)
-    for ep in range(n_episodes_nonRL):
-        episode         = episodes_name_nonRL[ep]
-        episode_id      = episodes_id_nonRL[ep]
+    for episode in episodes_name_nonRL:
+        episode_id      = episodes_name_id_dict_nonRL[episode]
         is_episode_idxs = np.where(episodes_id_data_nonRL == episode_id)[0]
         tavg_atEpStart_dict_nonRL[probe][episode] = float(time_data[is_episode_idxs[0]] - tavg0_RL)
         time_atEpStart_dict_nonRL[probe][episode] = float(time_data[is_episode_idxs[0]])
-        time_dict_nonRL[probe][episode]    = time_data[is_episode_idxs] - time_data[is_episode_idxs[0]]
+        time_dict_nonRL[probe][episode]     = time_data[is_episode_idxs] - time_data[is_episode_idxs[0]]
         assert np.allclose(y_data[is_episode_idxs], y_data[is_episode_idxs[0]])
-        y_value                            = float(y_data[is_episode_idxs[0]])
-        y_dict_nonRL[probe][episode]       = y_value
-        isBottomWall                       = y_value < delta
+        y_value                             = float(y_data[is_episode_idxs[0]])
+        y_dict_nonRL[probe][episode]        = y_value
+        isBottomWall                        = y_value < delta
         if isBottomWall:
-            y_plus_dict_RL[probe][episode] = y_value * rho0 * u_tau / mu0
+            y_plus_dict_RL[probe][episode]  = y_value * rho0 * u_tau / mu0
         else:
-            y_plus_dict_RL[probe][episode] =  (2 * delta - y_value) * rho0 * u_tau / mu0
-        rho_dict_nonRL[probe][episode]     = rho_data[is_episode_idxs]
-        rmsf_u_dict_nonRL[probe][episode]  = rmsf_u_data[is_episode_idxs]
-        vel_norm_dict_RL[probe][episode]   = np.sqrt(avg_u_data[is_episode_idxs]**2 + avg_v_data[is_episode_idxs]**2 + avg_w_data[is_episode_idxs]**2)
+            y_plus_dict_RL[probe][episode]  =  (2 * delta - y_value) * rho0 * u_tau / mu0
+        rho_dict_nonRL[probe][episode]      = rho_data[is_episode_idxs]
+        rmsf_u_dict_nonRL[probe][episode]   = rmsf_u_data[is_episode_idxs]
+        vel_norm_dict_nonRL[probe][episode] = np.sqrt(avg_u_data[is_episode_idxs]**2 + avg_v_data[is_episode_idxs]**2 + avg_w_data[is_episode_idxs]**2)
         #print(f"[Probe {probe}, Episode {episode}] Number of temporal data points: {len(is_episode_idxs)}")
 
 
@@ -360,8 +360,8 @@ print("\nProcess probelines data to calculate TKE spectra...")
 
 k_plus_dict_ref     = {probe: 0.0 for probe in probes_name}
 Euu_plus_dict_ref   = {probe: 0.0 for probe in probes_name}
-k_plus_dict_RL      = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
-Euu_plus_dict_RL    = {probe: {episode: 0.0 for episode in episodes_name_RL} for probe in probes_name}
+k_plus_dict_RL      = {probe: {episode: 0.0 for episode in episodes_name_RL}    for probe in probes_name}
+Euu_plus_dict_RL    = {probe: {episode: 0.0 for episode in episodes_name_RL}    for probe in probes_name}
 k_plus_dict_nonRL   = {probe: {episode: 0.0 for episode in episodes_name_nonRL} for probe in probes_name}
 Euu_plus_dict_nonRL = {probe: {episode: 0.0 for episode in episodes_name_nonRL} for probe in probes_name}
 for probe_idx in range(n_probes):
@@ -369,8 +369,9 @@ for probe_idx in range(n_probes):
     print(f"{probe_idx / n_probes * 100:.0f}%")
     
     # --- Reference data ---
-    _, k_plus_dict_ref[probe], _, _, _, k_plus_dict_ref = \
-        process_probeline_data(time_dict_ref[probe], rho_dict_ref[probe], rmsf_u_dict_ref[probe], vel_norm_dict_ref[probe], params)
+    _, k_plus_dict_ref[probe], _, _, _, k_plus_dict_ref[probe] = \
+        process_probeline_data(time_dict_ref[probe], rho_dict_ref[probe], 
+                               rmsf_u_dict_ref[probe], vel_norm_dict_ref[probe], params)
     
     # --- RL data ---
     for episode in episodes_name_RL:
@@ -388,25 +389,45 @@ for probe_idx in range(n_probes):
 #--------------------------------------------------------------------------------------------
 # Average probelines spectral data for same y-coords (different z-coords)
 print("\nAveraging probelines spectral data...")
-
-avg_Euu_plus_dict_ref   = {y_coord: None for y_coord in y_coord_name_list}
-avg_Euu_plus_dict_RL    = {y_coord: {episode: None for episode in episodes_name_RL}    for y_coord in y_coord_name_list}
-avg_Euu_plus_dict_nonRL = {y_coord: {episode: None for episode in episodes_name_nonRL} for y_coord in y_coord_name_list}
+avg_y_plus_dict_ref           = {y_coord: None for y_coord in y_coord_name_list}
+avg_k_plus_dict_ref           = {y_coord: None for y_coord in y_coord_name_list}
+avg_Euu_plus_dict_ref         = {y_coord: None for y_coord in y_coord_name_list}
+avg_y_plus_dict_RL            = {y_coord: {episode: None for episode in episodes_name_RL}    for y_coord in y_coord_name_list}
+avg_k_plus_dict_RL            = {y_coord: {episode: None for episode in episodes_name_RL}    for y_coord in y_coord_name_list}
+avg_Euu_plus_dict_RL          = {y_coord: {episode: None for episode in episodes_name_RL}    for y_coord in y_coord_name_list}
+avg_y_plus_dict_nonRL         = {y_coord: {episode: None for episode in episodes_name_nonRL} for y_coord in y_coord_name_list}
+avg_k_plus_dict_nonRL         = {y_coord: {episode: None for episode in episodes_name_nonRL} for y_coord in y_coord_name_list}
+avg_Euu_plus_dict_nonRL       = {y_coord: {episode: None for episode in episodes_name_nonRL} for y_coord in y_coord_name_list}
+avg_tavg_atEpStart_dict_nonRL = {y_coord: {episode: None for episode in episodes_name_nonRL} for y_coord in y_coord_name_list} 
 for y_coord in y_coord_name_list:
     avg_probes   = y_coord_name_vs_probes_name_dict[y_coord]
     n_avg_probes = 0
     for probe in avg_probes:
         if n_avg_probes == 0:
-            avg_Euu_plus_dict_ref[y_coord] = Euu_plus_dict_ref[probe]
+            avg_y_plus_dict_ref[y_coord]        = y_plus_dict_ref[probe]
+            avg_k_plus_dict_ref[y_coord]        = k_plus_dict_ref[probe]
+            avg_Euu_plus_dict_ref[y_coord]      = Euu_plus_dict_ref[probe]
             for episode in episodes_name_RL:
+                avg_y_plus_dict_RL[y_coord][episode]   = y_plus_dict_RL[probe][episode]
+                avg_k_plus_dict_RL[y_coord][episode]   = k_plus_dict_RL[probe][episode]
                 avg_Euu_plus_dict_RL[y_coord][episode] = Euu_plus_dict_RL[probe][episode]
             for episode in episodes_name_nonRL:
+                avg_tavg_atEpStart_dict_nonRL[y_coord][episode] = tavg_atEpStart_dict_nonRL[probe][episode]
+                avg_y_plus_dict_nonRL[y_coord][episode]   = y_plus_dict_nonRL[probe][episode]
+                avg_k_plus_dict_nonRL[y_coord][episode]   = k_plus_dict_nonRL[probe][episode]
                 avg_Euu_plus_dict_nonRL[y_coord][episode] = Euu_plus_dict_nonRL[probe][episode]
         else:
+            assert np.allclose(avg_y_plus_dict_ref[y_coord]-y_plus_dict_ref[probe], 0.0)
+            assert np.allclose(avg_k_plus_dict_ref[y_coord]-k_plus_dict_ref[probe], 0.0)
             avg_Euu_plus_dict_ref[y_coord] += Euu_plus_dict_ref[probe]
             for episode in episodes_name_RL:
+                assert np.allclose(avg_y_plus_dict_RL[y_coord][episode]-y_plus_dict_RL[probe][episode], 0.0)
+                assert np.allclose(avg_k_plus_dict_RL[y_coord][episode]-k_plus_dict_RL[probe][episode], 0.0)
                 avg_Euu_plus_dict_RL[y_coord][episode] += Euu_plus_dict_RL[probe][episode]
             for episode in episodes_name_nonRL:
+                assert np.allclose(avg_tavg_atEpStart_dict_nonRL[y_coord][episode]-tavg_atEpStart_dict_nonRL[probe][episode], 0.0)
+                assert np.allclose(avg_y_plus_dict_nonRL[y_coord][episode]-y_plus_dict_nonRL[probe][episode], 0.0)
+                assert np.allclose(avg_k_plus_dict_nonRL[y_coord][episode]-k_plus_dict_nonRL[probe][episode], 0.0)
                 avg_Euu_plus_dict_nonRL[y_coord][episode] += Euu_plus_dict_nonRL[probe][episode]
         n_avg_probes += 1
     avg_Euu_plus_dict_ref[y_coord] /= n_avg_probes
@@ -421,21 +442,23 @@ for y_coord in y_coord_name_list:
 print("\nBuild TKE spectra...")
 
 frames_spectral = []
-for probe in probes_name:
+for y_coord in y_coord_name_list:
     for episode in episodes_name_nonRL:
         if episode in episodes_name_RL:
             frames_spectral = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
-                    frames_spectral, y_plus_dict_ref[probe], 
-                    k_plus_dict_RL[probe][episode],         k_plus_dict_nonRL[probe][episode],         k_plus_dict_ref[probe],
-                    avg_Euu_plus_dict_RL[probe][episode],   avg_Euu_plus_dict_nonRL[probe][episode],   avg_Euu_plus_dict_ref[probe], 
-                    tavg_atEpStart_dict_RL[probe][episode], tavg_atEpStart_dict_nonRL[probe][episode], global_step_num_list[i],
+                    frames_spectral, 
+                    avg_y_plus_dict_ref[y_coord], 
+                    avg_k_plus_dict_RL[y_coord][episode],   avg_k_plus_dict_nonRL[y_coord][episode],         avg_k_plus_dict_ref[y_coord],
+                    avg_Euu_plus_dict_RL[y_coord][episode], avg_Euu_plus_dict_nonRL[y_coord][episode],       avg_Euu_plus_dict_ref[y_coord], 
+                    tavg_atEpStart_RL,                      avg_tavg_atEpStart_dict_nonRL[y_coord][episode], episodes_name_id_dict_nonRL[episode],
             )
         else:
             frames_spectral = visualizer.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame(
-                    frames_spectral, y_plus_dict_ref[probe], 
-                    None  k_plus_dict_nonRL[probe][episode],       k_plus_dict_ref[probe],
-                    None  avg_Euu_plus_dict_nonRL[probe][episode], avg_Euu_plus_dict_ref[probe], 
-                    None, tavg_atEpStart_dict_nonRL[probe][episode],  global_step_num_list[i],
+                    frames_spectral, 
+                    avg_y_plus_dict_ref[y_coord], 
+                    None, avg_k_plus_dict_nonRL[y_coord][episode],         avg_k_plus_dict_ref[y_coord],
+                    None, avg_Euu_plus_dict_nonRL[y_coord][episode],       avg_Euu_plus_dict_ref[y_coord], 
+                    None, avg_tavg_atEpStart_dict_nonRL[y_coord][episode], episodes_name_id_dict_nonRL[episode],
             )
 
 
