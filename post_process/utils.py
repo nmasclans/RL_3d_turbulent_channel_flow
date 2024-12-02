@@ -452,7 +452,7 @@ def process_probelines_list(probes_filepath_list, file_details, params):
     return tavg0, y_data, y_plus_data, k_data, k_plus_data, lambda_data, lambda_plus_data, Euu_data, Euu_plus_data
 
 
-def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, params):
+def process_probeline_data(t_data, rho_data, uf_data, params):
 
     # Problem parameters
     rho0               = params["rho0"]
@@ -471,7 +471,7 @@ def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, pa
         raise ValueError(f"Assumption not satisfied: grid has stretching in x-direction (A_x>0) which transformed [3-D snapshot at spec. time] into [1-D probeline at spec. (x,y,z), increasing time] to have different dt along probeline evolution")
         
     # Direct Fast Fourier Transform (DFFT)
-    fft_rhoufuf = np.fft.fft(rho_data * rmsf_u_data * rmsf_u_data)  #  Spectral turbulent kinetic energy density of the streamwise velocity
+    fft_rhoufuf = np.fft.fft(rho_data * uf_data * uf_data)  #  Spectral turbulent kinetic energy density of the streamwise velocity
     fft_freq    = np.fft.fftfreq(len(t_data), dt)
 
     # Filtering negative frequencies
@@ -480,15 +480,13 @@ def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, pa
     fft_rhoufuf = fft_rhoufuf[positive_freq_indices]            # spectral TKE density [kg/(m·s^2)=J/m^3]
     N           = len(fft_freq)
 
-    # Spatial wavelength and wavenumber, based on Taylor hypothesis
-    # Source: https://gibbs.science/efd/lectures/lecture_24.pdf
-    avg_velocity_norm = np.mean(velocity_norm_data)
-    spatial_wavenumber  = np.abs(fft_freq) / avg_velocity_norm  # spatial wavenumber (k) [1/m]
+    # Spatial wavelength and wavenumber
+    spatial_wavenumber  = np.abs(fft_freq)                      # spatial wavenumber (k) [1/m]
     spatial_wavelength  = ( (2*np.pi) / spatial_wavenumber )    # spatial wavelength (lambda) [m]  
-    
+
     # Spectral turbulent kinetic energy density of the streamwise velocity (Euu)
     streamwise_spectrum = np.abs(fft_rhoufuf) / N
-    
+
     # Sort all by increasing wavenumber / decreasing wavelength
     sorted_indices      = np.argsort(spatial_wavenumber)
     spatial_wavenumber  = spatial_wavenumber[sorted_indices]    # spatial wavenumber (k) [1/m]
@@ -512,7 +510,7 @@ def process_probeline_data(t_data, rho_data, rmsf_u_data, velocity_norm_data, pa
     spatial_wavenumber  = spatial_wavenumber[truncated_indices]             # spatial wavenumber (k) [1/m]
     spatial_wavelength  = spatial_wavelength[truncated_indices]             # spatial wavelength (lambda) [m]  
     streamwise_spectrum = streamwise_spectrum[truncated_indices]            # spectral TKE density (Euu) [kg/(m·s^2)]
-    
+        
     # Normalize in wall-units
     # (rho0 * u_tau / mu0) = [1/m]
     # (rho0 * u_tau**2) = [kg/(m·s^2)]

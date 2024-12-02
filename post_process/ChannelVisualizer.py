@@ -1642,8 +1642,8 @@ class ChannelVisualizer():
             if avg_k_plus_RL_dict is not None:
                 plt.loglog(avg_k_plus_RL_dict[y_coord], avg_Euu_plus_RL_dict[y_coord],    color=colors_dict[y_coord], linestyle=':',  lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, RL")
         # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
-        k_plus_slope   = np.linspace(10**(-3.0), 10**(-1.9), 50)
-        Euu_plus_slope = 1e-9*k_plus_slope**(-5.0/3.0)
+        k_plus_slope   = np.linspace(10**(-2.0), 10**(-1.0), 50)
+        Euu_plus_slope = k_plus_slope**(-5.0/3.0) * (0.1 / k_plus_slope[0]**(-5.0/3.0))
         plt.loglog(k_plus_slope, Euu_plus_slope, '-.', color="tab:gray", lw=2, label=r"$\sim k_x^{+(-5/3)}$")
         ###plt.text(10**(-2.0), 10**(-2.2), r"$\sim k_x^{+(-5/3)}$", fontsize=18)
         # plot parameters
@@ -1660,8 +1660,8 @@ class ChannelVisualizer():
         plt.tight_layout()
         return fig
 
-    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame_from_dicts(self, frames, avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step):
-        fig = self.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig_from_dicts(avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step)
+    def build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_frame_from_dicts(self, frames, avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step, ylim=[10**(-7.5),1.0]):
+        fig = self.build_spectral_turbulent_kinetic_energy_density_streamwise_velocity_fig_from_dicts(avg_y_plus_dict, avg_k_plus_RL_dict, avg_k_plus_nonRL_dict, avg_k_plus_ref_dict, avg_Euu_plus_RL_dict, avg_Euu_plus_nonRL_dict, avg_Euu_plus_ref_dict, avg_time_RL, avg_time_nonRL, global_step, ylim)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
