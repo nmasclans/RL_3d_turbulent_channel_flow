@@ -1637,10 +1637,10 @@ class ChannelVisualizer():
         # Plot Euu vs kplus
         fig, ax = plt.subplots(figsize=(12, 6))
         for y_coord in y_coord_name_list:
-            plt.loglog(avg_k_plus_ref_dict[y_coord],   avg_Euu_plus_ref_dict[y_coord],   color=colors_dict[y_coord], linestyle='-',  lw=2, label=rf"Reference, $y^+={avg_y_plus_dict[y_coord]:.2f}$")
-            plt.loglog(avg_k_plus_nonRL_dict[y_coord], avg_Euu_plus_nonRL_dict[y_coord], color=colors_dict[y_coord], linestyle='--', lw=2, label=rf"non-RL, $y^+={avg_y_plus_dict[y_coord]:.2f}$")
+            plt.loglog(avg_k_plus_ref_dict[y_coord],    avg_Euu_plus_ref_dict[y_coord],   color=colors_dict[y_coord], linestyle='-',  lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, Reference")
+            plt.loglog(avg_k_plus_nonRL_dict[y_coord],  avg_Euu_plus_nonRL_dict[y_coord], color=colors_dict[y_coord], linestyle='--', lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, non-RL")
             if avg_k_plus_RL_dict is not None:
-                plt.loglog(avg_k_plus_RL_dict[y_coord],    avg_Euu_plus_RL_dict[y_coord],    color=colors_dict[y_coord], linestyle=':',  lw=2, label=rf"RL, $y^+={avg_y_plus_dict[y_coord]:.2f}$")
+                plt.loglog(avg_k_plus_RL_dict[y_coord], avg_Euu_plus_RL_dict[y_coord],    color=colors_dict[y_coord], linestyle=':',  lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, RL")
         # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
         k_plus_slope   = np.linspace(10**(-3.0), 10**(-1.9), 50)
         Euu_plus_slope = 1e-9*k_plus_slope**(-5.0/3.0)
