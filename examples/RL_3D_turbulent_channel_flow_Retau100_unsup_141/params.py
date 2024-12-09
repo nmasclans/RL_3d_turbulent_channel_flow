@@ -2,7 +2,7 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.002         # action period
+t_action = 0.02         # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
@@ -51,12 +51,12 @@ params = {
 
     # RL params
     "mode": mode,
-    "num_episodes": 100000,
+    "num_episodes": 300,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
-    "action_bounds": (-2.0, 2.0),
+    "action_bounds": (-1.0, 1.0),
     "action_dim": 6,
     "state_dim": 7,
     "reward_norm": 1.0,

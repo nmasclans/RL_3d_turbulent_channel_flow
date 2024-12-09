@@ -2,7 +2,7 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.01         # action period
+t_action = 0.02         # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
@@ -56,8 +56,8 @@ params = {
     "t_action": t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
-    "action_bounds": (-1.0, 1.0),
-    "action_dim": 6,
+    "action_bounds": (-2.0, 2.0),
+    "action_dim": 1,
     "state_dim": 7,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
@@ -69,7 +69,7 @@ params = {
     # Clipping parameter controls how much the new policy can deviate from the old policy
     # Recommended: 0.2 - 0.5, 0.2 used in most implementations
     # If updates are too volatile, you can decrease to 0.1
-    "entropy_regularization": 0.1,                       
+    "entropy_regularization": 0.01,                       
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence

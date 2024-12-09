@@ -2,7 +2,7 @@ import random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.01         # action period
+t_action = 0.02         # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
@@ -57,7 +57,7 @@ params = {
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-1.0, 1.0),
-    "action_dim": 6,
+    "action_dim": 3,
     "state_dim": 7,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
