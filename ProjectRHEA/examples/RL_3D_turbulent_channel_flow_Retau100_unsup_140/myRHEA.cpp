@@ -573,7 +573,7 @@ void myRHEA::calculateSourceTerms() {
 
             /// Initialize variables
             double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
-            double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
+            double DeltaRkk = 0.0, DeltaThetaZ = 0.0, DeltaThetaY = 0.0, DeltaThetaX = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
             double Rkk_inv, Akk;
             bool   isNegligibleAction, isNegligibleRkk;
             size_t actuation_idx;
@@ -1971,54 +1971,62 @@ void myRHEA::calculateReward() {
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
 #if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
-    double l2_err_avg_u           = 0.0;
-    double l2_err_rmsf_u          = 0.0;
-    double l2_avg_u_reference     = 0.0;
-    double l2_rmsf_u_reference    = 0.0;
-    double relative_l2_err_avg_u  = 0.0;
-    double relative_l2_err_rmsf_u = 0.0;
-    double length_y = 0.0;
-    double delta_y  = 0.0;
+    double l2_err_avg_u = 0.0,  l2_err_avg_v = 0.0,  l2_err_avg_w = 0.0;
+    double l2_err_rmsf_u = 0.0, l2_err_rmsf_v = 0.0, l2_err_rmsf_w = 0.0;
+    double l2_avg_u_reference  = 0.0;   // avg_v_reference, avg_w_reference = 0.0 everywhere in the profile
+    double l2_rmsf_u_reference = 0.0, l2_rmsf_v_reference = 0.0, l2_rmsf_w_reference = 0.0;
+    double length_y = 0.0, delta_y  = 0.0;
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 delta_y             = 0.5 * ( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] );
-                l2_err_avg_u        += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_err_avg_u        += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
+                l2_err_avg_v        += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0,                                2.0) * delta_y;
+                l2_err_avg_w        += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0,                                2.0) * delta_y;
                 l2_err_rmsf_u       += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
-                l2_avg_u_reference  += std::pow(avg_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_err_rmsf_v       += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_err_rmsf_w       += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_avg_u_reference  += std::pow(avg_u_reference_field[I1D(i,j,k)], 2.0)  * delta_y;
                 l2_rmsf_u_reference += std::pow(rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_rmsf_v_reference += std::pow(rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_rmsf_w_reference += std::pow(rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_y;
                 length_y            += delta_y; 
             }
         }
     }
-    l2_err_avg_u        = std::sqrt( l2_err_avg_u / length_y );
+    l2_err_avg_u        = std::sqrt( l2_err_avg_u  / length_y );
+    l2_err_avg_v        = std::sqrt( l2_err_avg_v  / length_y );
+    l2_err_avg_w        = std::sqrt( l2_err_avg_w  / length_y );
     l2_err_rmsf_u       = std::sqrt( l2_err_rmsf_u / length_y );
-    l2_avg_u_reference  = std::sqrt( l2_avg_u_reference / length_y );
+    l2_err_rmsf_v       = std::sqrt( l2_err_rmsf_v / length_y );
+    l2_err_rmsf_w       = std::sqrt( l2_err_rmsf_w / length_y );
+    l2_avg_u_reference  = std::sqrt( l2_avg_u_reference  / length_y );
     l2_rmsf_u_reference = std::sqrt( l2_rmsf_u_reference / length_y );
-    relative_l2_err_avg_u  = l2_err_avg_u  / l2_avg_u_reference;
-    relative_l2_err_rmsf_u = l2_err_rmsf_u / l2_rmsf_u_reference;
-    reward_local = ( 1.0 - ( relative_l2_err_avg_u + relative_l2_err_rmsf_u ) )
-                   * std::pow(current_time - begin_actuation_time, 2.0);
+    l2_rmsf_v_reference = std::sqrt( l2_rmsf_v_reference / length_y );
+    l2_rmsf_w_reference = std::sqrt( l2_rmsf_w_reference / length_y );
+    reward_local = ( 3.0 - (   ( l2_err_avg_u  / l2_avg_u_reference ) \
+                             + l2_err_avg_v \
+                             + l2_err_avg_w \
+                             + ( l2_err_rmsf_u / l2_rmsf_u_reference ) \
+                             + ( l2_err_rmsf_v / l2_rmsf_v_reference ) \
+                             + ( l2_err_rmsf_w / l2_rmsf_w_reference ) \
+                            ) ) * std::pow(current_time - begin_actuation_time, 2.0);
     /// Debugging
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local
-         << ", with l2_err_avg_u: " << l2_err_avg_u
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with:"
+         << "  l2_err_avg_u: " << l2_err_avg_u
+         << ", l2_err_avg_v: "  << l2_err_avg_v
+         << ", l2_err_avg_w: "  << l2_err_avg_w
          << ", l2_err_rmsf_u: " << l2_err_rmsf_u
-         << ", l2_avg_u_reference: " << l2_avg_u_reference
-         << ", l2_rmsf_u_reference: " << l2_rmsf_u_reference
+         << ", l2_err_rmsf_v: " << l2_err_rmsf_v
+         << ", l2_err_rmsf_w: " << l2_err_rmsf_w
          << ", current_time - begin_averaging_time: " << (current_time - begin_actuation_time) << endl;
 
 #else                           /// Unsupervised Reward
     /// Initialize variables
-    double l2_d_avg_u         = 0.0;
-    double l2_d_avg_v         = 0.0;
-    double l2_d_avg_w         = 0.0;
-    double l2_d_rmsf_u        = 0.0; 
-    double l2_d_rmsf_v        = 0.0; 
-    double l2_d_rmsf_w        = 0.0; 
+    double l2_d_avg_u = 0.0, l2_d_avg_v = 0.0, l2_d_avg_w = 0.0;
+    double l2_d_rmsf_u = 0.0, l2_d_rmsf_v = 0.0, l2_d_rmsf_w = 0.0; 
     double l2_avg_u_previous  = 0.0;
-    double l2_rmsf_u_previous = 0.0; 
-    double l2_rmsf_v_previous = 0.0; 
-    double l2_rmsf_w_previous = 0.0; 
+    double l2_rmsf_u_previous = 0.0, l2_rmsf_v_previous = 0.0, l2_rmsf_w_previous = 0.0; 
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
 
