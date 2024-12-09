@@ -559,12 +559,11 @@ void myRHEA::calculateSourceTerms() {
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_smartredis_communications" );
 
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->start( "rl_update_DeltaRij" );
-
                 }   /// end if ( !first_actuation_period_done )
             }       /// end if (current_time - previous_actuation_time >= actuation_period), new action was required
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->start( "rl_update_DeltaRij" );
 
             /// Calculate smooth action in time
             /// ALERT: this is costly because eigen-decomposition and DeltaRii_field are re-calculated at each time instant
