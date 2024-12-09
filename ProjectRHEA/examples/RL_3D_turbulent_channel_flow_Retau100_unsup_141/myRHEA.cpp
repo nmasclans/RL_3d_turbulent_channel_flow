@@ -188,8 +188,6 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     ///rmsf_w_reference_field.setTopology(topo, "rmsf_w_reference_field");
 #else
     avg_u_previous_field.setTopology(topo,  "avg_u_previous_field");
-    avg_v_previous_field.setTopology(topo,  "avg_v_previous_field");
-    avg_w_previous_field.setTopology(topo,  "avg_w_previous_field");
     rmsf_u_previous_field.setTopology(topo, "rmsf_u_previous_field");
     rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
     rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
@@ -1943,7 +1941,7 @@ void myRHEA::updateState() {
 /// If _RL_CONTROL_IS_SUPERVISED_ 1:
 /// -> updates attributes: reward_local
 /// else _RL_CONTROL_IS_SUPERVISED_ 0:
-/// -> updates attributes: reward_local, avg_u_previous_field, avg_v_previous_field, avg_w_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field
+/// -> updates attributes: reward_local, avg_u_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field
 void myRHEA::calculateReward() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -1994,8 +1992,6 @@ void myRHEA::calculateReward() {
     double l2_d_rmsf_v        = 0.0; 
     double l2_d_rmsf_w        = 0.0; 
     double l2_avg_u_previous  = 0.0;
-    double l2_avg_v_previous  = 0.0;
-    double l2_avg_w_previous  = 0.0;
     double l2_rmsf_u_previous = 0.0; 
     double l2_rmsf_v_previous = 0.0; 
     double l2_rmsf_w_previous = 0.0; 
@@ -2012,14 +2008,12 @@ void myRHEA::calculateReward() {
                 delta_volume =  delta_x * delta_y * delta_z;
                 /// Calculate volume-averaged l2_d_avg_u & l2_d_rmsf_u
                 l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - avg_v_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - avg_w_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
+                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
+                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
                 l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_avg_u_previous  += std::pow(avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_avg_v_previous  += std::pow(avg_v_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_avg_w_previous  += std::pow(avg_w_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
                 l2_rmsf_u_previous += std::pow(rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rmsf_v_previous += std::pow(rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rmsf_w_previous += std::pow(rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
@@ -2034,14 +2028,12 @@ void myRHEA::calculateReward() {
     l2_d_rmsf_v        = std::sqrt( l2_d_rmsf_v / total_volume_local);
     l2_d_rmsf_w        = std::sqrt( l2_d_rmsf_w / total_volume_local);
     l2_avg_u_previous  = std::sqrt( l2_avg_u_previous  / total_volume_local);
-    l2_avg_v_previous  = std::sqrt( l2_avg_v_previous  / total_volume_local);
-    l2_avg_w_previous  = std::sqrt( l2_avg_w_previous  / total_volume_local);
     l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
     l2_rmsf_v_previous = std::sqrt( l2_rmsf_v_previous / total_volume_local);
     l2_rmsf_w_previous = std::sqrt( l2_rmsf_w_previous / total_volume_local);
-    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous ) \
-                                   + ( l2_d_avg_v / l2_avg_v_previous ) \
-                                   + ( l2_d_avg_w / l2_avg_w_previous ) \
+    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous * 10.0 ) \
+                                   + ( l2_d_avg_v * 0.01 ) \
+                                   + ( l2_d_avg_w * 0.01 ) \
                                    + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \
                                    + ( l2_d_rmsf_v / l2_rmsf_v_previous ) \
                                    + ( l2_d_rmsf_w / l2_rmsf_w_previous ) ) ) * std::pow(current_time - begin_actuation_time, 2.0);
@@ -2049,16 +2041,20 @@ void myRHEA::calculateReward() {
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
          << "local reward: "  << reward_local << endl
-         << "l2_d_*/l2_*_previous: " << l2_d_avg_u / l2_avg_u_previous << " " << l2_d_avg_v / l2_avg_v_previous << " " << l2_d_avg_w / l2_avg_w_previous << " " << l2_d_rmsf_u / l2_rmsf_u_previous << " " << l2_d_rmsf_v / l2_rmsf_v_previous << " " << l2_d_rmsf_w / l2_rmsf_w_previous << endl 
-         << "dt_RL: " << current_time - begin_actuation_time << endl;
+         << "reward terms: " 
+         << l2_d_avg_u / l2_avg_u_previous * 10.0 << " " 
+         << l2_d_avg_v * 0.01 << " "
+         << l2_d_avg_w * 0.01 << " "
+         << l2_d_rmsf_u / l2_rmsf_u_previous << " "
+         << l2_d_rmsf_v / l2_rmsf_v_previous << " " 
+         << l2_d_rmsf_w / l2_rmsf_w_previous << endl 
+         << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
     
     /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 avg_u_previous_field[I1D(i,j,k)]  = avg_u_field[I1D(i,j,k)];
-                avg_v_previous_field[I1D(i,j,k)]  = avg_v_field[I1D(i,j,k)];
-                avg_w_previous_field[I1D(i,j,k)]  = avg_w_field[I1D(i,j,k)];
                 rmsf_u_previous_field[I1D(i,j,k)] = rmsf_u_field[I1D(i,j,k)];
                 rmsf_v_previous_field[I1D(i,j,k)] = rmsf_v_field[I1D(i,j,k)];
                 rmsf_w_previous_field[I1D(i,j,k)] = rmsf_w_field[I1D(i,j,k)];
