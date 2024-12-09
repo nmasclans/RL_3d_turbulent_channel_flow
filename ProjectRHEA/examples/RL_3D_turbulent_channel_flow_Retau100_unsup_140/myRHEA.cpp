@@ -2031,7 +2031,7 @@ void myRHEA::calculateReward() {
     l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
     l2_rmsf_v_previous = std::sqrt( l2_rmsf_v_previous / total_volume_local);
     l2_rmsf_w_previous = std::sqrt( l2_rmsf_w_previous / total_volume_local);
-    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous ) \
+    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous * 10.0 ) \
                                    + ( l2_d_avg_v * 0.01 ) \
                                    + ( l2_d_avg_w * 0.01 ) \
                                    + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \
@@ -2041,14 +2041,14 @@ void myRHEA::calculateReward() {
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
          << "local reward: "  << reward_local << endl
-         << "l2_d_*/l2_*_previous: " 
-         << l2_d_avg_u / l2_avg_u_previous << " " 
+         << "reward terms: " 
+         << l2_d_avg_u / l2_avg_u_previous * 10.0 << " " 
          << l2_d_avg_v * 0.01 << " "
          << l2_d_avg_w * 0.01 << " "
          << l2_d_rmsf_u / l2_rmsf_u_previous << " "
          << l2_d_rmsf_v / l2_rmsf_v_previous << " " 
          << l2_d_rmsf_w / l2_rmsf_w_previous << endl 
-         << "dt_RL: " << current_time - begin_actuation_time << endl;
+         << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
     
     /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
