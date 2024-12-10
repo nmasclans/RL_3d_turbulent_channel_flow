@@ -15,7 +15,7 @@ using namespace std;
 #define _FEEDBACK_LOOP_BODY_FORCE_ 1				/// Activate feedback loop for the body force moving the flow
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
-#define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
+#define _REGULARIZE_RL_ACTION_ 0                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
 #define _RL_CONTROL_IS_SUPERVISED_ 0
 #define _SPATIAL_SMOOTHING_RL_ACTION_ 1
 #define _WITNESS_XZ_SLICES_ 1
