@@ -15,9 +15,9 @@ using namespace std;
 #define _FEEDBACK_LOOP_BODY_FORCE_ 1				/// Activate feedback loop for the body force moving the flow
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
-#define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
+#define _REGULARIZE_RL_ACTION_ 0                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
 #define _RL_CONTROL_IS_SUPERVISED_ 0
-#define _SPACE_AVERAGE_RL_ACTION_ 1
+#define _SPATIAL_SMOOTHING_RL_ACTION_ 1
 #define _WITNESS_XZ_SLICES_ 1
 #define _INCLUDE_RL_TIME_INTO_STATE_ 1
 
@@ -166,11 +166,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhou_field.setTopology(topo, "rl_f_rhou_field");
     rl_f_rhov_field.setTopology(topo, "rl_f_rhov_field");
     rl_f_rhow_field.setTopology(topo, "rl_f_rhow_field");
-#if _SPACE_AVERAGE_RL_ACTION_
+#if _SPATIAL_SMOOTHING_RL_ACTION_
     rl_f_rhou_field_aux.setTopology(topo, "rl_f_rhou_field_aux");
     rl_f_rhov_field_aux.setTopology(topo, "rl_f_rhov_field_aux");
     rl_f_rhow_field_aux.setTopology(topo, "rl_f_rhow_field_aux");
-#endif  /// of _SPACE_AVERAGE_RL_ACTION_
+#endif  /// of _SPATIAL_SMOOTHING_RL_ACTION_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -188,11 +188,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rmsf_w_reference_field.setTopology(topo, "rmsf_w_reference_field");
 #else
     avg_u_previous_field.setTopology(topo,  "avg_u_previous_field");
-    avg_v_previous_field.setTopology(topo,  "avg_v_previous_field");
-    avg_w_previous_field.setTopology(topo,  "avg_w_previous_field");
     rmsf_u_previous_field.setTopology(topo, "rmsf_u_previous_field");
     rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
     rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
+    ///rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
+    ///rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
 #endif  /// of _RL_CONTROL_IS_SUPERVISED_
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step);
     initSmartRedis();
@@ -522,7 +522,7 @@ void myRHEA::calculateSourceTerms() {
                     calculateReward();      /// update avg_u,v,w_previous_field, rmsf_u,v,w_previous_field for next reward calculation
                     updateState();
                     first_actuation_period_done = true;
-                    previous_actuation_time = previous_actuation_time + actuation_period;
+                    previous_actuation_time = current_time; /// TODO: modiy 'actuation_period' by 'current_time', check if still works
                     if (my_rank == 0) {
                         cout << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
                     }
@@ -536,11 +536,10 @@ void myRHEA::calculateSourceTerms() {
                         cout << endl << "[myRHEA::calculateSourceTerms] Performing SmartRedis communications (state, action, reward) at time instant " << current_time << endl;
                     }
 
-                    /// Save old action values and time - useful for interpolating to new action
-                    /// TODO: use action_global and action_global_previous for something (output writing) or delete them
-                    action_global_previous  = action_global;     // TODO: delete 'action_global_previous' if not used, only necessary when using smooth action with 'smoothControlFunction'
-                    previous_actuation_time = previous_actuation_time + actuation_period;   // TODO: delete if not used (if action smoothing is deactivated)
-
+                    /// Save old action values and time - useful for interpolating to new action in time
+                    action_global_previous  = action_global;
+                    previous_actuation_time = current_time;
+                    
                     // SmartRedis communications 
                     // Writing state, reward, time
                     updateState();
@@ -548,7 +547,7 @@ void myRHEA::calculateSourceTerms() {
                     calculateReward();                              /// update 'reward_local' attribute
                     manager->writeReward(reward_local, reward_key);
                     manager->writeTime(current_time, time_key);
-                    // Reading read action...
+                    // Reading new action...
                     manager->readAction(action_key);
                     action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = action_dim * n_rl_envs (currently only 1 action variable per rl env.)
                     /// action_local  = manager->getActionLocal();  /// action_local not used
@@ -560,359 +559,355 @@ void myRHEA::calculateSourceTerms() {
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_smartredis_communications" );
 
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->start( "rl_update_DeltaRij" );
-
-                    /// Calculate smooth action 
-                    /// OPTION 1 (smooth action implementation): if DeltaRii_field are re-calculated at each time instant,
-                    /// This option requires loop "if (current_time - previous_actuation_time >= actuation_period) {" to finish here!
-                    /// smoothControlFunction();        /// updates 'action_global_instant' 
-                    /// OPTION 2 (discrete non-smooth action implementation): if DeltaRii_field are calculated just once for each action, discrete value step
-                    for (int i_act=0; i_act<action_global_size2; i_act++) {
-                        action_global_instant[i_act] = action_global[i_act];
-                    }
-
-                    /// Initialize variables
-                    double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
-                    double DeltaRkk = 0.0, DeltaThetaZ = 0.0, DeltaThetaY = 0.0, DeltaThetaX = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
-                    double Rkk_inv, Akk;
-                    bool   isNegligibleAction, isNegligibleRkk;
-                    size_t actuation_idx;
-                    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
-                    
-                    /// Calculate DeltaRij = Rij_perturbated - Rij_original
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-
-                                /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
-                                if (action_mask[I1D(i,j,k)] != 0.0) {
-
-                                    /// Get perturbation values from RL agent
-                                    actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
-                                    if (action_dim == 1) {
-					DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-					DeltaThetaZ = 0.0;
-					DeltaThetaY = 0.0;
-					DeltaThetaX = 0.0;
-					DeltaXmap1  = 0.0;
-					DeltaXmap2  = 0.0;
-				    } else if (action_dim == 2) {
-				        DeltaRkk    = 0.0;
-                                        DeltaThetaZ = 0.0;
-                                        DeltaThetaY = 0.0;
-                                        DeltaThetaX = 0.0;
-                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 0];
-                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 1];
-				    } else if (action_dim == 3) {
-                                        DeltaRkk    = 0.0;
-                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
-                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
-                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
-                                        DeltaXmap1  = 0.0;
-                                        DeltaXmap2  = 0.0;
-				    } else if (action_dim == 5) {
-                                        DeltaRkk    = 0.0;
-                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
-                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
-                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
-                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 3];
-                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 4];
-                                    } else if (action_dim == 6) {
-                                        DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
-                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
-                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
-                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
-                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-                                    } else {
-                                        cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 1,2,3,5 and 6, but action_dim = " << action_dim << endl;
-                                        MPI_Abort( MPI_COMM_WORLD, 1);
-                                    }
-                                    
-                                    /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
-                                    isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
-                                    Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                                    isNegligibleRkk    = (abs(Rkk) < EPS);
-                                    if (isNegligibleAction || isNegligibleRkk) {
-                                        DeltaRxx_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRyy_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRzz_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRxy_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRxz_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRyz_field[I1D(i,j,k)] = 0.0;
-                                    } else {
-
-                                        /// Rkk is Rij trace (dof #1)
-                                        Rkk_inv = 1.0 / Rkk;
-
-                                        /// Build anisotropy tensor (symmetric, trace-free)
-                                        Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                                        Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                                        Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                                        Aij[1][0]  = Aij[0][1];
-                                        Aij[2][0]  = Aij[0][2];
-                                        Aij[2][1]  = Aij[1][2];
-
-                                        /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                                        Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                                        Aij[0][0] -= Akk / 3.0;
-                                        Aij[1][1] -= Akk / 3.0;
-                                        Aij[2][2] -= Akk / 3.0;
-
-                                        /// Aij eigen-decomposition
-                                        symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
-                                        sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
-
-                                        /// Eigen-vectors Euler Rotation angles (dof #2-4)
-                                        eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
-
-                                        /// Eigen-values Barycentric coordinates (dof #5-6)
-                                        eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
-
-                                        /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
-                                        /// Delta_* are standarized values between 'action_bounds' RL parameter
-                                        Rkk    = Rkk    * (1 + DeltaRkk);
-                                        thetaZ = thetaZ * (1 + DeltaThetaZ);
-                                        thetaY = thetaY * (1 + DeltaThetaY);
-                                        thetaX = thetaX * (1 + DeltaThetaX);
-                                        xmap1  = xmap1  * (1 + DeltaXmap1);
-                                        xmap2  = xmap2  * (1 + DeltaXmap2);
-
-                                        /// Enforce realizability to perturbed Rij d.o.f
-                                        enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
-
-                                        /// Calculate perturbed & realizable Rij
-                                        eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
-                                        barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
-                                        sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
-                                        Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
-
-                                        /// Calculate perturbed & realizable DeltaRij
-                                        DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
-                                        DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                                        DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
-                                        DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
-                                        DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
-                                        DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
-
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->stop( "rl_update_DeltaRij" );
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->start( "rl_update_control_term" );
-
-                    /// Initialize variables
-                    double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
-                    double delta_x, delta_y, delta_z;
-
-                    /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                
-                                /// Geometric stuff
-                                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
-                                
-                                /// Calculate DeltaRij derivatives
-                                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-
-                                /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                                rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                                rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                                rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
-#if _SPACE_AVERAGE_RL_ACTION_
-                                /// TODO: not necessary if averaging window size 3
-                                rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
-                                rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
-                                rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
-#endif  /// of _SPACE_AVERAGE_RL_ACTION_
-                            }
-                        }
-                    }
-
-#if _SPACE_AVERAGE_RL_ACTION_
-                    /// Calculate rl_f_rhou_field from rl_f_rhou_field_aux (idem. for v, w) + perform f_rl space averaging on bottom/top y boundaries of each mpi process 
-                    /// Allocate memory for sending/receiving boundary data slices
-                    int idx;
-                    int i_start = topo->iter_common[_INNER_][_INIX_]; int i_end = topo->iter_common[_INNER_][_ENDX_];
-                    int j_start = topo->iter_common[_INNER_][_INIY_]; int j_end = topo->iter_common[_INNER_][_ENDY_];
-                    int k_start = topo->iter_common[_INNER_][_INIZ_]; int k_end = topo->iter_common[_INNER_][_ENDZ_];
-                    int xz_slice_size = (i_end - i_start + 1) * (k_end - k_start + 1);
-                    /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                    vector<double> send_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
-                    vector<double> send_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
-                    /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                    vector<double> send_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
-                    vector<double> send_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
-                    /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                    vector<double> send_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
-                    vector<double> send_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
-
-                    /// Populate send_xz_slice_ymin_..., send_xz_slice_ymax_..., send_xz_slice_ymin2_... and send_xz_slice_ymax2_...  with boundary data
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                            idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                            /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                            send_xz_slice_ymin_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_start, k)]; 
-                            send_xz_slice_ymin_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_start, k)]; 
-                            send_xz_slice_ymin_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_start, k)];     
-                            send_xz_slice_ymax_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_end, k)];   
-                            send_xz_slice_ymax_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_end, k)];   
-                            send_xz_slice_ymax_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_end, k)]; 
-                            /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                            send_xz_slice_ymin2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+1, k)]; 
-                            send_xz_slice_ymin2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+1, k)]; 
-                            send_xz_slice_ymin2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+1, k)];     
-                            send_xz_slice_ymax2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-1, k)];   
-                            send_xz_slice_ymax2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-1, k)];   
-                            send_xz_slice_ymax2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-1, k)]; 
-                            /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                            send_xz_slice_ymin3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+2, k)]; 
-                            send_xz_slice_ymin3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+2, k)]; 
-                            send_xz_slice_ymin3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+2, k)];     
-                            send_xz_slice_ymax3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-2, k)];   
-                            send_xz_slice_ymax3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-2, k)];   
-                            send_xz_slice_ymax3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-2, k)]; 
-                        }
-                    }
-
-                    /// Exchange boundary data with neighboring processes
-                    /// Info: np_y == n_rl_envs == number of MPI processes (only distributed along y-coord)
-                    /// Arrays to hold MPI request handles
-                    MPI_Request requests[36];
-                    int req_count = 0;
-                    /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
-                    if (my_rank > 0) {
-                        /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
-                        /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
-                        /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
-                    }
-                    /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
-                    if (my_rank < (n_rl_envs - 1)) {
-                        /// >> 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
-                        /// >> 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
-                        /// >> 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
-                    }
-
-                    /// Wait for all non-blocking communication to complete
-                    MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
-                    cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " performed all data exchange for space-averaging rl action along y-coord on pseudo-environments (mpi processes) boundaries" << endl; 
-
-                    /// Apply action averaging in y-coord at the bottom/top y-coord boundaries of each mpi process
-                    /// Averaging window size: 7 
-                    /// > Averaging in pseudo-envioronments / mpi processes bottom boundary 
-                    if (my_rank > 0) {
-                        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                /// >> 1st xz_slice from bottom boundary
-                                rl_f_rhou_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhou[idx] + recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start,k)] );
-                                rl_f_rhov_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhov[idx] + recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start,k)] );
-                                rl_f_rhow_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhow[idx] + recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start,k)] );
-                                /// >> 2nd xz_slice from bottom boundary
-                                rl_f_rhou_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhov_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhow_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+1,k)] );
-                                /// >> 3rd xz_slice from bottom boundary
-                                rl_f_rhou_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+2,k)] );
-                                rl_f_rhov_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+2,k)] );
-                                rl_f_rhow_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+2,k)] );
-                            }
-                        }
-                    } 
-                    /// > Averaging in pseudo-envioronments / mpi processes top boundary 
-                    if (my_rank < (n_rl_envs - 1)) {
-                        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                /// >> 1st xz_slice from top boundary
-                                rl_f_rhou_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhou[idx] + recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end,k)] );
-                                rl_f_rhov_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhov[idx] + recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end,k)] );
-                                rl_f_rhow_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhow[idx] + recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end,k)] );
-                                /// >> 2nd xz_slice from top boundary
-                                rl_f_rhou_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhov_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhow_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-1,k)] );
-                                /// >> 3rd xz_slice from top boundary
-                                rl_f_rhou_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-2,k)] );
-                                rl_f_rhov_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-2,k)] );
-                                rl_f_rhow_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-2,k)] );
-                            }
-                        }
-                    }
-#endif /// of _SPACE_AVERAGE_RL_ACTION_
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->stop( "rl_update_control_term" );
-
                 }   /// end if ( !first_actuation_period_done )
             }       /// end if (current_time - previous_actuation_time >= actuation_period), new action was required
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->start( "rl_update_DeltaRij" );
+
+            /// Calculate smooth action in time
+            /// ALERT: this is costly because eigen-decomposition and DeltaRii_field are re-calculated at each time instant
+            /// ALERT: Time-smoothing option requires loop "if (current_time - previous_actuation_time >= actuation_period) {" to finish here!
+            smoothControlFunction();        /// updates 'action_global_instant' from action_global, action_global_previous, current_time, previous_actuation_time and actuation_period 
+
+            /// Initialize variables
+            double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
+            double DeltaRkk = 0.0, DeltaThetaZ = 0.0, DeltaThetaY = 0.0, DeltaThetaX = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
+            double Rkk_inv, Akk;
+            bool   isNegligibleAction, isNegligibleRkk;
+            size_t actuation_idx;
+            vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+            vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+            vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+            vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
+            
+            /// Calculate DeltaRij = Rij_perturbated - Rij_original
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+
+                        /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
+                        if (action_mask[I1D(i,j,k)] != 0.0) {
+
+                            /// Get perturbation values from RL agent
+                            actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
+                            if (action_dim == 1) {
+                                DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaZ = 0.0;
+                                DeltaThetaY = 0.0;
+                                DeltaThetaX = 0.0;
+                                DeltaXmap1  = 0.0;
+                                DeltaXmap2  = 0.0;
+                            } else if (action_dim == 2) {
+				                DeltaRkk    = 0.0;
+                                DeltaThetaZ = 0.0;
+                                DeltaThetaY = 0.0;
+                                DeltaThetaX = 0.0;
+                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 1];
+				            } else if (action_dim == 3) {
+                                DeltaRkk    = 0.0;
+                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaXmap1  = 0.0;
+                                DeltaXmap2  = 0.0;
+				            } else if (action_dim == 5) {
+                                DeltaRkk    = 0.0;
+                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 3];
+                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 4];
+                            } else if (action_dim == 6) {
+                                DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
+                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
+                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
+                            } else {
+                                cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 1,2,3,5 and 6, but action_dim = " << action_dim << endl;
+                                MPI_Abort( MPI_COMM_WORLD, 1);
+                            }
+                            
+                            /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
+                            isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                            Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                            isNegligibleRkk    = (abs(Rkk) < EPS);
+                            if (isNegligibleAction || isNegligibleRkk) {
+                                DeltaRxx_field[I1D(i,j,k)] = 0.0;
+                                DeltaRyy_field[I1D(i,j,k)] = 0.0;
+                                DeltaRzz_field[I1D(i,j,k)] = 0.0;
+                                DeltaRxy_field[I1D(i,j,k)] = 0.0;
+                                DeltaRxz_field[I1D(i,j,k)] = 0.0;
+                                DeltaRyz_field[I1D(i,j,k)] = 0.0;
+                            } else {
+
+                                /// Rkk is Rij trace (dof #1)
+                                Rkk_inv = 1.0 / Rkk;
+
+                                /// Build anisotropy tensor (symmetric, trace-free)
+                                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                                Aij[1][0]  = Aij[0][1];
+                                Aij[2][0]  = Aij[0][2];
+                                Aij[2][1]  = Aij[1][2];
+
+                                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                                Aij[0][0] -= Akk / 3.0;
+                                Aij[1][1] -= Akk / 3.0;
+                                Aij[2][2] -= Akk / 3.0;
+
+                                /// Aij eigen-decomposition
+                                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
+                                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
+
+                                /// Eigen-vectors Euler Rotation angles (dof #2-4)
+                                eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+
+                                /// Eigen-values Barycentric coordinates (dof #5-6)
+                                eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
+
+                                /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
+                                /// Delta_* are standarized values between 'action_bounds' RL parameter
+                                Rkk    = Rkk    * (1 + DeltaRkk);
+                                thetaZ = thetaZ * (1 + DeltaThetaZ);
+                                thetaY = thetaY * (1 + DeltaThetaY);
+                                thetaX = thetaX * (1 + DeltaThetaX);
+                                xmap1  = xmap1  * (1 + DeltaXmap1);
+                                xmap2  = xmap2  * (1 + DeltaXmap2);
+
+                                /// Enforce realizability to perturbed Rij d.o.f
+                                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+
+                                /// Calculate perturbed & realizable Rij
+                                eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                                barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
+                                sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
+                                Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+
+                                /// Calculate perturbed & realizable DeltaRij
+                                DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
+                                DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                                DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                                DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                                DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                                DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+
+                            }
+                        }
+                    }
+                }
+            }
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->stop( "rl_update_DeltaRij" );
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->start( "rl_update_control_term" );
+
+            /// Initialize variables
+            double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
+            double delta_x, delta_y, delta_z;
+
+            /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        
+                        /// Geometric stuff
+                        delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                        delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                        delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                        
+                        /// Calculate DeltaRij derivatives
+                        d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                        d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                        d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                        d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                        d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                        d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                        d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                        d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                        d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+
+                        /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+                        rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                        rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                        rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+#if _SPATIAL_SMOOTHING_RL_ACTION_
+                        /// TODO: not necessary if averaging window size 3
+                        rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
+                        rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
+                        rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
+#endif  /// of _SPATIAL_SMOOTHING_RL_ACTION_
+                    }
+                }
+            }
+
+#if _SPATIAL_SMOOTHING_RL_ACTION_
+            /// Calculate rl_f_rhou_field from rl_f_rhou_field_aux (idem. for v, w) + perform f_rl space averaging on bottom/top y boundaries of each mpi process 
+            /// Allocate memory for sending/receiving boundary data slices
+            int idx;
+            int i_start = topo->iter_common[_INNER_][_INIX_]; int i_end = topo->iter_common[_INNER_][_ENDX_];
+            int j_start = topo->iter_common[_INNER_][_INIY_]; int j_end = topo->iter_common[_INNER_][_ENDY_];
+            int k_start = topo->iter_common[_INNER_][_INIZ_]; int k_end = topo->iter_common[_INNER_][_ENDZ_];
+            int xz_slice_size = (i_end - i_start + 1) * (k_end - k_start + 1);
+            /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+            vector<double> send_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
+            vector<double> send_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
+            /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+            vector<double> send_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
+            vector<double> send_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
+            /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+            vector<double> send_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
+            vector<double> send_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
+
+            /// Populate send_xz_slice_ymin_..., send_xz_slice_ymax_..., send_xz_slice_ymin2_... and send_xz_slice_ymax2_...  with boundary data
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                    idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                    /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                    send_xz_slice_ymin_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_start, k)]; 
+                    send_xz_slice_ymin_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_start, k)]; 
+                    send_xz_slice_ymin_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_start, k)];     
+                    send_xz_slice_ymax_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_end, k)];   
+                    send_xz_slice_ymax_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_end, k)];   
+                    send_xz_slice_ymax_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_end, k)]; 
+                    /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                    send_xz_slice_ymin2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+1, k)]; 
+                    send_xz_slice_ymin2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+1, k)]; 
+                    send_xz_slice_ymin2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+1, k)];     
+                    send_xz_slice_ymax2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-1, k)];   
+                    send_xz_slice_ymax2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-1, k)];   
+                    send_xz_slice_ymax2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-1, k)]; 
+                    /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                    send_xz_slice_ymin3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+2, k)]; 
+                    send_xz_slice_ymin3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+2, k)]; 
+                    send_xz_slice_ymin3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+2, k)];     
+                    send_xz_slice_ymax3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-2, k)];   
+                    send_xz_slice_ymax3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-2, k)];   
+                    send_xz_slice_ymax3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-2, k)]; 
+                }
+            }
+
+            /// Exchange boundary data with neighboring processes
+            /// Info: np_y == n_rl_envs == number of MPI processes (only distributed along y-coord)
+            /// Arrays to hold MPI request handles
+            MPI_Request requests[36];
+            int req_count = 0;
+            /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
+            if (my_rank > 0) {
+                /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
+                /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
+                /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
+            }
+            /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
+            if (my_rank < (n_rl_envs - 1)) {
+                /// >> 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
+                /// >> 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
+                /// >> 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
+            }
+
+            /// Wait for all non-blocking communication to complete
+            MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
+            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " performed all data exchange for space-averaging rl action along y-coord on pseudo-environments (mpi processes) boundaries" << endl; 
+
+            /// Apply action averaging in y-coord at the bottom/top y-coord boundaries of each mpi process
+            /// Averaging window size: 7 
+            /// > Averaging in pseudo-envioronments / mpi processes bottom boundary 
+            if (my_rank > 0) {
+                for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                        /// >> 1st xz_slice from bottom boundary
+                        rl_f_rhou_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhou[idx] + recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start,k)] );
+                        rl_f_rhov_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhov[idx] + recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start,k)] );
+                        rl_f_rhow_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhow[idx] + recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start,k)] );
+                        /// >> 2nd xz_slice from bottom boundary
+                        rl_f_rhou_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+1,k)] );
+                        rl_f_rhov_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+1,k)] );
+                        rl_f_rhow_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+1,k)] );
+                        /// >> 3rd xz_slice from bottom boundary
+                        rl_f_rhou_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+2,k)] );
+                        rl_f_rhov_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+2,k)] );
+                        rl_f_rhow_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+2,k)] );
+                    }
+                }
+            } 
+            /// > Averaging in pseudo-envioronments / mpi processes top boundary 
+            if (my_rank < (n_rl_envs - 1)) {
+                for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                        /// >> 1st xz_slice from top boundary
+                        rl_f_rhou_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhou[idx] + recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end,k)] );
+                        rl_f_rhov_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhov[idx] + recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end,k)] );
+                        rl_f_rhow_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhow[idx] + recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end,k)] );
+                        /// >> 2nd xz_slice from top boundary
+                        rl_f_rhou_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-1,k)] );
+                        rl_f_rhov_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-1,k)] );
+                        rl_f_rhow_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-1,k)] );
+                        /// >> 3rd xz_slice from top boundary
+                        rl_f_rhou_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-2,k)] );
+                        rl_f_rhov_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-2,k)] );
+                        rl_f_rhow_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-2,k)] );
+                    }
+                }
+            }
+#endif /// of _SPATIAL_SMOOTHING_RL_ACTION_
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->stop( "rl_update_control_term" );
+
 
         } else {    /// current_time <= begin_actuation_time
 
@@ -1969,7 +1964,7 @@ void myRHEA::updateState() {
 /// If _RL_CONTROL_IS_SUPERVISED_ 1:
 /// -> updates attributes: reward_local
 /// else _RL_CONTROL_IS_SUPERVISED_ 0:
-/// -> updates attributes: reward_local, avg_u_previous_field, avg_v_previous_field, avg_w_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field
+/// -> updates attributes: reward_local, avg_u_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field
 void myRHEA::calculateReward() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -2027,9 +2022,9 @@ void myRHEA::calculateReward() {
 
 #else                           /// Unsupervised Reward
     /// Initialize variables
-    double l2_d_avg_u = 0.0,  l2_d_avg_v = 0.0,  l2_d_avg_w = 0.0;
+    double l2_d_avg_u = 0.0, l2_d_avg_v = 0.0, l2_d_avg_w = 0.0;
     double l2_d_rmsf_u = 0.0, l2_d_rmsf_v = 0.0, l2_d_rmsf_w = 0.0; 
-    double l2_avg_u_previous = 0.0,  l2_avg_v_previous = 0.0,  l2_avg_w_previous = 0.0;
+    double l2_avg_u_previous  = 0.0;
     double l2_rmsf_u_previous = 0.0, l2_rmsf_v_previous = 0.0, l2_rmsf_w_previous = 0.0; 
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
@@ -2044,14 +2039,12 @@ void myRHEA::calculateReward() {
                 delta_volume =  delta_x * delta_y * delta_z;
                 /// Calculate volume-averaged l2_d_avg_u & l2_d_rmsf_u
                 l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - avg_v_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - avg_w_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
+                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
+                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
                 l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_avg_u_previous  += std::pow(avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_avg_v_previous  += std::pow(avg_v_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_avg_w_previous  += std::pow(avg_w_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
                 l2_rmsf_u_previous += std::pow(rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rmsf_v_previous += std::pow(rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rmsf_w_previous += std::pow(rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
@@ -2066,14 +2059,12 @@ void myRHEA::calculateReward() {
     l2_d_rmsf_v        = std::sqrt( l2_d_rmsf_v / total_volume_local);
     l2_d_rmsf_w        = std::sqrt( l2_d_rmsf_w / total_volume_local);
     l2_avg_u_previous  = std::sqrt( l2_avg_u_previous  / total_volume_local);
-    l2_avg_v_previous  = std::sqrt( l2_avg_v_previous  / total_volume_local);
-    l2_avg_w_previous  = std::sqrt( l2_avg_w_previous  / total_volume_local);
     l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
     l2_rmsf_v_previous = std::sqrt( l2_rmsf_v_previous / total_volume_local);
     l2_rmsf_w_previous = std::sqrt( l2_rmsf_w_previous / total_volume_local);
-    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous ) \
-                                   + ( l2_d_avg_v / l2_avg_v_previous ) \
-                                   + ( l2_d_avg_w / l2_avg_w_previous ) \
+    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous * 10.0 ) \
+                                   + ( l2_d_avg_v * 0.01 ) \
+                                   + ( l2_d_avg_w * 0.01 ) \
                                    + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \
                                    + ( l2_d_rmsf_v / l2_rmsf_v_previous ) \
                                    + ( l2_d_rmsf_w / l2_rmsf_w_previous ) ) ) * std::pow(current_time - begin_actuation_time, 2.0);
@@ -2081,16 +2072,20 @@ void myRHEA::calculateReward() {
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
          << "local reward: "  << reward_local << endl
-         << "l2_d_*/l2_*_previous: " << l2_d_avg_u / l2_avg_u_previous << " " << l2_d_avg_v / l2_avg_v_previous << " " << l2_d_avg_w / l2_avg_w_previous << " " << l2_d_rmsf_u / l2_rmsf_u_previous << " " << l2_d_rmsf_v / l2_rmsf_v_previous << " " << l2_d_rmsf_w / l2_rmsf_w_previous << endl 
-         << "dt_RL: " << current_time - begin_actuation_time << endl;
+         << "reward terms: " 
+         << l2_d_avg_u / l2_avg_u_previous * 10.0 << " " 
+         << l2_d_avg_v * 0.01 << " "
+         << l2_d_avg_w * 0.01 << " "
+         << l2_d_rmsf_u / l2_rmsf_u_previous << " "
+         << l2_d_rmsf_v / l2_rmsf_v_previous << " " 
+         << l2_d_rmsf_w / l2_rmsf_w_previous << endl 
+         << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
     
     /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 avg_u_previous_field[I1D(i,j,k)]  = avg_u_field[I1D(i,j,k)];
-                avg_v_previous_field[I1D(i,j,k)]  = avg_v_field[I1D(i,j,k)];
-                avg_w_previous_field[I1D(i,j,k)]  = avg_w_field[I1D(i,j,k)];
                 rmsf_u_previous_field[I1D(i,j,k)] = rmsf_u_field[I1D(i,j,k)];
                 rmsf_v_previous_field[I1D(i,j,k)] = rmsf_v_field[I1D(i,j,k)];
                 rmsf_w_previous_field[I1D(i,j,k)] = rmsf_w_field[I1D(i,j,k)];
@@ -2102,7 +2097,7 @@ void myRHEA::calculateReward() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Update 'action_global_instant' - smooth transition from action_global_previous and action_global during all actuation_period
+/// Updates 'action_global_instant' - smooth transition from action_global_previous and action_global during all actuation_period
 void myRHEA::smoothControlFunction() {
     double actuation_period_fraction, f1, f2, f3;
     actuation_period_fraction = ( current_time - previous_actuation_time ) / actuation_period;
