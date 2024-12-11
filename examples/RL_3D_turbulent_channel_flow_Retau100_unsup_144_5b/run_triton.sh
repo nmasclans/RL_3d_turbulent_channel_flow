@@ -14,7 +14,7 @@ trap cleanup SIGINT SIGTERM
 # Environmental variables
 REPO_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
-export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144
+export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144_5b
 export RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144_5b
 export SMARTRHEA_PATH=$REPO_DIR/smartrhea
 
@@ -37,12 +37,12 @@ rm -fr __pycache__/
 rm -f temporal_point_probe_*.csv
 
 # Compile ProjectRHEA code
-#echo ">>> Compiling ProjectRHEA..."
-#cd "$RHEA_CASE_PATH"
-#make clean
-#make RL_CASE_PATH=$RL_CASE_PATH RHEA_PATH=$RHEA_PATH
-#echo ">>> ProjectRHEA compiled!"
-#cd "$RL_CASE_PATH"
+echo ">>> Compiling ProjectRHEA..."
+cd "$RHEA_CASE_PATH"
+make clean
+make RL_CASE_PATH=$RL_CASE_PATH RHEA_PATH=$RHEA_PATH
+echo ">>> ProjectRHEA compiled!"
+cd "$RL_CASE_PATH"
 
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"
