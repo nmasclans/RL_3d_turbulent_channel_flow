@@ -6,7 +6,7 @@ t_action = 0.02         # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
-cfd_n_envs = 1          # num. cfd simulations run in parallel
+cfd_n_envs = 4          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 mode = "train"          # "train" or "eval"
 
