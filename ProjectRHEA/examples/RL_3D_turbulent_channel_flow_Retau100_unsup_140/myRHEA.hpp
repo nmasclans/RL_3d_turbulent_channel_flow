@@ -29,22 +29,25 @@ class myRHEA : public FlowSolverRHEA {
 	////////// SOLVER METHODS //////////
         
         /// Set initial conditions: u, v, w, P and T ... needs to be modified/overwritten according to the problem under consideration
-        void setInitialConditions();
+        void setInitialConditions() override;
 
         /// Calculate rhou, rhov, rhow and rhoE source terms ... needs to be modified/overwritten according to the problem under consideration
-        void calculateSourceTerms();
+        void calculateSourceTerms() override;
 
         /// Temporal hook function ... needs to be modified/overwritten according to the problem under consideration
-        void temporalHookFunction();
+        void temporalHookFunction() override;
 	
  	    /// Calculate fixed time step
-        void calculateTimeStep();
+        void calculateTimeStep() override;
 
         /// Output current solver state data, in dedicated RL directory '$RL_CASE_PATH/rhea_exp/output_data'
         void outputCurrentStateDataRL( std::string path);
 
         /// Advance conserved variables in time
-        void timeAdvanceConservedVariables();
+        void timeAdvanceConservedVariables() override;
+
+        /// Output temporal point probes data
+        void outputTemporalPointProbesData() override;
 
     protected:
 
@@ -63,8 +66,8 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray DeltaRzz_field;               /// 3-D field of DeltaRzz
         DistributedArray avg_u_reference_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         DistributedArray rmsf_u_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
-        ///DistributedArray rmsf_v_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
-        ///DistributedArray rmsf_w_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_v_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_w_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         DistributedArray avg_u_previous_field;         /// only if _RL_CONTROL_IS_SUPERVISED_ 0
         DistributedArray rmsf_u_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
         DistributedArray rmsf_v_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
