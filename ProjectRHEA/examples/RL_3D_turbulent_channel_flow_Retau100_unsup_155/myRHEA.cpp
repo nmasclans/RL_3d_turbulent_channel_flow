@@ -983,13 +983,13 @@ void myRHEA::outputCurrentStateDataRL( string path ) {
 
 };
 
-/// TODO: check, remove function if not used anymore for checks
+
 void myRHEA::timeAdvanceConservedVariables() {
 
-    /// TODO: check, remove lines below
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
+    /// TODO: check, remove lines below
     /// Debugging variables
     double rhou_inv_flux_ratio   = 0.0;
     double rhou_vis_flux_ratio   = 0.0;
@@ -1138,7 +1138,15 @@ void myRHEA::timeAdvanceConservedVariables() {
     }
 
 };
-/// TODO: end remove
+
+
+void myRHEA::outputTemporalPointProbesData() {
+
+    if (tag == "0") {
+        FlowSolverRHEA::outputTemporalPointProbesData();
+    }
+
+};
 
 
 ///////////////////////////////////////////////////////////////////////////////
