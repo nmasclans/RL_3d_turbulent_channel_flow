@@ -15,7 +15,7 @@ trap cleanup SIGINT SIGTERM
 REPO_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
 export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144
-export RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144
+export RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144_5b
 export SMARTRHEA_PATH=$REPO_DIR/smartrhea
 
 # add shared dynamic libraries
@@ -33,6 +33,8 @@ export SMARTSIM_LOG_LEVEL="DEBUG"
 
 # Remove .out and .err files, if necessary
 rm -f ensemble.out ensemble.err
+rm -fr __pycache__/
+rm -f temporal_point_probe_*.csv
 
 # Compile ProjectRHEA code
 #echo ">>> Compiling ProjectRHEA..."
