@@ -35,12 +35,12 @@ export SMARTSIM_LOG_LEVEL="DEBUG"
 rm -f ensemble.out ensemble.err
 
 # Compile ProjectRHEA code
-echo ">>> Compiling ProjectRHEA..."
-cd "$RHEA_CASE_PATH"
-make clean
-make RL_CASE_PATH=$RL_CASE_PATH RHEA_PATH=$RHEA_PATH
-echo ">>> ProjectRHEA compiled!"
-cd "$RL_CASE_PATH"
+#echo ">>> Compiling ProjectRHEA..."
+#cd "$RHEA_CASE_PATH"
+#make clean
+#make RL_CASE_PATH=$RL_CASE_PATH RHEA_PATH=$RHEA_PATH
+#echo ">>> ProjectRHEA compiled!"
+#cd "$RL_CASE_PATH"
 
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"
