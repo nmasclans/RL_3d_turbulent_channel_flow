@@ -19,13 +19,14 @@ from matplotlib import rc, rcParams
 # --- Get CASE parameters ---
 
 try :
-    iteration  = sys.argv[1]
-    ensemble   = sys.argv[2]
-    train_name = sys.argv[3]
-    Re_tau     = float(sys.argv[4])     # Friction Reynolds number [-]
-    dt_phys    = float(sys.argv[5])
-    case_dir   = sys.argv[6]
-    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Case directory: {case_dir}")
+    iteration       = sys.argv[1]
+    ensemble        = sys.argv[2]
+    train_name      = sys.argv[3]
+    Re_tau          = float(sys.argv[4])     # Friction Reynolds number [-]
+    dt_phys         = float(sys.argv[5])
+    t_episode_train = float(sys.argv[6])
+    case_dir        = sys.argv[7]
+    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir}")
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
 
@@ -48,8 +49,6 @@ iteration_max_nonRL = 4000000
 max_length_legend_RL = 10
 
 # RL parameters
-t_episode_train = 1.0
-dt_phys = 1e-4
 cfd_n_envs = 1
 rl_n_envs  = 8
 simulation_time_per_train_step   = t_episode_train                    # total cfd simulated time per training step (in parallel per each cfd_n_envs)
