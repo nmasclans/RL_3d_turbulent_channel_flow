@@ -2017,7 +2017,7 @@ void myRHEA::calculateReward() {
                              + ( l2_err_rmsf_u / l2_rmsf_u_reference ) \
                              + ( l2_err_rmsf_v / l2_rmsf_v_reference ) \
                              + ( l2_err_rmsf_w / l2_rmsf_w_reference ) \
-                            ) ) * std::pow(current_time - begin_actuation_time, 4.0);
+                            ) ) * std::pow(current_time - begin_actuation_time, 3.0);
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
          << l2_err_avg_u  / l2_avg_u_reference * 10.0 << " " 
@@ -2075,7 +2075,7 @@ void myRHEA::calculateReward() {
                                    + ( l2_d_avg_w * 0.01 ) \
                                    + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \
                                    + ( l2_d_rmsf_v / l2_rmsf_v_previous ) \
-                                   + ( l2_d_rmsf_w / l2_rmsf_w_previous ) ) ) * std::pow(current_time - begin_actuation_time, 2.0);
+                                   + ( l2_d_rmsf_w / l2_rmsf_w_previous ) ) ) * std::pow(current_time - begin_actuation_time, 3.0);
 
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
