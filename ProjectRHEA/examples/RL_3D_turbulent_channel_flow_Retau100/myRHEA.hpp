@@ -29,22 +29,25 @@ class myRHEA : public FlowSolverRHEA {
 	////////// SOLVER METHODS //////////
         
         /// Set initial conditions: u, v, w, P and T ... needs to be modified/overwritten according to the problem under consideration
-        void setInitialConditions();
+        void setInitialConditions() override;
 
         /// Calculate rhou, rhov, rhow and rhoE source terms ... needs to be modified/overwritten according to the problem under consideration
-        void calculateSourceTerms();
+        void calculateSourceTerms() override;
 
         /// Temporal hook function ... needs to be modified/overwritten according to the problem under consideration
-        void temporalHookFunction();
+        void temporalHookFunction() override;
 	
  	    /// Calculate fixed time step
-        void calculateTimeStep();
+        void calculateTimeStep() override;
 
         /// Output current solver state data, in dedicated RL directory '$RL_CASE_PATH/rhea_exp/output_data'
         void outputCurrentStateDataRL( std::string path);
 
         /// Advance conserved variables in time
-        void timeAdvanceConservedVariables();
+        void timeAdvanceConservedVariables() override;
+
+        /// Output temporal point probes data
+        void outputTemporalPointProbesData() override;
 
     protected:
 
@@ -52,27 +55,36 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field;
         DistributedArray rl_f_rhov_field;
         DistributedArray rl_f_rhow_field;
-        DistributedArray DeltaRxx_field;        /// 3-D field of DeltaRxx
-        DistributedArray DeltaRxy_field;        /// 3-D field of DeltaRxy
-        DistributedArray DeltaRxz_field;        /// 3-D field of DeltaRxz
-        DistributedArray DeltaRyy_field;        /// 3-D field of DeltaRyy
-        DistributedArray DeltaRyz_field;        /// 3-D field of DeltaRyz
-        DistributedArray DeltaRzz_field;        /// 3-D field of DeltaRzz
-        DistributedArray rmsf_u_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
-        DistributedArray rmsf_v_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
-        DistributedArray rmsf_w_reference_field;    /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rl_f_rhou_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
+        DistributedArray rl_f_rhov_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
+        DistributedArray rl_f_rhow_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
+        DistributedArray DeltaRxx_field;               /// 3-D field of DeltaRxx
+        DistributedArray DeltaRxy_field;               /// 3-D field of DeltaRxy
+        DistributedArray DeltaRxz_field;               /// 3-D field of DeltaRxz
+        DistributedArray DeltaRyy_field;               /// 3-D field of DeltaRyy
+        DistributedArray DeltaRyz_field;               /// 3-D field of DeltaRyz
+        DistributedArray DeltaRzz_field;               /// 3-D field of DeltaRzz
+        DistributedArray avg_u_reference_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_u_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_v_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_w_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray avg_u_previous_field;         /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray rmsf_u_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray rmsf_v_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray rmsf_w_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
 
         /// Witness points
         std::string witness_file;
         std::vector<TemporalPointProbe> temporal_witness_probes;
-        std::vector<double> twp_x_positions;
+        std::vector<double> twp_x_positions;        /// only used if _WITNESS_XZ_PLANES_ 0
         std::vector<double> twp_y_positions;
-        std::vector<double> twp_z_positions;
+        std::vector<double> twp_z_positions;        /// only used if _WITNESS_XZ_PLANES_ 0
         int num_witness_probes;
 
         /// Cubic control regions
         DistributedArray action_mask;
         std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
+        std::vector<double> control_cubes_y_central;
         std::string control_cubes_file; 
         int num_control_cubes;
         int num_control_points;
@@ -95,17 +107,6 @@ class myRHEA : public FlowSolverRHEA {
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
         int action_global_size2;                 /// or nRectangleControl
-        double rmsf_u_field_local;               /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_v_field_local;               /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_w_field_local;               /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_u_field_local_previous;      /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_v_field_local_previous;      /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_w_field_local_previous;      /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_u_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_v_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double rmsf_w_field_local_two_previous;  /// only used if _RL_CONTROL_IS_SUPERVISED_ 0
-        double l1_error_current;                 /// only used if _RL_CONTROL_IS_SUPERVISED_ 1
-        double l1_error_previous;                /// only used if _RL_CONTROL_IS_SUPERVISED_ 1
         double reward_local;
         std::vector<double> action_global;
         std::vector<double> action_global_previous;

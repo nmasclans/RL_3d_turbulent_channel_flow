@@ -6,17 +6,20 @@
 #include <numeric>
 #include <algorithm>
 #include <cmath>        // std::pow
+#include <math.h>       // M_PI constant
 
 using namespace std;
 
 ////////// COMPILATION DIRECTIVES //////////
 /// TODO: move these env parameters to an .h to be included by SmartRedisManager.cpp & .h files 
-#define _FEEDBACK_LOOP_BODY_FORCE_ 0				/// Activate feedback loop for the body force moving the flow
-#define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
+#define _FEEDBACK_LOOP_BODY_FORCE_ 1				/// Activate feedback loop for the body force moving the flow
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
-#define _REGULARIZE_RL_ACTION_ 1                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
-#define _SPACE_AVERAGE_RL_ACTION_ 1
-#define _RL_CONTROL_IS_SUPERVISED_ 1
+#define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
+#define _REGULARIZE_RL_ACTION_ 0                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
+#define _RL_CONTROL_IS_SUPERVISED_ 1 
+#define _SPATIAL_SMOOTHING_RL_ACTION_ 1
+#define _WITNESS_XZ_SLICES_ 1
+#define _INCLUDE_RL_TIME_INTO_STATE_ 1
 
 /// Pi number
 //const double pi = 2.0*asin( 1.0 );
@@ -66,11 +69,7 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 #if _REGULARIZE_RL_ACTION_
-const double reg_lambda = 0.5;
-#endif
-
-#if _SPACE_AVERAGE_RL_ACTION_
-const double dy_space_averaging = 0.1;
+const vector<double> reg_lambda_vect = {0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.55, 0.55};    /// TODO: add check somewhere, length must correspond to num. nodes total, and num. nodes along y-axis
 #endif
 
 int action_dim = 6;
@@ -103,48 +102,61 @@ const vector<vector<double>> Deltaij = {
 };
 
 #if _RL_CONTROL_IS_SUPERVISED_
-// Reference profiles (_ALL_ coordinates, including boundaries)
+// Reference profiles (_ALL_ coordinates, not including boundaries)
+double avg_u_reference_profile[] = {   /// only inner points
+    1.56250681,  4.53208987,  7.1319341,   9.21610755,  10.80941713, 12.01061986,
+    12.92394768, 13.63084145, 14.19101597, 14.64527649, 15.02198375, 15.34038925,
+    15.61407404, 15.8526443,  16.06328415, 16.25131431, 16.42061089, 16.57378995,
+    16.71267302, 16.83863397, 16.95284802, 17.05627761, 17.1496196,  17.23328929,
+    17.3074833,  17.37228527, 17.42777158, 17.47402154, 17.51107657, 17.53892986,
+    17.55755075, 17.56688639, 17.56688639, 17.55755075, 17.53892986, 17.51107657,
+    17.47402154, 17.42777158, 17.37228527, 17.3074833,  17.23328929, 17.1496196,
+    17.05627761, 16.95284802, 16.83863397, 16.71267302, 16.57378995, 16.42061089,
+    16.25131431, 16.06328415, 15.8526443,  15.61407404, 15.34038925, 15.02198375,
+    14.64527649, 14.19101597, 13.63084145, 12.92394768, 12.01061986, 10.80941713,
+    9.21610755,  7.1319341,   4.53208987,  1.56250681,
+};
 double rmsf_u_reference_profile[] = {   /// only inner points
-    0.51150471, 1.45835662, 2.11404174, 2.44017584, 2.54703401,
-    2.53763372, 2.47299457, 2.38526539, 2.29087569, 2.19823627, 2.11135341,
-    2.03182011, 1.9603063,  1.89640688, 1.83874786, 1.78562372, 1.73589045,
-    1.68926942, 1.64582258, 1.60539581, 1.56771906, 1.53270985, 1.50052829,
-    1.47134978, 1.44525996, 1.42221959, 1.40212976, 1.38502714, 1.37109622,
-    1.36058096, 1.35369685, 1.35057738, 1.35123427, 1.3555985,  1.36360569,
-    1.37521577, 1.39033546, 1.40873267, 1.43011968, 1.4542445,  1.4809011,
-    1.50987913, 1.54098663, 1.57436436, 1.6104301,  1.64961678, 1.69243293,
-    1.73938057, 1.79090939, 1.84761624, 1.91010811, 1.97861765, 2.05301811,
-    2.13364007, 2.22065781, 2.31311318, 2.40742388, 2.49523502, 2.55948262,
-    2.56722702, 2.4570923,  2.12806339, 1.47013439, 0.51661591,
+    0.51420372, 1.46461524, 2.12115121, 2.44822476, 2.55641146, 2.54775172,
+    2.48329431, 2.39547355, 2.30102961, 2.20835085, 2.12122626, 2.04096227,
+    1.9678679,  1.90159865, 1.84149707, 1.78657356, 1.73595965, 1.68921476,
+    1.64614762, 1.60641594, 1.56960547, 1.53545274, 1.5038238,  1.47474421,
+    1.4483624,  1.42476202, 1.40400397, 1.38624215, 1.37171104, 1.36065011,
+    1.35321591, 1.34948453, 1.34948453, 1.35321591, 1.36065011, 1.37171104,
+    1.38624215, 1.40400397, 1.42476202, 1.4483624,  1.47474421, 1.5038238,
+    1.53545274, 1.56960547, 1.60641594, 1.64614762, 1.68921476, 1.73595965,
+    1.78657356, 1.84149707, 1.90159865, 1.9678679,  2.04096227, 2.12122626,
+    2.20835085, 2.30102961, 2.39547355, 2.48329431, 2.54775172, 2.55641146,
+    2.44822476, 2.12115121, 1.46461524, 0.51420372,
 };
 double rmsf_v_reference_profile[] = {   /// only inner points
-    0.01650155, 0.08181275, 0.16729574, 0.24822572, 0.32499139,
-    0.39233852, 0.45178113, 0.50177154, 0.54370385, 0.57736409, 0.60390731,
-    0.62361946, 0.63748449, 0.6460212,  0.65020967, 0.65063157, 0.64800714,
-    0.64280504, 0.63565974, 0.62707176, 0.61758074, 0.60754187, 0.59728562,
-    0.58702418, 0.57698958, 0.56738207, 0.55846834, 0.55051633, 0.54382089,
-    0.53863505, 0.53516008, 0.5334955,  0.53365564, 0.53558278, 0.5391632,
-    0.54424361, 0.55062734, 0.5581099,  0.56645285, 0.57543321, 0.58480146,
-    0.59433624, 0.60376919, 0.61284912, 0.62120998, 0.6285256,  0.6343766,
-    0.63843548, 0.64019427, 0.63920571, 0.6346971,  0.62610772, 0.61264217,
-    0.59382854, 0.56853613, 0.53636736, 0.49601822, 0.44754995, 0.38951674,
-    0.32335627, 0.24746871, 0.1671392,  0.08202398, 0.01678448,
+    0.01665036, 0.0819584,  0.16730256, 0.24795548, 0.32427953, 0.39101187,
+    0.44971311, 0.49887803, 0.53992747, 0.57274725, 0.59858818, 0.61780168,
+    0.63145149, 0.64002939, 0.64441306, 0.64516155, 0.6430155,  0.6384253,
+    0.63195878, 0.62403478, 0.6151404,  0.60561876, 0.5958134,  0.58594603,
+    0.57625823, 0.56695901, 0.55830965, 0.55056118, 0.54398771, 0.53882548,
+    0.53527766, 0.53347188, 0.53347188, 0.53527766, 0.53882548, 0.54398771,
+    0.55056118, 0.55830965, 0.56695901, 0.57625823, 0.58594603, 0.5958134,
+    0.60561876, 0.6151404,  0.62403478, 0.63195878, 0.6384253,  0.6430155,
+    0.64516155, 0.64441306, 0.64002939, 0.63145149, 0.61780168, 0.59858818,
+    0.57274725, 0.53992747, 0.49887803, 0.44971311, 0.39101187, 0.32427953,
+    0.24795548, 0.16730256, 0.0819584,  0.01665036,
 };
 double rmsf_w_reference_profile[] = {   /// only inner points
-    0.20571631, 0.41576762, 0.54813711, 0.63775117, 0.70223838,
-    0.74644498, 0.77708618, 0.79799458, 0.81192009, 0.8205753,  0.824915,
-    0.82531996, 0.82188959, 0.81515366, 0.8056561,  0.7941513,  0.78086151,
-    0.7658519,  0.74924255, 0.73137574, 0.71271056, 0.6938646,  0.67540599,
-    0.65780804, 0.64143427, 0.62666719, 0.61382452, 0.60310661, 0.59457335,
-    0.58818177, 0.58387553, 0.58174093, 0.58199005, 0.58478415, 0.59008226,
-    0.59765905, 0.60728489, 0.6188314,  0.63219725, 0.64709561, 0.66309653,
-    0.6797968,  0.69692535, 0.71425501, 0.73158266, 0.74859145, 0.76483269,
-    0.77968062, 0.79265889, 0.80346704, 0.81196701, 0.81778646, 0.82069221,
-    0.82020542, 0.81579751, 0.80669046, 0.79225442, 0.77132631, 0.74095518,
-    0.69659095, 0.63190866, 0.54316025, 0.41282767, 0.20502068,
+    0.20548671, 0.41458449, 0.54589934, 0.63491356, 0.69937532, 0.74364254,
+    0.77419641, 0.79515881, 0.80928574, 0.81800294, 0.82219749, 0.8225368,
+    0.81933529, 0.81306419, 0.80409932, 0.79300213, 0.77993032, 0.76505711,
+    0.74868062, 0.73128271, 0.71331081, 0.69522915, 0.67742764, 0.66026295,
+    0.6440551,  0.62919172, 0.61603816, 0.60484136, 0.59569842, 0.58866505,
+    0.58383073, 0.58135072, 0.58135072, 0.58383073, 0.58866505, 0.59569842,
+    0.60484136, 0.61603816, 0.62919172, 0.6440551,  0.66026295, 0.67742764,
+    0.69522915, 0.71331081, 0.73128271, 0.74868062, 0.76505711, 0.77993032,
+    0.79300213, 0.80409932, 0.81306419, 0.81933529, 0.8225368,  0.82219749,
+    0.81800294, 0.80928574, 0.79515881, 0.77419641, 0.74364254, 0.69937532,
+    0.63491356, 0.54589934, 0.41458449, 0.20548671,
 };
-#endif
-#endif
+#endif  /// of _RL_CONTROL_IS_SUPERVISED_
+#endif  /// of _ACTIVE_CONTROL_BODY_FORCE_
 
 ////////// myRHEA CLASS //////////
 
@@ -154,6 +166,11 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhou_field.setTopology(topo, "rl_f_rhou_field");
     rl_f_rhov_field.setTopology(topo, "rl_f_rhov_field");
     rl_f_rhow_field.setTopology(topo, "rl_f_rhow_field");
+#if _SPATIAL_SMOOTHING_RL_ACTION_
+    rl_f_rhou_field_aux.setTopology(topo, "rl_f_rhou_field_aux");
+    rl_f_rhov_field_aux.setTopology(topo, "rl_f_rhov_field_aux");
+    rl_f_rhow_field_aux.setTopology(topo, "rl_f_rhow_field_aux");
+#endif  /// of _SPATIAL_SMOOTHING_RL_ACTION_
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -165,13 +182,21 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
 #if _RL_CONTROL_IS_SUPERVISED_
+    avg_u_reference_field.setTopology(topo,  "avg_u_reference_field");
     rmsf_u_reference_field.setTopology(topo, "rmsf_u_reference_field");
     rmsf_v_reference_field.setTopology(topo, "rmsf_v_reference_field");
     rmsf_w_reference_field.setTopology(topo, "rmsf_w_reference_field");
-#endif
+#else
+    avg_u_previous_field.setTopology(topo,  "avg_u_previous_field");
+    rmsf_u_previous_field.setTopology(topo, "rmsf_u_previous_field");
+    rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
+    rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
+    ///rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
+    ///rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
+#endif  /// of _RL_CONTROL_IS_SUPERVISED_
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step);
     initSmartRedis();
-#endif
+#endif  /// of _ACTIVE_CONTROL_BODY_FORCE_
 
 };
 
@@ -231,7 +256,11 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// Additional arguments, defined here /// TODO: include this in some configuration file
-    this->witness_file = string(rl_case_path) + "/config_control_witness/witness8.txt";
+#if _WITNESS_XZ_SLICES_
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessXZSlices8.txt";
+#else
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints8.txt";
+#endif
     this->control_cubes_file = string(rl_case_path) + "/config_control_witness/cubeControl8.txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
@@ -286,6 +315,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         global_j = global_startY + (j - topo->iter_common[_INNER_][_INIY_]);
         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                avg_u_reference_field[I1D(i,j,k)]  = avg_u_reference_profile[global_j];
                 rmsf_u_reference_field[I1D(i,j,k)] = rmsf_u_reference_profile[global_j];
                 rmsf_v_reference_field[I1D(i,j,k)] = rmsf_v_reference_profile[global_j];
                 rmsf_w_reference_field[I1D(i,j,k)] = rmsf_w_reference_profile[global_j];
@@ -293,22 +323,17 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         }
         /// Debugging
         cout << "Rank " << my_rank << ": j=" << j << " (local), global_j=" << global_j 
-             << ", Reference value of rmsf_u: " << rmsf_u_reference_profile[global_j]
+             << ", Reference value of avg_u: " << avg_u_reference_profile[global_j]
+             << ", rmsf_u: " << rmsf_u_reference_profile[global_j]
              << ", rmsf_v: " << rmsf_v_reference_profile[global_j]
-             << ", rmsf_w: " << rmsf_w_reference_profile[global_j] << endl;
+             << ", rmsf_w: " << rmsf_w_reference_profile[global_j] 
+             << endl;
     }
-    /// -------------- Define control variables --------------
-    l1_error_current  = 1.0;
-    l1_error_previous = 1.0;
-#else
-    rmsf_u_field_local = 0.0;    rmsf_u_field_local_previous = 0.0;   rmsf_u_field_local_two_previous = 0.0;
-    rmsf_v_field_local = 0.0;    rmsf_v_field_local_previous = 0.0;   rmsf_v_field_local_two_previous = 0.0;
-    rmsf_w_field_local = 0.0;    rmsf_w_field_local_previous = 0.0;   rmsf_w_field_local_two_previous = 0.0;
 #endif
 
     /// Initialize additional attribute members
 #if _RL_CONTROL_IS_SUPERVISED_
-    first_actuation_time_done   = false;
+    first_actuation_time_done   = true;
     first_actuation_period_done = true;
 #else
     first_actuation_time_done   = false;
@@ -482,7 +507,8 @@ void myRHEA::calculateSourceTerms() {
         if (current_time > begin_actuation_time) {
 
             if ( !first_actuation_time_done ) {     /// executed just once
-                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (unsupervised) or 'l1_error_prevoius' (supervised)...
+                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (unsupervised)
+                updateState();
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
                     cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'" << endl;
@@ -492,17 +518,12 @@ void myRHEA::calculateSourceTerms() {
             /// Check if new action is needed
             if (current_time - previous_actuation_time >= actuation_period) {
 
-                if ( action_dim != 6 ) {
-                    cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 6, but action_dim = " << action_dim << endl;
-                    MPI_Abort( MPI_COMM_WORLD, 1);
-                }
-
                 if ( !first_actuation_period_done ) {
-                    calculateReward();              /// initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'
+                    calculateReward();      /// update avg_u,v,w_previous_field, rmsf_u,v,w_previous_field for next reward calculation
+                    updateState();
                     first_actuation_period_done = true;
-                    previous_actuation_time = previous_actuation_time + actuation_period;
+                    previous_actuation_time = current_time; /// TODO: modiy 'actuation_period' by 'current_time', check if still works
                     if (my_rank == 0) {
-                        cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_two_previous', 'rmsf_v_field_local_two_previous', 'rmsf_w_field_local_two_previous'" << endl;
                         cout << endl << "[myRHEA::calculateSourceTerms] RL control is activated at current time (" << scientific << current_time << ") " << "> time begin control (" << scientific << begin_actuation_time << ")" << endl;
                     }
                 } else {
@@ -515,11 +536,10 @@ void myRHEA::calculateSourceTerms() {
                         cout << endl << "[myRHEA::calculateSourceTerms] Performing SmartRedis communications (state, action, reward) at time instant " << current_time << endl;
                     }
 
-                    /// Save old action values and time - useful for interpolating to new action
-                    /// TODO: use action_global and action_global_previous for something (output writing) or delete them
-                    action_global_previous  = action_global;     // TODO: delete 'action_global_previous' if not used, only necessary when using smooth action with 'smoothControlFunction'
-                    previous_actuation_time = previous_actuation_time + actuation_period;   // TODO: delete if not used (if action smoothing is deactivated)
-
+                    /// Save old action values and time - useful for interpolating to new action in time
+                    action_global_previous  = action_global;
+                    previous_actuation_time = current_time;
+                    
                     // SmartRedis communications 
                     // Writing state, reward, time
                     updateState();
@@ -527,7 +547,7 @@ void myRHEA::calculateSourceTerms() {
                     calculateReward();                              /// update 'reward_local' attribute
                     manager->writeReward(reward_local, reward_key);
                     manager->writeTime(current_time, time_key);
-                    // Reading read action...
+                    // Reading new action...
                     manager->readAction(action_key);
                     action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = action_dim * n_rl_envs (currently only 1 action variable per rl env.)
                     /// action_local  = manager->getActionLocal();  /// action_local not used
@@ -539,242 +559,355 @@ void myRHEA::calculateSourceTerms() {
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_smartredis_communications" );
 
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->start( "rl_update_DeltaRij" );
-
-                    /// Calculate smooth action 
-                    /// OPTION 1 (smooth action implementation): if DeltaRii_field are re-calculated at each time instant,
-                    /// This option requires loop "if (current_time - previous_actuation_time >= actuation_period) {" to finish here!
-                    /// smoothControlFunction();        /// updates 'action_global_instant' 
-                    /// OPTION 2 (discrete non-smooth action implementation): if DeltaRii_field are calculated just once for each action, discrete value step
-                    for (int i_act=0; i_act<action_global_size2; i_act++) {
-                        action_global_instant[i_act] = action_global[i_act];
-                    }
-
-                    /// Initialize variables
-                    double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
-                    double DeltaRkk, DeltaThetaZ, DeltaThetaY, DeltaThetaX, DeltaXmap1, DeltaXmap2; 
-                    double Rkk_inv, Akk;
-                    bool   isNegligibleAction, isNegligibleRkk;
-                    size_t actuation_idx;
-                    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
-#if _SPACE_AVERAGE_RL_ACTION_
-                    size_t actuation_idx_max = static_cast<size_t>(num_control_cubes) - 1;
-                    double y_local_top_wall, y_local_bottom_wall;
-                    double y_dist_to_local_top_wall, y_dist_to_local_bottom_wall;
-                    double DeltaRkk_current, DeltaRkk_prev, DeltaRkk_next;
-                    double y_ratio_aux;
-                    double DeltaThetaZ_current, DeltaThetaZ_prev, DeltaThetaZ_next;          
-                    double DeltaThetaY_current, DeltaThetaY_prev, DeltaThetaY_next;          
-                    double DeltaThetaX_current, DeltaThetaX_prev, DeltaThetaX_next;          
-                    double DeltaXmap1_current,  DeltaXmap1_prev,  DeltaXmap1_next;      
-                    double DeltaXmap2_current,  DeltaXmap2_prev,  DeltaXmap2_next;      
-                    int space_avg_bottom_counter = 0;
-                    int space_avg_top_counter = 0;
-                    int applied_action_counter = 0;
-#endif
-                    
-                    /// Calculate DeltaRij = Rij_perturbated - Rij_original
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-
-                                /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
-                                if (action_mask[I1D(i,j,k)] != 0.0) {
-
-                                    /// Get perturbation values from RL agent
-                                    actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
-#if _SPACE_AVERAGE_RL_ACTION_
-                                    applied_action_counter += 1;
-                                    /// Apply action space-averaging if needed
-                                    y_local_bottom_wall         = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_INIY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_INIY_]-1,k)] );
-                                    y_local_top_wall            = 0.5 * ( y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_],k)] + y_field[I1D(i,topo->iter_common[_INNER_][_ENDY_]+1,k)] );
-                                    y_dist_to_local_bottom_wall = abs(y_local_bottom_wall - y_field[I1D(i,j,k)]);
-                                    y_dist_to_local_top_wall    = abs(y_local_top_wall    - y_field[I1D(i,j,k)]);
-                                    /// -> action averaging with previous action if close to local bottom wall (& not in global bottom wall, act_idx != 0)
-                                    if ( ( y_dist_to_local_bottom_wall < dy_space_averaging ) && ( actuation_idx > 0) ) {
-                                        /// define current (my_rank) and previous action (my_rank - 1)
-                                        DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_prev    = action_global_instant[(actuation_idx-1) * action_dim + 0];
-                                        DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_prev = action_global_instant[(actuation_idx-1) * action_dim + 1];
-                                        DeltaThetaY_current = action_global_instant[actuation_idx * action_dim + 2]; DeltaThetaY_prev = action_global_instant[(actuation_idx-1) * action_dim + 2];
-                                        DeltaThetaX_current = action_global_instant[actuation_idx * action_dim + 3]; DeltaThetaX_prev = action_global_instant[(actuation_idx-1) * action_dim + 3];
-                                        DeltaXmap1_current  = action_global_instant[actuation_idx * action_dim + 4]; DeltaXmap1_prev  = action_global_instant[(actuation_idx-1) * action_dim + 4];
-                                        DeltaXmap2_current  = action_global_instant[actuation_idx * action_dim + 5]; DeltaXmap2_prev  = action_global_instant[(actuation_idx-1) * action_dim + 5];
-                                        /// calculate space-averaged action
-                                        y_ratio_aux = y_dist_to_local_bottom_wall / dy_space_averaging;     // <= 1, only = 1 when y_dist_to_local_bottom_wall == dy_space_averaging
-                                        DeltaRkk    = ( ( DeltaRkk_current    + DeltaRkk_prev    ) / 2.0 ) + y_ratio_aux * ( ( DeltaRkk_current    - DeltaRkk_prev    ) / 2.0 );
-                                        DeltaThetaZ = ( ( DeltaThetaZ_current + DeltaThetaZ_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaZ_current - DeltaThetaZ_prev ) / 2.0 );
-                                        DeltaThetaY = ( ( DeltaThetaY_current + DeltaThetaY_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaY_current - DeltaThetaY_prev ) / 2.0 );
-                                        DeltaThetaX = ( ( DeltaThetaX_current + DeltaThetaX_prev ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaX_current - DeltaThetaX_prev ) / 2.0 );
-                                        DeltaXmap1  = ( ( DeltaXmap1_current  + DeltaXmap1_prev  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap1_current  - DeltaXmap1_prev  ) / 2.0 );
-                                        DeltaXmap2  = ( ( DeltaXmap2_current  + DeltaXmap2_prev  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap2_current  - DeltaXmap2_prev  ) / 2.0 );
-                                        /// Update counter for debugging
-                                        space_avg_bottom_counter += 1;
-                                    }
-                                    /// -> action averaging with next action if close to local top wall (& not in global top wall, act_idx != )
-                                    else if ( ( y_dist_to_local_top_wall < dy_space_averaging ) && ( actuation_idx < actuation_idx_max ) ) {
-                                        /// define current (my_rank) and next action (my_rank + 1)
-                                        DeltaRkk_current    = action_global_instant[actuation_idx * action_dim + 0]; DeltaRkk_next    = action_global_instant[(actuation_idx+1) * action_dim + 0];
-                                        DeltaThetaZ_current = action_global_instant[actuation_idx * action_dim + 1]; DeltaThetaZ_next = action_global_instant[(actuation_idx+1) * action_dim + 1];
-                                        DeltaThetaY_current = action_global_instant[actuation_idx * action_dim + 2]; DeltaThetaY_next = action_global_instant[(actuation_idx+1) * action_dim + 2];
-                                        DeltaThetaX_current = action_global_instant[actuation_idx * action_dim + 3]; DeltaThetaX_next = action_global_instant[(actuation_idx+1) * action_dim + 3];
-                                        DeltaXmap1_current  = action_global_instant[actuation_idx * action_dim + 4]; DeltaXmap1_next  = action_global_instant[(actuation_idx+1) * action_dim + 4];
-                                        DeltaXmap2_current  = action_global_instant[actuation_idx * action_dim + 5]; DeltaXmap2_next  = action_global_instant[(actuation_idx+1) * action_dim + 5];
-                                        /// calculate space-averaged action
-                                        y_ratio_aux = y_dist_to_local_top_wall / dy_space_averaging;     // <= 1, only = 1 when y_dist_to_local_top_wall == dy_space_averaging
-                                        DeltaRkk    = ( ( DeltaRkk_current    + DeltaRkk_next    ) / 2.0 ) + y_ratio_aux * ( ( DeltaRkk_current    - DeltaRkk_next    ) / 2.0 );
-                                        DeltaThetaZ = ( ( DeltaThetaZ_current + DeltaThetaZ_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaZ_current - DeltaThetaZ_next ) / 2.0 );
-                                        DeltaThetaY = ( ( DeltaThetaY_current + DeltaThetaY_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaY_current - DeltaThetaY_next ) / 2.0 );
-                                        DeltaThetaX = ( ( DeltaThetaX_current + DeltaThetaX_next ) / 2.0 ) + y_ratio_aux * ( ( DeltaThetaX_current - DeltaThetaX_next ) / 2.0 );
-                                        DeltaXmap1  = ( ( DeltaXmap1_current  + DeltaXmap1_next  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap1_current  - DeltaXmap1_next  ) / 2.0 );
-                                        DeltaXmap2  = ( ( DeltaXmap2_current  + DeltaXmap2_next  ) / 2.0 ) + y_ratio_aux * ( ( DeltaXmap2_current  - DeltaXmap2_next  ) / 2.0 );                                 
-                                        /// Update counter for debugging
-                                        space_avg_top_counter += 1;
-                                    }
-                                    /// -> action not space averaged, far from the pseudo-environment boundaries
-                                    else {
-                                        DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-                                        DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
-                                        DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
-                                        DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
-                                        DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
-                                        DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-                                    }
-#else                               /// Do not apply action space-averaging 
-                                    DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-                                    DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
-                                    DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
-                                    DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
-                                    DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
-                                    DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
-#endif
-                                    /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
-                                    isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
-                                    Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                                    isNegligibleRkk    = (abs(Rkk) < EPS);
-                                    if (isNegligibleAction || isNegligibleRkk) {
-                                        DeltaRxx_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRyy_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRzz_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRxy_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRxz_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRyz_field[I1D(i,j,k)] = 0.0;
-                                    } else {
-
-                                        /// Rkk is Rij trace (dof #1)
-                                        Rkk_inv = 1.0 / Rkk;
-
-                                        /// Build anisotropy tensor (symmetric, trace-free)
-                                        Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                                        Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                                        Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                                        Aij[1][0]  = Aij[0][1];
-                                        Aij[2][0]  = Aij[0][2];
-                                        Aij[2][1]  = Aij[1][2];
-
-                                        /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                                        Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                                        Aij[0][0] -= Akk / 3.0;
-                                        Aij[1][1] -= Akk / 3.0;
-                                        Aij[2][2] -= Akk / 3.0;
-
-                                        /// Aij eigen-decomposition
-                                        symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
-                                        sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
-
-                                        /// Eigen-vectors Euler Rotation angles (dof #2-4)
-                                        eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
-
-                                        /// Eigen-values Barycentric coordinates (dof #5-6)
-                                        eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
-
-                                        /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
-                                        /// Delta_* are standarized values between 'action_bounds' RL parameter
-                                        Rkk    = Rkk    * (1 + DeltaRkk);
-                                        thetaZ = thetaZ * (1 + DeltaThetaZ);
-                                        thetaY = thetaY * (1 + DeltaThetaY);
-                                        thetaX = thetaX * (1 + DeltaThetaX);
-                                        xmap1  = xmap1  * (1 + DeltaXmap1);
-                                        xmap2  = xmap2  * (1 + DeltaXmap2);
-
-                                        /// Enforce realizability to perturbed Rij d.o.f
-                                        enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
-
-                                        /// Calculate perturbed & realizable Rij
-                                        eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
-                                        barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
-                                        sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
-                                        Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
-
-                                        /// Calculate perturbed & realizable DeltaRij
-                                        DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
-                                        DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                                        DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
-                                        DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
-                                        DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
-                                        DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
-
-                                    }
-                                }
-                            }
-                        }
-                    }
-#if _SPACE_AVERAGE_RL_ACTION_
-                    /// Debugging
-                    cout << "Rank " << my_rank << " has applied accion in " << applied_action_counter << " points, with " 
-                         << " space averaging in " << space_avg_bottom_counter << " (bottom) and " << space_avg_top_counter << " (top) points" << endl; 
-#endif
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->stop( "rl_update_DeltaRij" );
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->start( "rl_update_control_term" );
-
-                    /// Initialize variables
-                    double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
-                    double delta_x, delta_y, delta_z;
-
-                    /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                
-                                /// Geometric stuff
-                                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
-                                
-                                /// Calculate DeltaRij derivatives
-                                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-
-                                /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                                rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                                rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                                rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
-                            }
-                        }
-                    }
-
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    timers->stop( "rl_update_control_term" );
-
                 }   /// end if ( !first_actuation_period_done )
             }       /// end if (current_time - previous_actuation_time >= actuation_period), new action was required
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->start( "rl_update_DeltaRij" );
+
+            /// Calculate smooth action in time
+            /// ALERT: this is costly because eigen-decomposition and DeltaRii_field are re-calculated at each time instant
+            /// ALERT: Time-smoothing option requires loop "if (current_time - previous_actuation_time >= actuation_period) {" to finish here!
+            smoothControlFunction();        /// updates 'action_global_instant' from action_global, action_global_previous, current_time, previous_actuation_time and actuation_period 
+
+            /// Initialize variables
+            double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
+            double DeltaRkk = 0.0, DeltaThetaZ = 0.0, DeltaThetaY = 0.0, DeltaThetaX = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
+            double Rkk_inv, Akk;
+            bool   isNegligibleAction, isNegligibleRkk;
+            size_t actuation_idx;
+            vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+            vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+            vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+            vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
+            
+            /// Calculate DeltaRij = Rij_perturbated - Rij_original
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+
+                        /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
+                        if (action_mask[I1D(i,j,k)] != 0.0) {
+
+                            /// Get perturbation values from RL agent
+                            actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
+                            if (action_dim == 1) {
+                                DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaZ = 0.0;
+                                DeltaThetaY = 0.0;
+                                DeltaThetaX = 0.0;
+                                DeltaXmap1  = 0.0;
+                                DeltaXmap2  = 0.0;
+                            } else if (action_dim == 2) {
+				                DeltaRkk    = 0.0;
+                                DeltaThetaZ = 0.0;
+                                DeltaThetaY = 0.0;
+                                DeltaThetaX = 0.0;
+                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 1];
+				            } else if (action_dim == 3) {
+                                DeltaRkk    = 0.0;
+                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaXmap1  = 0.0;
+                                DeltaXmap2  = 0.0;
+				            } else if (action_dim == 5) {
+                                DeltaRkk    = 0.0;
+                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 3];
+                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 4];
+                            } else if (action_dim == 6) {
+                                DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
+                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
+                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
+                            } else {
+                                cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 1,2,3,5 and 6, but action_dim = " << action_dim << endl;
+                                MPI_Abort( MPI_COMM_WORLD, 1);
+                            }
+                            
+                            /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
+                            isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                            Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                            isNegligibleRkk    = (abs(Rkk) < EPS);
+                            if (isNegligibleAction || isNegligibleRkk) {
+                                DeltaRxx_field[I1D(i,j,k)] = 0.0;
+                                DeltaRyy_field[I1D(i,j,k)] = 0.0;
+                                DeltaRzz_field[I1D(i,j,k)] = 0.0;
+                                DeltaRxy_field[I1D(i,j,k)] = 0.0;
+                                DeltaRxz_field[I1D(i,j,k)] = 0.0;
+                                DeltaRyz_field[I1D(i,j,k)] = 0.0;
+                            } else {
+
+                                /// Rkk is Rij trace (dof #1)
+                                Rkk_inv = 1.0 / Rkk;
+
+                                /// Build anisotropy tensor (symmetric, trace-free)
+                                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                                Aij[1][0]  = Aij[0][1];
+                                Aij[2][0]  = Aij[0][2];
+                                Aij[2][1]  = Aij[1][2];
+
+                                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                                Aij[0][0] -= Akk / 3.0;
+                                Aij[1][1] -= Akk / 3.0;
+                                Aij[2][2] -= Akk / 3.0;
+
+                                /// Aij eigen-decomposition
+                                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
+                                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
+
+                                /// Eigen-vectors Euler Rotation angles (dof #2-4)
+                                eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+
+                                /// Eigen-values Barycentric coordinates (dof #5-6)
+                                eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
+
+                                /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
+                                /// Delta_* are standarized values between 'action_bounds' RL parameter
+                                Rkk    = Rkk    * (1 + DeltaRkk);
+                                thetaZ = thetaZ * (1 + DeltaThetaZ);
+                                thetaY = thetaY * (1 + DeltaThetaY);
+                                thetaX = thetaX * (1 + DeltaThetaX);
+                                xmap1  = xmap1  * (1 + DeltaXmap1);
+                                xmap2  = xmap2  * (1 + DeltaXmap2);
+
+                                /// Enforce realizability to perturbed Rij d.o.f
+                                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+
+                                /// Calculate perturbed & realizable Rij
+                                eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                                barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
+                                sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
+                                Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+
+                                /// Calculate perturbed & realizable DeltaRij
+                                DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
+                                DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                                DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                                DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                                DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                                DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+
+                            }
+                        }
+                    }
+                }
+            }
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->stop( "rl_update_DeltaRij" );
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->start( "rl_update_control_term" );
+
+            /// Initialize variables
+            double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
+            double delta_x, delta_y, delta_z;
+
+            /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        
+                        /// Geometric stuff
+                        delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                        delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                        delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                        
+                        /// Calculate DeltaRij derivatives
+                        d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                        d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                        d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                        d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                        d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                        d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                        d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                        d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                        d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+
+                        /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+                        rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
+                        rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
+                        rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+#if _SPATIAL_SMOOTHING_RL_ACTION_
+                        /// TODO: not necessary if averaging window size 3
+                        rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
+                        rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
+                        rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
+#endif  /// of _SPATIAL_SMOOTHING_RL_ACTION_
+                    }
+                }
+            }
+
+#if _SPATIAL_SMOOTHING_RL_ACTION_
+            /// Calculate rl_f_rhou_field from rl_f_rhou_field_aux (idem. for v, w) + perform f_rl space averaging on bottom/top y boundaries of each mpi process 
+            /// Allocate memory for sending/receiving boundary data slices
+            int idx;
+            int i_start = topo->iter_common[_INNER_][_INIX_]; int i_end = topo->iter_common[_INNER_][_ENDX_];
+            int j_start = topo->iter_common[_INNER_][_INIY_]; int j_end = topo->iter_common[_INNER_][_ENDY_];
+            int k_start = topo->iter_common[_INNER_][_INIZ_]; int k_end = topo->iter_common[_INNER_][_ENDZ_];
+            int xz_slice_size = (i_end - i_start + 1) * (k_end - k_start + 1);
+            /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+            vector<double> send_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
+            vector<double> send_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
+            /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+            vector<double> send_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
+            vector<double> send_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
+            /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+            vector<double> send_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
+            vector<double> send_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
+            vector<double> recv_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
+
+            /// Populate send_xz_slice_ymin_..., send_xz_slice_ymax_..., send_xz_slice_ymin2_... and send_xz_slice_ymax2_...  with boundary data
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                    idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                    /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                    send_xz_slice_ymin_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_start, k)]; 
+                    send_xz_slice_ymin_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_start, k)]; 
+                    send_xz_slice_ymin_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_start, k)];     
+                    send_xz_slice_ymax_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_end, k)];   
+                    send_xz_slice_ymax_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_end, k)];   
+                    send_xz_slice_ymax_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_end, k)]; 
+                    /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                    send_xz_slice_ymin2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+1, k)]; 
+                    send_xz_slice_ymin2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+1, k)]; 
+                    send_xz_slice_ymin2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+1, k)];     
+                    send_xz_slice_ymax2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-1, k)];   
+                    send_xz_slice_ymax2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-1, k)];   
+                    send_xz_slice_ymax2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-1, k)]; 
+                    /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                    send_xz_slice_ymin3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+2, k)]; 
+                    send_xz_slice_ymin3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+2, k)]; 
+                    send_xz_slice_ymin3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+2, k)];     
+                    send_xz_slice_ymax3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-2, k)];   
+                    send_xz_slice_ymax3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-2, k)];   
+                    send_xz_slice_ymax3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-2, k)]; 
+                }
+            }
+
+            /// Exchange boundary data with neighboring processes
+            /// Info: np_y == n_rl_envs == number of MPI processes (only distributed along y-coord)
+            /// Arrays to hold MPI request handles
+            MPI_Request requests[36];
+            int req_count = 0;
+            /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
+            if (my_rank > 0) {
+                /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
+                /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
+                /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
+            }
+            /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
+            if (my_rank < (n_rl_envs - 1)) {
+                /// >> 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
+                /// >> 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
+                /// >> 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
+                MPI_Isend(send_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Isend(send_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
+                MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
+            }
+
+            /// Wait for all non-blocking communication to complete
+            MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
+            cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " performed all data exchange for space-averaging rl action along y-coord on pseudo-environments (mpi processes) boundaries" << endl; 
+
+            /// Apply action averaging in y-coord at the bottom/top y-coord boundaries of each mpi process
+            /// Averaging window size: 7 
+            /// > Averaging in pseudo-envioronments / mpi processes bottom boundary 
+            if (my_rank > 0) {
+                for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                        /// >> 1st xz_slice from bottom boundary
+                        rl_f_rhou_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhou[idx] + recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start,k)] );
+                        rl_f_rhov_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhov[idx] + recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start,k)] );
+                        rl_f_rhow_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhow[idx] + recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start,k)] );
+                        /// >> 2nd xz_slice from bottom boundary
+                        rl_f_rhou_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+1,k)] );
+                        rl_f_rhov_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+1,k)] );
+                        rl_f_rhow_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+1,k)] );
+                        /// >> 3rd xz_slice from bottom boundary
+                        rl_f_rhou_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+2,k)] );
+                        rl_f_rhov_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+2,k)] );
+                        rl_f_rhow_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+2,k)] );
+                    }
+                }
+            } 
+            /// > Averaging in pseudo-envioronments / mpi processes top boundary 
+            if (my_rank < (n_rl_envs - 1)) {
+                for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
+                        /// >> 1st xz_slice from top boundary
+                        rl_f_rhou_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhou[idx] + recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end,k)] );
+                        rl_f_rhov_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhov[idx] + recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end,k)] );
+                        rl_f_rhow_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhow[idx] + recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end,k)] );
+                        /// >> 2nd xz_slice from top boundary
+                        rl_f_rhou_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-1,k)] );
+                        rl_f_rhov_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-1,k)] );
+                        rl_f_rhow_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-1,k)] );
+                        /// >> 3rd xz_slice from top boundary
+                        rl_f_rhou_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-2,k)] );
+                        rl_f_rhov_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-2,k)] );
+                        rl_f_rhow_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-2,k)] );
+                    }
+                }
+            }
+#endif /// of _SPATIAL_SMOOTHING_RL_ACTION_
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            timers->stop( "rl_update_control_term" );
+
 
         } else {    /// current_time <= begin_actuation_time
 
@@ -793,7 +926,7 @@ void myRHEA::calculateSourceTerms() {
         }
     }               /// end if (rk_time_stage == 1)
     
-#endif
+#endif /// of _ACTIVE_CONTROL_BODY_FORCE_
 
     /// Update halo values
     f_rhou_field.update();
@@ -849,13 +982,13 @@ void myRHEA::outputCurrentStateDataRL( string path ) {
 
 };
 
-/// TODO: check, remove function if not used anymore for checks
+
 void myRHEA::timeAdvanceConservedVariables() {
 
-    /// TODO: check, remove lines below
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
+    /// TODO: check, remove lines below
     /// Debugging variables
     double rhou_inv_flux_ratio   = 0.0;
     double rhou_vis_flux_ratio   = 0.0;
@@ -864,6 +997,7 @@ void myRHEA::timeAdvanceConservedVariables() {
     int ratio_counter            = 0;
 #if _REGULARIZE_RL_ACTION_
     /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+    double reg_lambda;
     /// Apply smooth regularization when RL control term << RHS term
     double rhou_rhs, rhov_rhs, rhow_rhs;
     double rhou_rl_f, rhov_rl_f, rhow_rl_f;
@@ -910,7 +1044,8 @@ void myRHEA::timeAdvanceConservedVariables() {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 #endif
 #if _REGULARIZE_RL_ACTION_
-                /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
+                /// ---- Smooth regularization of RL control load by hyperbolic tangent function ----
+                reg_lambda = reg_lambda_vect.at(my_rank);
                 /// Calculate RL control load ratio wrt RHS with no RL control load
                 rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
                 rhov_rhs      = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)];
@@ -935,8 +1070,8 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rl_f_rhou_field[I1D(i,j,k)] = rhou_rl_f_reg;
                 rl_f_rhov_field[I1D(i,j,k)] = rhov_rl_f_reg;
                 rl_f_rhow_field[I1D(i,j,k)] = rhow_rl_f_reg;
-                /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
-#endif
+#endif  /// of _REGULARIZE_RL_ACTION_
+
                 /// Work of momentum sources
                 f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)]) * u_field[I1D(i,j,k)]
                          + (f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]) * v_field[I1D(i,j,k)]
@@ -1002,7 +1137,15 @@ void myRHEA::timeAdvanceConservedVariables() {
     }
 
 };
-/// TODO: end remove
+
+
+void myRHEA::outputTemporalPointProbesData() {
+
+    if (tag == "0") {
+        FlowSolverRHEA::outputTemporalPointProbesData();
+    }
+
+};
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1459,8 +1602,16 @@ void myRHEA::preproceWitnessPoints() {
             state_local_size2_counter += 1;
         }
     }
-    this->state_local_size2 = state_local_size2_counter;  // each mpi process updates attribute 'state_local_size2'
-    cout << "Rank " << my_rank << " has " << state_local_size2 << " local witness points" << endl;
+    
+    // Each mpi process updates attribute 'state_local_size2'
+#if _INCLUDE_RL_TIME_INTO_STATE_
+    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, ||avg_v||_2, ||avg_w||_2, ||rmsf_u||_2, ||rmsf_v||_2, ||rmsf_w||_2, t_RL )
+    this->state_local_size2 = 7 * state_local_size2_counter;
+#else
+    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2, ||avg_v||_2, ||avg_w||_2, ||rmsf_u||_2, ||rmsf_v||_2, ||rmsf_w||_2, )
+    this->state_local_size2 = 6 * state_local_size2_counter;
+#endif
+    cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, can be deleted?
 
@@ -1551,7 +1702,8 @@ void myRHEA::getControlCubes() {
     double size1, size2, size3, x, y, z, proj1, proj2, proj3;
     bool isInside;
     int num_control_points_local, num_control_points_per_cube_global, num_control_points_per_cube_local;
-    
+    control_cubes_y_central.resize(num_control_cubes);
+
     /// Set counters to 0
     n_rl_envs = 0;
     action_global_size2 = 0;                // global attribute
@@ -1577,6 +1729,10 @@ void myRHEA::getControlCubes() {
             dir2[icoord] = cube_vertices[2][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 2
             dir3[icoord] = cube_vertices[3][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 3
         }
+
+        /// y-coordinade of cube central point
+        control_cubes_y_central[icube] = cube_origin[1] + 0.5 * ( dir1[1] + dir2[1] + dir3[1] );
+        
         /// Transform director vectors to unitary vectors for further calculations of dot product
         size1 = myNorm(dir1);
         size2 = myNorm(dir2);
@@ -1693,12 +1849,16 @@ void myRHEA::getControlCubes() {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+
     /// Logging
     if (my_rank == 0) {
         cout << "[myRHEA::getControlCubes] Total number of control points: " << num_control_points << endl;
         cout << "[myRHEA::getControlCubes] Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
         cout << "[myRHEA::getControlCubes] Number of RL pseudo-environments: " << n_rl_envs << endl; 
         cout << "[myRHEA::getControlCubes] Action dimension: " << action_dim << endl; 
+        for (int icube = 0; icube < num_control_cubes; icube++) {
+            cout << "[myRHEA::getControlCubes] Cube #" << icube << " has central point with y-coordinate: " << control_cubes_y_central[icube] << endl;
+        }
     }
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1739,22 +1899,69 @@ void myRHEA::initializeFromRestart() {
 void myRHEA::updateState() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    int i_index, j_index, k_index;
     int state_local_size2_counter = 0;
     state_local.resize(state_local_size2);
     std::fill(state_local.begin(), state_local.end(), 0.0);
+#if _WITNESS_XZ_SLICES_
+    int j_index;
+    int xz_slice_points_counter;
+#else
+    int i_index, j_index, k_index;
+#endif  /// of _WITNESS_XZ_SLICES_
+
     for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Owner rank writes to file
         if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
+
+#if _WITNESS_XZ_SLICES_
+            /// Get local index j
+            j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
+            /// Calculate state value
+            /// > Average state value (l2 error of rmsf_u_field) over regular grid xz-slice
+            xz_slice_points_counter = 0;
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+
+                    state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(avg_v_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+2] += std::pow(avg_w_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+3] += std::pow(rmsf_u_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+4] += std::pow(rmsf_v_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+5] += std::pow(rmsf_w_field[I1D(i,j_index,k)], 2.0);
+                    xz_slice_points_counter += 1;
+                }
+            }
+            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+3] = std::sqrt( state_local[state_local_size2_counter+3] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+4] = std::sqrt( state_local[state_local_size2_counter+4] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+5] = std::sqrt( state_local[state_local_size2_counter+5] / xz_slice_points_counter );
+
+#else ///  _WITNESS_XZ_SLICES_ 0
             /// Get local indices i, j, k
             i_index = temporal_witness_probes[twp].getLocalIndexI(); 
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
-            /// Get state data: turbulent kinetic energy
-            state_local[state_local_size2_counter] = 0.5 * (   pow(rmsf_u_field[I1D(i_index,j_index,k_index)], 2.0) 
-                                                             + pow(rmsf_v_field[I1D(i_index,j_index,k_index)], 2.0)
-                                                             + pow(rmsf_w_field[I1D(i_index,j_index,k_index)], 2.0) );
-            state_local_size2_counter += 1;
+            /// Calculate state value/s
+            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+1] = avg_v_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+2] = avg_w_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+3] = rmsf_u_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+4] = rmsf_v_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+5] = rmsf_w_field[I1D(i_index,j_index,k_index)];
+#endif /// of _WITNESS_XZ_SLICES_
+
+#if _INCLUDE_RL_TIME_INTO_STATE_
+            state_local[state_local_size2_counter+6] = current_time - begin_actuation_time;
+#endif /// of _INCLUDE_RL_TIME_INTO_STATE_
+
+            /// Update local state counter
+#if _INCLUDE_RL_TIME_INTO_STATE_
+            state_local_size2_counter += 7;
+#else
+            state_local_size2_counter += 6;
+#endif
         }
     }
 }   
@@ -1763,52 +1970,73 @@ void myRHEA::updateState() {
 
 /// Calculate reward local value (local to single mpi process, which corresponds to RL environment)
 /// If _RL_CONTROL_IS_SUPERVISED_ 1:
-/// -> updates attributes: reward_local, l1_error_current, l1_error_previous
+/// -> updates attributes: reward_local
 /// else _RL_CONTROL_IS_SUPERVISED_ 0:
-/// -> updates attributes: reward_local, rmsf_u_field_local, rmsf_u_field_local_previous, rmsf_u_field_local_two_previous
-///                                      rmsf_v_field_local, rmsf_v_field_local_previous, rmsf_v_field_local_two_previous
-///                                      rmsf_w_field_local, rmsf_w_field_local_previous, rmsf_w_field_local_two_previous
+/// -> updates attributes: reward_local, avg_u_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field
 void myRHEA::calculateReward() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
 #if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
-    double l1_err_rmsf_u  = 0.0;
-    double l1_err_rmsf_v  = 0.0;
-    double l1_err_rmsf_w  = 0.0;
-    int    l1_err_counter = 0;
+    double l2_err_avg_u = 0.0,  l2_err_avg_v = 0.0,  l2_err_avg_w = 0.0;
+    double l2_err_rmsf_u = 0.0, l2_err_rmsf_v = 0.0, l2_err_rmsf_w = 0.0;
+    double l2_avg_u_reference  = 0.0;   // avg_v_reference, avg_w_reference = 0.0 everywhere in the profile
+    double l2_rmsf_u_reference = 0.0, l2_rmsf_v_reference = 0.0, l2_rmsf_w_reference = 0.0;
+    double length_y = 0.0, delta_y  = 0.0;
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                l1_err_rmsf_u  += std::abs( (rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)]) );
-                l1_err_rmsf_v  += std::abs( (rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)]) );
-                l1_err_rmsf_w  += std::abs( (rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)]) );
-                l1_err_counter += 1;
+                delta_y             = 0.5 * ( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] );
+                l2_err_avg_u        += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
+                l2_err_avg_v        += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0,                                2.0) * delta_y;
+                l2_err_avg_w        += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0,                                2.0) * delta_y;
+                l2_err_rmsf_u       += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_err_rmsf_v       += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_err_rmsf_w       += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_avg_u_reference  += std::pow(avg_u_reference_field[I1D(i,j,k)], 2.0)  * delta_y;
+                l2_rmsf_u_reference += std::pow(rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_rmsf_v_reference += std::pow(rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                l2_rmsf_w_reference += std::pow(rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_y;
+                length_y            += delta_y; 
             }
         }
     }
-    l1_err_rmsf_u /= l1_err_counter;
-    l1_err_rmsf_v /= l1_err_counter;
-    l1_err_rmsf_w /= l1_err_counter;
-    l1_error_current = ( l1_err_rmsf_u + l1_err_rmsf_v + l1_err_rmsf_w ) / 3.0;
-    reward_local = ( l1_error_previous - l1_error_current ) / ( l1_error_previous + EPS );
+    l2_err_avg_u        = std::sqrt( l2_err_avg_u  / length_y );
+    l2_err_avg_v        = std::sqrt( l2_err_avg_v  / length_y );
+    l2_err_avg_w        = std::sqrt( l2_err_avg_w  / length_y );
+    l2_err_rmsf_u       = std::sqrt( l2_err_rmsf_u / length_y );
+    l2_err_rmsf_v       = std::sqrt( l2_err_rmsf_v / length_y );
+    l2_err_rmsf_w       = std::sqrt( l2_err_rmsf_w / length_y );
+    l2_avg_u_reference  = std::sqrt( l2_avg_u_reference  / length_y );
+    l2_rmsf_u_reference = std::sqrt( l2_rmsf_u_reference / length_y );
+    l2_rmsf_v_reference = std::sqrt( l2_rmsf_v_reference / length_y );
+    l2_rmsf_w_reference = std::sqrt( l2_rmsf_w_reference / length_y );
+    reward_local = ( 3.0 - (   ( l2_err_avg_u  / l2_avg_u_reference * 10.0 ) \
+                             + ( l2_err_avg_v * 0.01 ) \
+                             + ( l2_err_avg_w * 0.01 ) \
+                             + ( l2_err_rmsf_u / l2_rmsf_u_reference ) \
+                             + ( l2_err_rmsf_v / l2_rmsf_v_reference ) \
+                             + ( l2_err_rmsf_w / l2_rmsf_w_reference ) \
+                            ) ) * std::pow(current_time - begin_actuation_time, 3.0);
     /// Debugging
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", L1 error: " << l1_error_current << ", L1 error previous: " << l1_error_previous << endl;
-    /// Update 'l1_error_previous'
-    l1_error_previous = l1_error_current;
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
+         << l2_err_avg_u  / l2_avg_u_reference * 10.0 << " " 
+	 << l2_err_avg_v * 0.01 << " "
+	 << l2_err_avg_w * 0.01 << " "
+	 << l2_err_rmsf_u / l2_rmsf_u_reference << " "
+	 << l2_err_rmsf_v / l2_rmsf_v_reference << " "
+	 << l2_err_rmsf_w / l2_rmsf_w_reference << " "
+	 << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
 
 #else                           /// Unsupervised Reward
     /// Initialize variables
-    rmsf_u_field_local = 0.0; 
-    rmsf_v_field_local = 0.0; 
-    rmsf_w_field_local = 0.0; 
+    double l2_d_avg_u = 0.0, l2_d_avg_v = 0.0, l2_d_avg_w = 0.0;
+    double l2_d_rmsf_u = 0.0, l2_d_rmsf_v = 0.0, l2_d_rmsf_w = 0.0; 
+    double l2_avg_u_previous  = 0.0;
+    double l2_rmsf_u_previous = 0.0, l2_rmsf_v_previous = 0.0, l2_rmsf_w_previous = 0.0; 
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
-    double d_rmsf_u_field_local_previous, d_rmsf_u_field_local;
-    double d_rmsf_v_field_local_previous, d_rmsf_v_field_local;
-    double d_rmsf_w_field_local_previous, d_rmsf_w_field_local;
 
-    /// Calculate avg_u_field_rl_envs, the temporal-average of u_field space-averaged over each rl environment
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -1817,45 +2045,67 @@ void myRHEA::calculateReward() {
                 delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
                 delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                 delta_volume =  delta_x * delta_y * delta_z;
-                /// Calculate volume-averaged rmsf_u, rmsf_v, rmsf_w
-                rmsf_u_field_local += rmsf_u_field[I1D(i,j,k)] * delta_volume;
-                rmsf_v_field_local += rmsf_v_field[I1D(i,j,k)] * delta_volume;
-                rmsf_w_field_local += rmsf_w_field[I1D(i,j,k)] * delta_volume;
+                /// Calculate volume-averaged l2_d_avg_u & l2_d_rmsf_u
+                l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
+                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
+                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
+                l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_avg_u_previous  += std::pow(avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
+                l2_rmsf_u_previous += std::pow(rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_rmsf_v_previous += std::pow(rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_rmsf_w_previous += std::pow(rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 total_volume_local += delta_volume;
             }
         }
     }
-    rmsf_u_field_local /= total_volume_local;
-    rmsf_v_field_local /= total_volume_local;
-    rmsf_w_field_local /= total_volume_local;
-    d_rmsf_u_field_local_previous = std::abs( rmsf_u_field_local_two_previous - rmsf_u_field_local_previous );
-    d_rmsf_v_field_local_previous = std::abs( rmsf_v_field_local_two_previous - rmsf_v_field_local_previous );
-    d_rmsf_w_field_local_previous = std::abs( rmsf_w_field_local_two_previous - rmsf_w_field_local_previous );
-    d_rmsf_u_field_local          = std::abs( rmsf_u_field_local_previous     - rmsf_u_field_local );
-    d_rmsf_v_field_local          = std::abs( rmsf_v_field_local_previous     - rmsf_v_field_local );
-    d_rmsf_w_field_local          = std::abs( rmsf_w_field_local_previous     - rmsf_w_field_local );
-    reward_local = ( d_rmsf_u_field_local_previous - d_rmsf_u_field_local )
-                 + ( d_rmsf_v_field_local_previous - d_rmsf_v_field_local )
-                 + ( d_rmsf_w_field_local_previous - d_rmsf_w_field_local );
-    ///  TODO: maybe do relative adding: / std::abs( d_avg_u_field_local_previous + EPS );
+    l2_d_avg_u         = std::sqrt( l2_d_avg_u  / total_volume_local);
+    l2_d_avg_v         = std::sqrt( l2_d_avg_v  / total_volume_local);
+    l2_d_avg_w         = std::sqrt( l2_d_avg_w  / total_volume_local);
+    l2_d_rmsf_u        = std::sqrt( l2_d_rmsf_u / total_volume_local);
+    l2_d_rmsf_v        = std::sqrt( l2_d_rmsf_v / total_volume_local);
+    l2_d_rmsf_w        = std::sqrt( l2_d_rmsf_w / total_volume_local);
+    l2_avg_u_previous  = std::sqrt( l2_avg_u_previous  / total_volume_local);
+    l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
+    l2_rmsf_v_previous = std::sqrt( l2_rmsf_v_previous / total_volume_local);
+    l2_rmsf_w_previous = std::sqrt( l2_rmsf_w_previous / total_volume_local);
+    reward_local       = ( 3.0 - (   ( l2_d_avg_u / l2_avg_u_previous * 10.0 ) \
+                                   + ( l2_d_avg_v * 0.01 ) \
+                                   + ( l2_d_avg_w * 0.01 ) \
+                                   + ( l2_d_rmsf_u / l2_rmsf_u_previous ) \
+                                   + ( l2_d_rmsf_v / l2_rmsf_v_previous ) \
+                                   + ( l2_d_rmsf_w / l2_rmsf_w_previous ) ) ) * std::pow(current_time - begin_actuation_time, 3.0);
 
     /// Debugging
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with rmsf_u (k-2): " << rmsf_u_field_local_two_previous << ", rmsf_u (k-1): " << rmsf_u_field_local_previous << ", rmsf_u (k): " << rmsf_u_field_local 
-         << ", d_rmsf_u (k-1): " << d_rmsf_u_field_local_previous << ", d_rmsf_u (k): " << d_rmsf_u_field_local << endl;
+    cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
+         << "local reward: "  << reward_local << endl
+         << "reward terms: " 
+         << l2_d_avg_u / l2_avg_u_previous * 10.0 << " " 
+         << l2_d_avg_v * 0.01 << " "
+         << l2_d_avg_w * 0.01 << " "
+         << l2_d_rmsf_u / l2_rmsf_u_previous << " "
+         << l2_d_rmsf_v / l2_rmsf_v_previous << " " 
+         << l2_d_rmsf_w / l2_rmsf_w_previous << endl 
+         << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
     
-    /// Update rmsf_u,v,w_field_local_previous & rmsf_u,v,w_field_local_two_previous for next reward calculation
-    rmsf_u_field_local_two_previous = rmsf_u_field_local_previous;
-    rmsf_v_field_local_two_previous = rmsf_v_field_local_previous;
-    rmsf_w_field_local_two_previous = rmsf_w_field_local_previous;
-    rmsf_u_field_local_previous     = rmsf_u_field_local;
-    rmsf_v_field_local_previous     = rmsf_v_field_local;
-    rmsf_w_field_local_previous     = rmsf_w_field_local;
+    /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                avg_u_previous_field[I1D(i,j,k)]  = avg_u_field[I1D(i,j,k)];
+                rmsf_u_previous_field[I1D(i,j,k)] = rmsf_u_field[I1D(i,j,k)];
+                rmsf_v_previous_field[I1D(i,j,k)] = rmsf_v_field[I1D(i,j,k)];
+                rmsf_w_previous_field[I1D(i,j,k)] = rmsf_w_field[I1D(i,j,k)];
+            }
+        }
+    } 
 #endif
 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Update 'action_global_instant' - smooth transition from action_global_previous and action_global during all actuation_period
+/// Updates 'action_global_instant' - smooth transition from action_global_previous and action_global during all actuation_period
 void myRHEA::smoothControlFunction() {
     double actuation_period_fraction, f1, f2, f3;
     actuation_period_fraction = ( current_time - previous_actuation_time ) / actuation_period;
