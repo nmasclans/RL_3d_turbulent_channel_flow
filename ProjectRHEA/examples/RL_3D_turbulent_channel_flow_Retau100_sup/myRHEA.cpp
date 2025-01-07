@@ -668,8 +668,8 @@ void myRHEA::calculateSourceTerms() {
                                 symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
                                 sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
-                                /// Eigen-vectors Euler Rotation angles (dof #2-4)
-                                eigVect2eulerAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+                                /// Eigen-vectors Tait-Bryan Rotation angles (dof #2-4)
+                                eigVect2taitBryanAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
 
                                 /// Eigen-values Barycentric coordinates (dof #5-6)
                                 eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
@@ -687,7 +687,7 @@ void myRHEA::calculateSourceTerms() {
                                 enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
 
                                 /// Calculate perturbed & realizable Rij
-                                eulerAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                                taitBryanAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
                                 barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
                                 sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
                                 Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
@@ -1410,7 +1410,7 @@ void myRHEA::enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, d
    This ensures that the matrix represents a rotation without improper reflection or scaling.
    This has been check to be satisfied (+ computational error) at 15 feb. 2024 
 */
-void myRHEA::eigVect2eulerAngles(const vector<vector<double>> &Q, double &thetaZ, double &thetaY, double &thetaX){
+void myRHEA::eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &thetaZ, double &thetaY, double &thetaX){
     
     // thetaY         has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
     // thetaZ, thetaX has range (-pi, pi]     (range of 'atan2' function used in their calculation)
@@ -1426,8 +1426,8 @@ void myRHEA::eigVect2eulerAngles(const vector<vector<double>> &Q, double &thetaZ
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Transform Euler angles to rotation matrix of eigen-vectors
-void myRHEA::eulerAngles2eigVect(const double &thetaZ, const double &thetaY, const double &thetaX, vector<vector<double>> &Q) {
+/// Transform Tait-Bryan angles to rotation matrix of eigen-vectors
+void myRHEA::taitBryanAngles2eigVect(const double &thetaZ, const double &thetaY, const double &thetaX, vector<vector<double>> &Q) {
     Q.assign(3, vector<double>(3, 0.0));
     // Calculate trigonometric values
     double cz = cos(thetaZ);
