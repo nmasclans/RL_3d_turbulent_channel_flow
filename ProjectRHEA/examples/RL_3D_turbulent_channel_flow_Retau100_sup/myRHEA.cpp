@@ -1406,26 +1406,46 @@ void myRHEA::enforceRealizability(double &Rkk, double &phi1, double &phi2, doubl
 ///////////////////////////////////////////////////////////////////////////////
 /// From rotation matrix of eigenvectors calculate Euler angles (convention Z-X-Z)
 void myRHEA::eigVect2eulerAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3){
-    ...
+    // phi2       has range [0, pi]    (range of 'acos' function used in its calculation)
+    // phi1, phi3 has range (-pi, pi]  (range of 'atan2' function used in their calculation)
+    phi2 = std::acos(Q[2][2]);
+    if (std::abs(std::sin(phi2)) > EPS) {
+        /// Calculate phi1 using: Q[2][0] = s2 * s1 ; Q[2][1] = - s2 * c1 ;
+        /// Calculate phi3 using: Q[0][2] = s3 * s2 ; Q[1][2] =   c3 * s2 ;
+        phi1 = std::atan2(Q[2][0], - Q[2][1]);
+        phi3 = std::atan2(Q[0][2], Q[1][2]);
+    } else {
+        /// Set phi3=0 (c3=1, s3=0), solve for phi1
+        phi1 = std::atan2(Q[0][1], Q[0][0]);
+        phi3 = 0.0;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 /// From Euler angles (convention Z-X-Z) calculate rotation matrix of eigen-vectors
-/// thetaZ: phi1, thetaY: phi2, thetaX: phi3
+/*  Note: Expression of the rotation matrix of eigenvectors in terms of Euler angles
+    extracted from Classical Mechanics 2nd Edition, H. Goldstein, 1908, pag 147, eq. 4-46,
+    with notation phi: phi1, theta: phi2, psi: phi3
+*/  
 void myRHEA::eulerAngles2eigVect(const double &phi1, const double &phi2, const double &phi3, vector<vector<double>> &Q) {
     Q.assign(3, vector<double>(3, 0.0));
     // Calculate trigonometric values
-    ...
+    double c1 = cos(phi1);
+    double s1 = sin(phi1);
+    double c2 = cos(phi2);
+    double s2 = sin(phi2);
+    double c3 = cos(phi3);
+    double s3 = sin(phi3);
     // Calculate the elements of the rotation matrix
-    Q[0][0] = ... ;
-    Q[0][1] = ... ;
-    Q[0][2] = ... ;
-    Q[1][0] = ... ;
-    Q[1][1] = ... ;
-    Q[1][2] = ... ;
-    Q[2][0] = ... ;
-    Q[2][1] = ... ;
-    Q[2][2] = ... ;
+    Q[0][0] =   c3 * c1 - c2 * s1 * s3 ;
+    Q[0][1] =   c3 * s1 + c2 * c1 * s3 ;
+    Q[0][2] =   s3 * s2 ;
+    Q[1][0] = - s3 * c1 - c2 * s1 * c3 ;
+    Q[1][1] = - s3 * s1 + c2 * c1 * c3 ;
+    Q[1][2] =   c3 * s2 ;
+    Q[2][0] =   s2 * s1 ;
+    Q[2][1] = - s2 * c1 ;
+    Q[2][2] =   c2 ;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1433,14 +1453,14 @@ void myRHEA::eulerAngles2eigVect(const double &phi1, const double &phi2, const d
 /// thetaZ: phi1, thetaY: phi2, thetaX: phi3
 void myRHEA::eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3){
     
-    // phi2         has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
+    // phi2       has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
     // phi1, phi3 has range (-pi, pi]     (range of 'atan2' function used in their calculation)
     phi2 = std::asin(-Q[2][0]);
     if (std::abs(std::cos(phi2)) > EPS) { // Avoid gimbal lock
         phi1 = std::atan2(Q[1][0], Q[0][0]);
         phi3 = std::atan2(Q[2][1], Q[2][2]);
     } else {                                  // Gimbal lock, set yaw to 0 and calculate roll
-        phi1 = 0;
+        phi1 = 0.0;
         phi3 = std::atan2(-Q[0][1], Q[1][1]);
     }
 
