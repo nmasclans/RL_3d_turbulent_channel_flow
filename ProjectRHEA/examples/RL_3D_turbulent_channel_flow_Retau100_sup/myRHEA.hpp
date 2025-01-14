@@ -135,6 +135,8 @@ class myRHEA : public FlowSolverRHEA {
         /// Rij d.o.f. transformations
         void truncateAndNormalizeEigVal(vector<double> &lambda);
         void enforceRealizability(double &Rkk, double &phi1, double &phi2, double &phi3, double &xmap1, double &xmap2);
+        void eigVect2eulerAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3);
+        void eulerAngles2eigVect(const double &phi1, const double &phi2, const double &phi3, vector<vector<double>> &Q);        
         void eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3);
         void taitBryanAngles2eigVect(const double &phi1, const double &phi2, const double &phi3, vector<vector<double>> &Q);        
         void eigVal2barycentricCoord(const vector<double> &lambda, double &xmap1, double &xmap2);

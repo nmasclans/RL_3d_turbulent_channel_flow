@@ -1404,12 +1404,32 @@ void myRHEA::enforceRealizability(double &Rkk, double &phi1, double &phi2, doubl
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/* From rotation matrix of eigenvectors calculate Tait-Bryan angles
-   Attention: the rotation matrix of eigen-vectors must be indeed a proper rotation matrix. 
-   A proper rotation matrix is orthogonal (meaning its inverse is its transpose) and has a determinant of +1.
-   This ensures that the matrix represents a rotation without improper reflection or scaling.
-   This has been check to be satisfied (+ computational error) at 15 feb. 2024 
-*/
+/// From rotation matrix of eigenvectors calculate Euler angles (convention Z-X-Z)
+void myRHEA::eigVect2eulerAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3){
+    ...
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// From Euler angles (convention Z-X-Z) calculate rotation matrix of eigen-vectors
+/// thetaZ: phi1, thetaY: phi2, thetaX: phi3
+void myRHEA::eulerAngles2eigVect(const double &phi1, const double &phi2, const double &phi3, vector<vector<double>> &Q) {
+    Q.assign(3, vector<double>(3, 0.0));
+    // Calculate trigonometric values
+    ...
+    // Calculate the elements of the rotation matrix
+    Q[0][0] = ... ;
+    Q[0][1] = ... ;
+    Q[0][2] = ... ;
+    Q[1][0] = ... ;
+    Q[1][1] = ... ;
+    Q[1][2] = ... ;
+    Q[2][0] = ... ;
+    Q[2][1] = ... ;
+    Q[2][2] = ... ;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// From rotation matrix of eigenvectors calculate Tait-Bryan angles
 /// thetaZ: phi1, thetaY: phi2, thetaX: phi3
 void myRHEA::eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3){
     
