@@ -571,8 +571,8 @@ void myRHEA::calculateSourceTerms() {
             smoothControlFunction();        /// updates 'action_global_instant' from action_global, action_global_previous, current_time, previous_actuation_time and actuation_period 
 
             /// Initialize variables
-            double Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2; 
-            double DeltaRkk = 0.0, DeltaThetaZ = 0.0, DeltaThetaY = 0.0, DeltaThetaX = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
+            double Rkk, phi1, phi2, phi3, xmap1, xmap2; 
+            double DeltaRkk = 0.0, DeltaPhi1 = 0.0, DeltaPhi2 = 0.0, DeltaPhi3 = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
             double Rkk_inv, Akk;
             bool   isNegligibleAction, isNegligibleRkk;
             size_t actuation_idx;
@@ -592,47 +592,47 @@ void myRHEA::calculateSourceTerms() {
                             /// Get perturbation values from RL agent
                             actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
                             if (action_dim == 1) {
-                                DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-                                DeltaThetaZ = 0.0;
-                                DeltaThetaY = 0.0;
-                                DeltaThetaX = 0.0;
-                                DeltaXmap1  = 0.0;
-                                DeltaXmap2  = 0.0;
+                                DeltaRkk   = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaPhi1  = 0.0;
+                                DeltaPhi2  = 0.0;
+                                DeltaPhi3  = 0.0;
+                                DeltaXmap1 = 0.0;
+                                DeltaXmap2 = 0.0;
                             } else if (action_dim == 2) {
-				                DeltaRkk    = 0.0;
-                                DeltaThetaZ = 0.0;
-                                DeltaThetaY = 0.0;
-                                DeltaThetaX = 0.0;
-                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 0];
-                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 1];
+				                DeltaRkk   = 0.0;
+                                DeltaPhi1  = 0.0;
+                                DeltaPhi2  = 0.0;
+                                DeltaPhi3  = 0.0;
+                                DeltaXmap1 = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaXmap2 = action_global_instant[actuation_idx * action_dim + 1];
 				            } else if (action_dim == 3) {
-                                DeltaRkk    = 0.0;
-                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
-                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
-                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
-                                DeltaXmap1  = 0.0;
-                                DeltaXmap2  = 0.0;
+                                DeltaRkk   = 0.0;
+                                DeltaPhi1  = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaPhi2  = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaPhi3  = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaXmap1 = 0.0;
+                                DeltaXmap2 = 0.0;
 				            } else if (action_dim == 5) {
-                                DeltaRkk    = 0.0;
-                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 0];
-                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 1];
-                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 2];
-                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 3];
-                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 4];
+                                DeltaRkk   = 0.0;
+                                DeltaPhi1  = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaPhi2  = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaPhi3  = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaXmap1 = action_global_instant[actuation_idx * action_dim + 3];
+                                DeltaXmap2 = action_global_instant[actuation_idx * action_dim + 4];
                             } else if (action_dim == 6) {
-                                DeltaRkk    = action_global_instant[actuation_idx * action_dim + 0];
-                                DeltaThetaZ = action_global_instant[actuation_idx * action_dim + 1];
-                                DeltaThetaY = action_global_instant[actuation_idx * action_dim + 2];
-                                DeltaThetaX = action_global_instant[actuation_idx * action_dim + 3];
-                                DeltaXmap1  = action_global_instant[actuation_idx * action_dim + 4];
-                                DeltaXmap2  = action_global_instant[actuation_idx * action_dim + 5];
+                                DeltaRkk   = action_global_instant[actuation_idx * action_dim + 0];
+                                DeltaPhi1  = action_global_instant[actuation_idx * action_dim + 1];
+                                DeltaPhi2  = action_global_instant[actuation_idx * action_dim + 2];
+                                DeltaPhi3  = action_global_instant[actuation_idx * action_dim + 3];
+                                DeltaXmap1 = action_global_instant[actuation_idx * action_dim + 4];
+                                DeltaXmap2 = action_global_instant[actuation_idx * action_dim + 5];
                             } else {
                                 cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 1,2,3,5 and 6, but action_dim = " << action_dim << endl;
                                 MPI_Abort( MPI_COMM_WORLD, 1);
                             }
                             
                             /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
-                            isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaThetaZ) < EPS && abs(DeltaThetaY) < EPS && abs(DeltaThetaX) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                            isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaPhi1) < EPS && abs(DeltaPhi2) < EPS && abs(DeltaPhi3) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
                             Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
                             isNegligibleRkk    = (abs(Rkk) < EPS);
                             if (isNegligibleAction || isNegligibleRkk) {
@@ -669,25 +669,25 @@ void myRHEA::calculateSourceTerms() {
                                 sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
                                 /// Eigen-vectors Tait-Bryan Rotation angles (dof #2-4)
-                                eigVect2taitBryanAngles(Qij, thetaZ, thetaY, thetaX);      // update thetaZ, thetaY, thetaX
+                                eigVect2taitBryanAngles(Qij, phi1, phi2, phi3);      // update phi1, phi2, phi3
 
                                 /// Eigen-values Barycentric coordinates (dof #5-6)
                                 eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
 
                                 /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
                                 /// Delta_* are standarized values between 'action_bounds' RL parameter
-                                Rkk    = Rkk    * (1 + DeltaRkk);
-                                thetaZ = thetaZ * (1 + DeltaThetaZ);
-                                thetaY = thetaY * (1 + DeltaThetaY);
-                                thetaX = thetaX * (1 + DeltaThetaX);
-                                xmap1  = xmap1  * (1 + DeltaXmap1);
-                                xmap2  = xmap2  * (1 + DeltaXmap2);
+                                Rkk    = Rkk   * (1 + DeltaRkk);
+                                phi1   = phi1  * (1 + DeltaPhi1);
+                                phi2   = phi2  * (1 + DeltaPhi2);
+                                phi3   = phi3  * (1 + DeltaPhi3);
+                                xmap1  = xmap1 * (1 + DeltaXmap1);
+                                xmap2  = xmap2 * (1 + DeltaXmap2);
 
                                 /// Enforce realizability to perturbed Rij d.o.f
-                                enforceRealizability(Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2);    // update Rkk, thetaZ, thetaY, thetaX, xmap1, xmap2, if necessary
+                                enforceRealizability(Rkk, phi1, phi2, phi3, xmap1, xmap2);    // update Rkk, phi1, phi2, phi3, xmap1, xmap2, if necessary
 
                                 /// Calculate perturbed & realizable Rij
-                                taitBryanAngles2eigVect(thetaZ, thetaY, thetaX, Qij);                   // update Qij
+                                taitBryanAngles2eigVect(phi1, phi2, phi3, Qij);                   // update Qij
                                 barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
                                 sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
                                 Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
@@ -1383,12 +1383,12 @@ void myRHEA::truncateAndNormalizeEigVal(vector<double> &lambda){
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Enforce realizability conditions to Rij d.o.f.
-void myRHEA::enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, double &thetaX, double &xmap1, double &xmap2) {
+void myRHEA::enforceRealizability(double &Rkk, double &phi1, double &phi2, double &phi3, double &xmap1, double &xmap2) {
     
     /// Realizability condition Rkk: Rkk >= 0.0
     Rkk = max(Rkk, 0.0);
 
-    /// Realizability condition thetaZ, thetaY, thetaX: none
+    /// Realizability condition phi1, phi2, phi3: none
 
     /// Realizability condition xmap1, xmap2: 0 <= eigen-values <= 1
     vector<double> lambda(3, 0.0);
@@ -1404,38 +1404,40 @@ void myRHEA::enforceRealizability(double &Rkk, double &thetaZ, double &thetaY, d
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/* Calculate rotation angles from rotation matrix of eigenvectors
+/* From rotation matrix of eigenvectors calculate Tait-Bryan angles
    Attention: the rotation matrix of eigen-vectors must be indeed a proper rotation matrix. 
    A proper rotation matrix is orthogonal (meaning its inverse is its transpose) and has a determinant of +1.
    This ensures that the matrix represents a rotation without improper reflection or scaling.
    This has been check to be satisfied (+ computational error) at 15 feb. 2024 
 */
-void myRHEA::eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &thetaZ, double &thetaY, double &thetaX){
+/// thetaZ: phi1, thetaY: phi2, thetaX: phi3
+void myRHEA::eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3){
     
-    // thetaY         has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
-    // thetaZ, thetaX has range (-pi, pi]     (range of 'atan2' function used in their calculation)
-    thetaY = std::asin(-Q[2][0]);
-    if (std::abs(std::cos(thetaY)) > EPS) { // Avoid gimbal lock
-        thetaZ = std::atan2(Q[1][0], Q[0][0]);
-        thetaX = std::atan2(Q[2][1], Q[2][2]);
+    // phi2         has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
+    // phi1, phi3 has range (-pi, pi]     (range of 'atan2' function used in their calculation)
+    phi2 = std::asin(-Q[2][0]);
+    if (std::abs(std::cos(phi2)) > EPS) { // Avoid gimbal lock
+        phi1 = std::atan2(Q[1][0], Q[0][0]);
+        phi3 = std::atan2(Q[2][1], Q[2][2]);
     } else {                                  // Gimbal lock, set yaw to 0 and calculate roll
-        thetaZ = 0;
-        thetaX = std::atan2(-Q[0][1], Q[1][1]);
+        phi1 = 0;
+        phi3 = std::atan2(-Q[0][1], Q[1][1]);
     }
 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Transform Tait-Bryan angles to rotation matrix of eigen-vectors
-void myRHEA::taitBryanAngles2eigVect(const double &thetaZ, const double &thetaY, const double &thetaX, vector<vector<double>> &Q) {
+/// From Tait-Bryan angles calculate rotation matrix of eigen-vectors
+/// thetaZ: phi1, thetaY: phi2, thetaX: phi3
+void myRHEA::taitBryanAngles2eigVect(const double &phi1, const double &phi2, const double &phi3, vector<vector<double>> &Q) {
     Q.assign(3, vector<double>(3, 0.0));
     // Calculate trigonometric values
-    double cz = cos(thetaZ);
-    double sz = sin(thetaZ);
-    double cy = cos(thetaY);
-    double sy = sin(thetaY);
-    double cx = cos(thetaX);
-    double sx = sin(thetaX);
+    double cz = cos(phi1);
+    double sz = sin(phi1);
+    double cy = cos(phi2);
+    double sy = sin(phi2);
+    double cx = cos(phi3);
+    double sx = sin(phi3);
     // Calculate the elements of the rotation matrix
     Q[0][0] = cy * cz;
     Q[0][1] = cy * sz;
