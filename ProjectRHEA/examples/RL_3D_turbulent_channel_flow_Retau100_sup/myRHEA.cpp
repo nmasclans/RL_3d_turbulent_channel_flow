@@ -668,7 +668,7 @@ void myRHEA::calculateSourceTerms() {
                                 symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
                                 sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
-                                /// Eigen-vectors Tait-Bryan Rotation angles (dof #2-4)
+                                /// Eigen-vectors Euler ZXZ rotation angles (dof #2-4)
                                 eigVect2eulerAngles(Qij, phi1, phi2, phi3);      // update phi1, phi2, phi3
 
                                 /// Eigen-values Barycentric coordinates (dof #5-6)
