@@ -1449,48 +1449,6 @@ void myRHEA::eulerAngles2eigVect(const double &phi1, const double &phi2, const d
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// From rotation matrix of eigenvectors calculate Tait-Bryan angles
-/// thetaZ: phi1, thetaY: phi2, thetaX: phi3
-void myRHEA::eigVect2taitBryanAngles(const vector<vector<double>> &Q, double &phi1, double &phi2, double &phi3){
-    
-    // phi2       has range [-pi/2, pi/2] (range of 'asin' function used in its calculation)
-    // phi1, phi3 has range (-pi, pi]     (range of 'atan2' function used in their calculation)
-    phi2 = std::asin(-Q[2][0]);
-    if (std::abs(std::cos(phi2)) > EPS) { // Avoid gimbal lock
-        phi1 = std::atan2(Q[1][0], Q[0][0]);
-        phi3 = std::atan2(Q[2][1], Q[2][2]);
-    } else {                                  // Gimbal lock, set yaw to 0 and calculate roll
-        phi1 = 0.0;
-        phi3 = std::atan2(-Q[0][1], Q[1][1]);
-    }
-
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// From Tait-Bryan angles calculate rotation matrix of eigen-vectors
-/// thetaZ: phi1, thetaY: phi2, thetaX: phi3
-void myRHEA::taitBryanAngles2eigVect(const double &phi1, const double &phi2, const double &phi3, vector<vector<double>> &Q) {
-    Q.assign(3, vector<double>(3, 0.0));
-    // Calculate trigonometric values
-    double cz = cos(phi1);
-    double sz = sin(phi1);
-    double cy = cos(phi2);
-    double sy = sin(phi2);
-    double cx = cos(phi3);
-    double sx = sin(phi3);
-    // Calculate the elements of the rotation matrix
-    Q[0][0] = cy * cz;
-    Q[0][1] = cy * sz;
-    Q[0][2] = -sy;
-    Q[1][0] = (sx * sy * cz) - (cx * sz);
-    Q[1][1] = (sx * sy * sz) + (cx * cz);
-    Q[1][2] = sx * cy;
-    Q[2][0] = (cx * sy * cz) + (sx * sz);
-    Q[2][1] = (cx * sy * sz) - (sx * cz);
-    Q[2][2] = cx * cy;
-}
-
-///////////////////////////////////////////////////////////////////////////////
 /// Transform eigen-values vector (lambda) to barycentric map coordinates (xmap1, xmap2) 
 void myRHEA::eigVal2barycentricCoord(const vector<double> &lambda, double &xmap1, double &xmap2){
     // Assuming lambda is always of size 3
