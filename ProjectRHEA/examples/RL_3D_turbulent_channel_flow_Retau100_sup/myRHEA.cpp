@@ -669,7 +669,7 @@ void myRHEA::calculateSourceTerms() {
                                 sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
                                 /// Eigen-vectors Tait-Bryan Rotation angles (dof #2-4)
-                                eigVect2taitBryanAngles(Qij, phi1, phi2, phi3);      // update phi1, phi2, phi3
+                                eigVect2eulerAngles(Qij, phi1, phi2, phi3);      // update phi1, phi2, phi3
 
                                 /// Eigen-values Barycentric coordinates (dof #5-6)
                                 eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
@@ -687,7 +687,7 @@ void myRHEA::calculateSourceTerms() {
                                 enforceRealizability(Rkk, phi1, phi2, phi3, xmap1, xmap2);    // update Rkk, phi1, phi2, phi3, xmap1, xmap2, if necessary
 
                                 /// Calculate perturbed & realizable Rij
-                                taitBryanAngles2eigVect(phi1, phi2, phi3, Qij);                   // update Qij
+                                eulerAngles2eigVect(phi1, phi2, phi3, Qij);                   // update Qij
                                 barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
                                 sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
                                 Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
