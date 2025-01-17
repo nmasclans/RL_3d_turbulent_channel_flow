@@ -58,6 +58,12 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
         DistributedArray rl_f_rhov_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
         DistributedArray rl_f_rhow_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
+        DistributedArray Rkk_field;
+        DistributedArray phi1_field;
+        DistributedArray phi2_field;
+        DistributedArray phi3_field;
+        DistributedArray xmap1_field;
+        DistributedArray xmap2_field;
         DistributedArray DeltaRxx_field;               /// 3-D field of DeltaRxx
         DistributedArray DeltaRxy_field;               /// 3-D field of DeltaRxy
         DistributedArray DeltaRxz_field;               /// 3-D field of DeltaRxz
@@ -123,6 +129,7 @@ class myRHEA : public FlowSolverRHEA {
         void updateState();
         void calculateReward();
         void smoothControlFunction();
+        void updateRijEigParam();
 
     private:
 
@@ -131,7 +138,7 @@ class myRHEA : public FlowSolverRHEA {
         void eigenDecomposition2Matrix(const vector<vector<double>> &D, const vector<vector<double>> &Q, vector<vector<double>> &A);
         void sortEigenDecomposition(vector<vector<double>> &Q, vector<vector<double>> &D);
         void matrixMultiplicate(const vector<vector<double>> &A, const vector<vector<double>> &B, vector<vector<double>> &C);
-        
+
         /// Rij d.o.f. transformations
         void truncateAndNormalizeEigVal(vector<double> &lambda);
         void enforceRealizability(double &Rkk, double &phi1, double &phi2, double &phi3, double &xmap1, double &xmap2);
