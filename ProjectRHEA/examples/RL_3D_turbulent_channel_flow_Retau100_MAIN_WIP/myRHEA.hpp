@@ -58,6 +58,12 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
         DistributedArray rl_f_rhov_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
         DistributedArray rl_f_rhow_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
+        DistributedArray rl_f_rhou_field_prev_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray rl_f_rhov_field_prev_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray rl_f_rhow_field_prev_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray rl_f_rhou_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray rl_f_rhov_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray rl_f_rhow_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray DeltaRxx_field;               /// 3-D field of DeltaRxx
         DistributedArray DeltaRxy_field;               /// 3-D field of DeltaRxy
         DistributedArray DeltaRxz_field;               /// 3-D field of DeltaRxz
@@ -109,8 +115,6 @@ class myRHEA : public FlowSolverRHEA {
         int action_global_size2;                 /// or nRectangleControl
         double reward_local;
         std::vector<double> action_global;
-        std::vector<double> action_global_previous;
-        std::vector<double> action_global_instant;
         std::vector<double> state_local;
 
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered, const string &global_step);
@@ -122,7 +126,6 @@ class myRHEA : public FlowSolverRHEA {
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void updateState();
         void calculateReward();
-        void smoothControlFunction();
 
     private:
 
