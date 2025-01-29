@@ -1,5 +1,3 @@
-*.h5
-*.xdmf
-*.exe
-*.out
-nohup*
+*
+!myRHEA.cpp
+!myRHEA.hpp
