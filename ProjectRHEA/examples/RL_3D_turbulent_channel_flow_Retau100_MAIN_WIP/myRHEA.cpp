@@ -15,7 +15,6 @@ using namespace std;
 #define _FEEDBACK_LOOP_BODY_FORCE_ 1				/// Activate feedback loop for the body force moving the flow
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
-#define _REGULARIZE_RL_ACTION_ 0                    /// Activate regularization for RL action or RL source term w.r.t. momentum equation rhs 
 #define _RL_CONTROL_IS_SUPERVISED_ 1 
 #define _SPATIAL_SMOOTHING_RL_ACTION_ 1
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
@@ -68,10 +67,6 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
     #error "RL_CASE_PATH is not defined! Please define it during compilation."
 #endif
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
-
-#if _REGULARIZE_RL_ACTION_
-const vector<double> reg_lambda_vect = {0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.55, 0.55};    /// TODO: add check somewhere, length must correspond to num. nodes total, and num. nodes along y-axis
-#endif
 
 int action_dim = 6;
 /// eigen-values barycentric map coordinates - corners of realizable region
@@ -1078,18 +1073,6 @@ void myRHEA::timeAdvanceConservedVariables() {
     double f2 = exp(-1.0 / (1.0 - actuation_period_fraction));
     double f3 = f1 / (f1 + f2);
 #endif
-#if _REGULARIZE_RL_ACTION_
-    /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
-    double reg_lambda;
-    /// Apply smooth regularization when RL control term << RHS term
-    double rhou_rhs, rhov_rhs, rhow_rhs;
-    double rhou_rl_f, rhov_rl_f, rhow_rl_f;
-    double rhou_rl_f_reg, rhov_rl_f_reg, rhow_rl_f_reg;
-    /// Debugging additional variables
-    double rl_f_rhou_field_reg_factor = 0.0;
-    int saturated_actions_counter = 0;
-    /// ---- smooth regularization of RL control load by hyperbolic tangent function ----
-#endif
 
     /// Coefficients of explicit Runge-Kutta stages
     double rk_a = 0.0, rk_b = 0.0, rk_c = 0.0;
@@ -1139,35 +1122,6 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rl_f_rhow_field[I1D(i,j,k)] = rl_f_rhow_field_prev_step[I1D(i,j,k)] + f3 * ( rl_f_rhow_field_curr_step[I1D(i,j,k)] - rl_f_rhow_field_prev_step[I1D(i,j,k)] ); 
 #endif  /// of _TEMPORAL_SMOOTHING_RL_ACTION_
 
-#if _REGULARIZE_RL_ACTION_
-                /// ---- Smooth regularization of RL control load by hyperbolic tangent function ----
-                reg_lambda = reg_lambda_vect.at(my_rank);
-                /// Calculate RL control load ratio wrt RHS with no RL control load
-                rhou_rhs      = ( -1.0 ) * rhou_inv_flux[I1D(i,j,k)] + rhou_vis_flux[I1D(i,j,k)] + f_rhou_field[I1D(i,j,k)];
-                rhov_rhs      = ( -1.0 ) * rhov_inv_flux[I1D(i,j,k)] + rhov_vis_flux[I1D(i,j,k)] + f_rhov_field[I1D(i,j,k)];
-                rhow_rhs      = ( -1.0 ) * rhow_inv_flux[I1D(i,j,k)] + rhow_vis_flux[I1D(i,j,k)] + f_rhow_field[I1D(i,j,k)];
-                rhou_rl_f     = rl_f_rhou_field[I1D(i,j,k)];
-                rhov_rl_f     = rl_f_rhov_field[I1D(i,j,k)];
-                rhow_rl_f     = rl_f_rhow_field[I1D(i,j,k)];
-                /// Apply smooth regularization approach when |rl_f| < |rhs|/10.0, E = 0.1 achieves regularization to be smooth enough
-                /// TODO: improve regularization, not smooth! (specially else if)
-                if ( std::abs(rhou_rl_f) < ( std::abs(rhou_rhs) * reg_lambda ) ) {
-                    rhou_rl_f_reg = ( rhou_rhs * reg_lambda ) * std::tanh( rhou_rl_f / ( 0.5 * ( rhou_rhs * reg_lambda ) + EPS) );
-                    rhov_rl_f_reg = ( rhov_rhs * reg_lambda ) * std::tanh( rhov_rl_f / ( 0.5 * ( rhov_rhs * reg_lambda ) + EPS) );
-                    rhow_rl_f_reg = ( rhow_rhs * reg_lambda ) * std::tanh( rhow_rl_f / ( 0.5 * ( rhow_rhs * reg_lambda ) + EPS) );
-                } else { /// saturate actions
-                    rhou_rl_f_reg = rhou_rl_f  * int( abs( (rhou_rhs * reg_lambda) / (rhou_rl_f + EPS) ) ); 
-                    rhov_rl_f_reg = rhov_rl_f  * int( abs( (rhov_rhs * reg_lambda) / (rhov_rl_f + EPS) ) ); 
-                    rhow_rl_f_reg = rhow_rl_f  * int( abs( (rhow_rhs * reg_lambda) / (rhow_rl_f + EPS) ) ); 
-                    saturated_actions_counter += 1;
-                }
-                /// TODO: improve this regularization, check commented code above!
-                /// Update 'rl_f_rhow_field'
-                rl_f_rhou_field[I1D(i,j,k)] = rhou_rl_f_reg;
-                rl_f_rhov_field[I1D(i,j,k)] = rhov_rl_f_reg;
-                rl_f_rhow_field[I1D(i,j,k)] = rhow_rl_f_reg;
-#endif  /// of _REGULARIZE_RL_ACTION_
-
                 /// Work of momentum sources
                 f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)]) * u_field[I1D(i,j,k)]
                          + (f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]) * v_field[I1D(i,j,k)]
@@ -1193,9 +1147,6 @@ void myRHEA::timeAdvanceConservedVariables() {
                     rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
                     f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / ( rhou_rhs_flux + EPS ) );
                     rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / ( rhou_rhs_flux + EPS) );
-#if _REGULARIZE_RL_ACTION_
-                    rl_f_rhou_field_reg_factor   += std::abs( rhou_rl_f_reg               / ( rhou_rl_f + EPS) );
-#endif
                     ratio_counter += 1;
                 }
 	        }
@@ -1205,16 +1156,10 @@ void myRHEA::timeAdvanceConservedVariables() {
     rhou_vis_flux_ratio          /= ratio_counter;
     f_rhou_field_ratio           /= ratio_counter;
     rl_f_rhou_field_ratio        /= ratio_counter;
-#if _REGULARIZE_RL_ACTION_
-    rl_f_rhou_field_reg_factor   /= ratio_counter;
-#endif
     
     /// Summarized output
     if ( my_rank < 4) {
         cout << endl << "Rank " << my_rank << " u-RHS Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
-#if _REGULARIZE_RL_ACTION_
-        cout << "Rank " << my_rank << " u-RHS Ratio f_rl / f_rl_nonReg: " << rl_f_rhou_field_reg_factor << ", # saturated: " << saturated_actions_counter << endl;
-#endif
     }
 
 #if _OPENACC_MANUAL_DATA_MOVEMENT_
