@@ -95,15 +95,14 @@ boundary_conditions:
 
 ##### PRINT/WRITE/READ PARAMETERS #####
 print_write_read_parameters:
-   print_frequency_iter: 1000	             				   # Print information iteration frequency
+   print_frequency_iter: 10000	             				   # Print information iteration frequency
    output_data_file_name: 'RL_3d_turbulent_channel_flow'    # Name of output data file
    output_frequency_iter: 10000000   					         # Data output iteration frequency
    generate_xdmf_file: 'TRUE'          				      # Generate xdmf file reader
    use_restart: 'TRUE'                					      # Use restart to initialize problem
    restart_data_file: 'restart_data_file.h5' 			   # Restart data file
-   #time_averaging_active: 'FALSE'          				   # Activate time averaging
    time_averaging_active: 'TRUE'          				   # Activate time averaging
-   reset_time_averaging: 'TRUE'          				   # Reset time averaging
+   reset_time_averaging: 'FALSE'          				   # Reset time averaging
 
 
 ##### TWO-DIMENSIONAL DATA OUTPUT SLICES #####
@@ -136,26 +135,134 @@ two_dimensional_data_output_slices:
 
 
 ##### TEMPORAL POINT PROBES #####
+# 4 y-coords of interest: [0.125, 0.375, 0.625, 0.875]
+# 5 probes along z-axis per each y-coord (for averaging probes data): [0.4188790205, 1.2566370615, 2.0943951025, 2.9321531435, 3.7699111845] 
 temporal_point_probes:
-   number_temporal_point_probes: 0            				# Number of temporal point probes
-   ## TEMPORAL POINT PROBE 1
-   #probe_1_x_position: 6.283185307179586       			# Probe 1 position in x-direction [m]
-   #probe_1_y_position: 0.01                    			# Probe 1 position in y-direction [m]
-   #probe_1_z_position: 2.0943951023931953      			# Probe 1 position in z-direction [m]
-   #probe_1_output_frequency_iter: 1      				   # Probe 1 output iteration frequency
-   #probe_1_output_data_file_name: 'temporal_point_probe_y_plus_1.csv'   # Probe 1 name of output data file
-   ## TEMPORAL POINT PROBE 2
-   #probe_2_x_position: 6.283185307179586       			# Probe 2 position in x-direction [m]
-   #probe_2_y_position: 0.1                    				# Probe 2 position in y-direction [m]
-   #probe_2_z_position: 2.0943951023931953      			# Probe 2 position in z-direction [m]
-   #probe_2_output_frequency_iter: 1      				   # Probe 2 output iteration frequency
-   #probe_2_output_data_file_name: 'temporal_point_probe_y_plus_10.csv'  # Probe 2 name of output data file
-   ## TEMPORAL POINT PROBE 3
-   #probe_3_x_position: 6.283185307179586       			# Probe 3 position in x-direction [m]
-   #probe_3_y_position: 1.0                    				# Probe 3 position in y-direction [m]
-   #probe_3_z_position: 2.0943951023931953      			# Probe 3 position in z-direction [m]
-   #probe_3_output_frequency_iter: 1      				   # Probe 3 output iteration frequency
-   #probe_3_output_data_file_name: 'temporal_point_probe_y_plus_100.csv' # Probe 3 name of output data file
+   number_temporal_point_probes: 20            				                     # Number of temporal point probes
+   ### PROBES 1-5: y_position: 0.375
+   # TEMPORAL POINT PROBE 1
+   probe_1_x_position: 6.283185307179586       			                        # Probe 1 position in x-direction [m]
+   probe_1_y_position: 0.125                    	                           # Probe 1 position in y-direction [m]
+   probe_1_z_position: 0.4188790205            			                        # Probe 1 position in z-direction [m]
+   probe_1_output_frequency_iter: 1      				                           # Probe 1 output iteration frequency
+   probe_1_output_data_file_name: 'temporal_point_probe_y_plus_0125_1.csv'    # Probe 1 name of output data file
+   # TEMPORAL POINT PROBE 2
+   probe_2_x_position: 6.283185307179586       			                        # Probe 2 position in x-direction [m]
+   probe_2_y_position: 0.125                    			                     # Probe 2 position in y-direction [m]
+   probe_2_z_position: 1.2566370615            			                        # Probe 2 position in z-direction [m]
+   probe_2_output_frequency_iter: 1      				                           # Probe 2 output iteration frequency
+   probe_2_output_data_file_name: 'temporal_point_probe_y_plus_0125_2.csv'    # Probe 2 name of output data file
+   # TEMPORAL POINT PROBE 3
+   probe_3_x_position: 6.283185307179586       			                        # Probe 3 position in x-direction [m]
+   probe_3_y_position: 0.125                    			                     # Probe 3 position in y-direction [m]
+   probe_3_z_position: 2.0943951025            			                        # Probe 3 position in z-direction [m]
+   probe_3_output_frequency_iter: 1      				                           # Probe 3 output iteration frequency
+   probe_3_output_data_file_name: 'temporal_point_probe_y_plus_0125_3.csv'    # Probe 3 name of output data file
+   # TEMPORAL POINT PROBE 4
+   probe_4_x_position: 6.283185307179586       			                        # Probe 4 position in x-direction [m]
+   probe_4_y_position: 0.125                    			                     # Probe 4 position in y-direction [m]
+   probe_4_z_position: 2.9321531435            			                        # Probe 4 position in z-direction [m]
+   probe_4_output_frequency_iter: 1      				                           # Probe 4 output iteration frequency
+   probe_4_output_data_file_name: 'temporal_point_probe_y_plus_0125_4.csv'    # Probe 4 name of output data file
+   # TEMPORAL POINT PROBE 5
+   probe_5_x_position: 6.283185307179586       			                        # Probe 5 position in x-direction [m]
+   probe_5_y_position: 0.125                    			                     # Probe 5 position in y-direction [m]
+   probe_5_z_position: 3.7699111845            			                        # Probe 5 position in z-direction [m]
+   probe_5_output_frequency_iter: 1      				                           # Probe 5 output iteration frequency
+   probe_5_output_data_file_name: 'temporal_point_probe_y_plus_0125_5.csv'    # Probe 5 name of output data file
+   ### PROBES 6-10: y_position: 0.375
+   # TEMPORAL POINT PROBE 6
+   probe_6_x_position: 6.283185307179586       			                        # Probe 6 position in x-direction [m]
+   probe_6_y_position: 0.375                    	                           # Probe 6 position in y-direction [m]
+   probe_6_z_position: 0.4188790205            			                        # Probe 6 position in z-direction [m]
+   probe_6_output_frequency_iter: 1      				                           # Probe 6 output iteration frequency
+   probe_6_output_data_file_name: 'temporal_point_probe_y_plus_0375_1.csv'    # Probe 6 name of output data file
+   # TEMPORAL POINT PROBE 7
+   probe_7_x_position: 6.283185307179586       			                        # Probe 7 position in x-direction [m]
+   probe_7_y_position: 0.375                    			                     # Probe 7 position in y-direction [m]
+   probe_7_z_position: 1.2566370615            			                        # Probe 7 position in z-direction [m]
+   probe_7_output_frequency_iter: 1      				                           # Probe 7 output iteration frequency
+   probe_7_output_data_file_name: 'temporal_point_probe_y_plus_0375_2.csv'    # Probe 7 name of output data file
+   # TEMPORAL POINT PROBE 8
+   probe_8_x_position: 6.283185307179586       			                        # Probe 8 position in x-direction [m]
+   probe_8_y_position: 0.375                    			                     # Probe 8 position in y-direction [m]
+   probe_8_z_position: 2.0943951025            			                        # Probe 8 position in z-direction [m]
+   probe_8_output_frequency_iter: 1      				                           # Probe 8 output iteration frequency
+   probe_8_output_data_file_name: 'temporal_point_probe_y_plus_0375_3.csv'    # Probe 8 name of output data file
+   # TEMPORAL POINT PROBE 9
+   probe_9_x_position: 6.283185307179586       			                        # Probe 9 position in x-direction [m]
+   probe_9_y_position: 0.375                    			                     # Probe 9 position in y-direction [m]
+   probe_9_z_position: 2.9321531435            			                        # Probe 9 position in z-direction [m]
+   probe_9_output_frequency_iter: 1      				                           # Probe 9 output iteration frequency
+   probe_9_output_data_file_name: 'temporal_point_probe_y_plus_0375_4.csv'    # Probe 9 name of output data file
+   # TEMPORAL POINT PROBE 10
+   probe_10_x_position: 6.283185307179586       			                     # Probe 10 position in x-direction [m]
+   probe_10_y_position: 0.375                    			                     # Probe 10 position in y-direction [m]
+   probe_10_z_position: 3.7699111845            			                     # Probe 10 position in z-direction [m]
+   probe_10_output_frequency_iter: 1      				                        # Probe 10 output iteration frequency
+   probe_10_output_data_file_name: 'temporal_point_probe_y_plus_0375_5.csv'   # Probe 10 name of output data file
+   ### PROBES 11-15: y_position: 0.625
+   # TEMPORAL POINT PROBE 11
+   probe_11_x_position: 6.283185307179586       			                     # Probe 11 position in x-direction [m]
+   probe_11_y_position: 0.625                    	                           # Probe 11 position in y-direction [m]
+   probe_11_z_position: 0.4188790205            			                     # Probe 11 position in z-direction [m]
+   probe_11_output_frequency_iter: 1      				                        # Probe 11 output iteration frequency
+   probe_11_output_data_file_name: 'temporal_point_probe_y_plus_0625_1.csv'   # Probe 11 name of output data file
+   # TEMPORAL POINT PROBE 12
+   probe_12_x_position: 6.283185307179586       			                     # Probe 12 position in x-direction [m]
+   probe_12_y_position: 0.625                    			                     # Probe 12 position in y-direction [m]
+   probe_12_z_position: 1.2566370615            			                     # Probe 12 position in z-direction [m]
+   probe_12_output_frequency_iter: 1      				                        # Probe 12 output iteration frequency
+   probe_12_output_data_file_name: 'temporal_point_probe_y_plus_0625_2.csv'   # Probe 12 name of output data file
+   # TEMPORAL POINT PROBE 13
+   probe_13_x_position: 6.283185307179586       			                     # Probe 13 position in x-direction [m]
+   probe_13_y_position: 0.625                    			                     # Probe 13 position in y-direction [m]
+   probe_13_z_position: 2.0943951025            			                     # Probe 13 position in z-direction [m]
+   probe_13_output_frequency_iter: 1      				                        # Probe 13 output iteration frequency
+   probe_13_output_data_file_name: 'temporal_point_probe_y_plus_0625_3.csv'   # Probe 13 name of output data file
+   # TEMPORAL POINT PROBE 14
+   probe_14_x_position: 6.283185307179586       			                     # Probe 14 position in x-direction [m]
+   probe_14_y_position: 0.625                    			                     # Probe 14 position in y-direction [m]
+   probe_14_z_position: 2.9321531435            			                     # Probe 14 position in z-direction [m]
+   probe_14_output_frequency_iter: 1      				                        # Probe 14 output iteration frequency
+   probe_14_output_data_file_name: 'temporal_point_probe_y_plus_0625_4.csv'   # Probe 14 name of output data file
+   # TEMPORAL POINT PROBE 15
+   probe_15_x_position: 6.283185307179586       			                     # Probe 15 position in x-direction [m]
+   probe_15_y_position: 0.625                    			                     # Probe 15 position in y-direction [m]
+   probe_15_z_position: 3.7699111845            			                     # Probe 15 position in z-direction [m]
+   probe_15_output_frequency_iter: 1      				                        # Probe 15 output iteration frequency
+   probe_15_output_data_file_name: 'temporal_point_probe_y_plus_0625_5.csv'   # Probe 15 name of output data file
+   ### PROBES 16-20: y_position: 0.875
+   # TEMPORAL POINT PROBE 16
+   probe_16_x_position: 6.283185307179586       			                     # Probe 16 position in x-direction [m]
+   probe_16_y_position: 0.875                    	                           # Probe 16 position in y-direction [m]
+   probe_16_z_position: 0.4188790205            			                     # Probe 16 position in z-direction [m]
+   probe_16_output_frequency_iter: 1      				                        # Probe 16 output iteration frequency
+   probe_16_output_data_file_name: 'temporal_point_probe_y_plus_0875_1.csv'   # Probe 16 name of output data file
+   # TEMPORAL POINT PROBE 17
+   probe_17_x_position: 6.283185307179586       			                     # Probe 17 position in x-direction [m]
+   probe_17_y_position: 0.875                    			                     # Probe 17 position in y-direction [m]
+   probe_17_z_position: 1.2566370615            			                     # Probe 17 position in z-direction [m]
+   probe_17_output_frequency_iter: 1      				                        # Probe 17 output iteration frequency
+   probe_17_output_data_file_name: 'temporal_point_probe_y_plus_0875_2.csv'   # Probe 17 name of output data file
+   # TEMPORAL POINT PROBE 18
+   probe_18_x_position: 6.283185307179586       			                     # Probe 18 position in x-direction [m]
+   probe_18_y_position: 0.875                    			                     # Probe 18 position in y-direction [m]
+   probe_18_z_position: 2.0943951025            			                     # Probe 18 position in z-direction [m]
+   probe_18_output_frequency_iter: 1      				                        # Probe 18 output iteration frequency
+   probe_18_output_data_file_name: 'temporal_point_probe_y_plus_0875_3.csv'   # Probe 18 name of output data file
+   # TEMPORAL POINT PROBE 19
+   probe_19_x_position: 6.283185307179586       			                     # Probe 19 position in x-direction [m]
+   probe_19_y_position: 0.875                    			                     # Probe 19 position in y-direction [m]
+   probe_19_z_position: 2.9321531435            			                     # Probe 19 position in z-direction [m]
+   probe_19_output_frequency_iter: 1      				                        # Probe 19 output iteration frequency
+   probe_19_output_data_file_name: 'temporal_point_probe_y_plus_0875_4.csv'   # Probe 19 name of output data file
+   # TEMPORAL POINT PROBE 20
+   probe_20_x_position: 6.283185307179586       			                     # Probe 20 position in x-direction [m]
+   probe_20_y_position: 0.875                    			                     # Probe 20 position in y-direction [m]
+   probe_20_z_position: 3.7699111845            			                     # Probe 20 position in z-direction [m]
+   probe_20_output_frequency_iter: 1      				                        # Probe 20 output iteration frequency
+   probe_20_output_data_file_name: 'temporal_point_probe_y_plus_0875_5.csv'   # Probe 20 name of output data file
 
 
 ##### TIMERS INFORMATION #####
