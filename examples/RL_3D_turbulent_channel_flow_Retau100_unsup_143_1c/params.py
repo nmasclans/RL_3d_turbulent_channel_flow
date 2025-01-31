@@ -1,4 +1,4 @@
-import random, os, numpy as np
+import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
@@ -96,7 +96,7 @@ params = {
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]
-    "seed": 10,
+    "seed": int(time.time()%(2**32)),
     "ckpt_num": int(1e6),
     "ckpt_interval": 1,
     #"do_profile": False,               # TODO: remove if not used
