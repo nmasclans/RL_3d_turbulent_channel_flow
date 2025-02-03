@@ -47,7 +47,7 @@ if not os.path.exists(probelinesDir):
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
-iteration_max_nonRL = 4000000
+iteration_max_nonRL = 3790000
 
 # Custom colormap
 cmap = plt.get_cmap('RdBu_r')  # Replace with your desired colormap

@@ -45,7 +45,7 @@ if not os.path.exists(postDir):
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
-iteration_max_nonRL = 4000000
+iteration_max_nonRL = 3790000
 max_length_legend_RL = 10
 
 # RL parameters
@@ -114,6 +114,7 @@ N = len(filename_RL_list)
 train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
 iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
+
 assert N == len(train_step_list)
 print("\nnon-RL files:")
 for i in range(N):
@@ -152,7 +153,6 @@ filename_RL_list    = filename_RL_list_available
 filename_nonRL_list = filename_nonRL_list_available
 N = len(filename_RL_list)   # update N
 print(f"Datasets RL and non-RL have now {N} files each")
-
 
 # ----------- Get RL and non-RL data ------------
 
