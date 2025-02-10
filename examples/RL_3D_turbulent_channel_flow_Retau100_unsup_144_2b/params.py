@@ -51,7 +51,7 @@ params = {
 
     # RL params
     "mode": mode,
-    "num_episodes": 100000,
+    "num_episodes": 408,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if mode == "train" else t_episode_eval,
