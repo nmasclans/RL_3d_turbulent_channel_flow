@@ -173,12 +173,12 @@ class RheaEnv(py_environment.PyEnvironment):
             os.makedirs(self.dump_data_path)
         if self.mode == "eval" and os.path.exists(self.dump_data_path):
             counter = 0
-            path = self.dump_data_path + f"_{counter}"
+            path = os.path.join(self.dump_data_path, f"eval_{counter}")
             while os.path.exists(path):
                 counter += 1
-                path = self.dump_data_path + f"_{counter}"
-            os.rename(self.dump_data_path, path)
-            logger.info(f"{bcolors.WARNING}The data path `{self.dump_data_path}` exists. Moving it to `{path}`{bcolors.ENDC}")
+                path = os.path.join(self.dump_data_path, f"eval_{counter}")
+            self.dump_data_path = path
+            logger.info(f"Evaluation data path: `{self.dump_data_path}`")
         if self.dump_data_flag:
             if not os.path.exists(os.path.join(self.dump_data_path, "state")):
                 os.makedirs(os.path.join(self.dump_data_path, "state"))
@@ -856,6 +856,10 @@ class RheaEnv(py_environment.PyEnvironment):
 
     def action_spec(self):
         return self._action_spec    
+
+
+    def get_dump_data_path(self):
+        return self.dump_data_path
 
 
     @property
