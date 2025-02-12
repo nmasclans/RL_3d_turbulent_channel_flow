@@ -39,12 +39,11 @@ rm -fr __pycache__/
 rm -f temporal_point_probe_*.csv
 
 # Compile ProjectRHEA code
-# TODO: uncomment lines below!
-### echo ">>> Compiling ProjectRHEA..."
-### cd "$RHEA_CASE_PATH"
-### make clean
-### make RL_CASE_PATH=$EVAL_RL_CASE_PATH RHEA_PATH=$RHEA_PATH
-### echo ">>> ProjectRHEA compiled!"
+echo ">>> Compiling ProjectRHEA..."
+cd "$RHEA_CASE_PATH"
+make clean
+make RL_CASE_PATH=$EVAL_RL_CASE_PATH RHEA_PATH=$RHEA_PATH
+echo ">>> ProjectRHEA compiled!"
 cd "$EVAL_RL_CASE_PATH"
 
 # Activate conda environment for the current session
