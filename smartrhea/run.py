@@ -451,7 +451,10 @@ elif params["mode"] == "eval":
     <host_name>: host name of the machine where TensorFlow process runs, e.g. triton
     <pid>: pid of the TensorFlow process that created the event file    """
 working_parent_dir = train_parent_dir if params["mode"] == "train" else eval_parent_dir
-summary_writter_dir = os.path.join(working_parent_dir, "summary", eval_id)
+if params["mode"] == "train":
+    summary_writter_dir = os.path.join(working_parent_dir, "summary", run_id)
+elif params["mode"] == "eval":
+    summary_writter_dir = os.path.join(working_parent_dir, "summary", eval_id)
 summary_writer = tf.summary.create_file_writer(summary_writter_dir, flush_millis=1000)
 summary_writer.set_as_default()
 logger.info(f"Tensorboard event file created: {summary_writter_dir}/events.out.tfevents.{int(time.time())}.{gethostname()}.{os.getpid()}")
