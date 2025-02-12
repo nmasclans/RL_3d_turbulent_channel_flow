@@ -41,7 +41,10 @@ try :
     Re_tau     = float(sys.argv[4])     # Friction Reynolds number [-]
     dt_phys    = float(sys.argv[5])
     case_dir   = sys.argv[6]
+    run_mode        = sys.argv[7] if len(sys.argv) > 7 else None
     print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys}\n- Case directory: {case_dir}")
+    if run_mode == "eval":
+        print("Run mode is set to evaluation")
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
 
@@ -125,36 +128,55 @@ if matching_files:
         print(f"Filename: {base_filename}, File details: {file_details}")
 else:
     print(f"No files found matching the pattern: {pattern}")
-n_RL = len(filename_RL_list)
 global_step_num_list = global_step_list
 
 # --- non-RL filenames ---
 train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
-iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
+if run_mode != "eval":
+    iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
+else:
+    iteration_nonRL_list = [ iteration_end_train_step ]
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
-n_nonRL = len(train_step_list)
 print("\nnon-RL files:")
-for i_nonRL in range(n_nonRL):
-    print("Filename:", filename_nonRL_list[i_nonRL], ", Iteration:", iteration_nonRL_list[i_nonRL])
+for i in range(len(train_step_list)):
+    print("Filename:", filename_nonRL_list[i], ", Iteration:", iteration_nonRL_list[i])
 
 # --- non-RL converged reference filename ---
 filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 
+# --- non-RL restart data file
+filename_rst = f"{compareDatasetDir}/3d_turbulent_channel_flow_{iteration_restart_data_file}.h5"
+
+# Append restart data file to RL & non-RL files list
+# > RL lists:
+filename_RL_list.insert(0,filename_rst)
+file_details_list.insert(0,'restart')
+global_step_num_list.insert(0,'000000') 
+N = len(filename_RL_list)   # update N
+# > non-RL lists:
+filename_nonRL_list.insert(0,filename_rst)
+train_step_list.insert(0,0)
+iteration_nonRL_list.insert(0,iteration_restart_data_file)
+assert N == len(filename_nonRL_list)
+# Logging
+if run_mode == "eval":
+    print(f"RL filenames: {filename_RL_list}")
+    print(f"non-RL filenames: {filename_nonRL_list}")
+
 # --- Discard non-RL (and corresponding RL) snapshots if not available
-assert n_nonRL == n_RL
 filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
 n_nonRL_is_available = sum(filename_nonRL_is_available)
-print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", n_nonRL - n_nonRL_is_available)
+print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", N - n_nonRL_is_available)
 filename_RL_list_available = []
 filename_nonRL_list_available = []
-for i in range(n_RL):
+for i in range(N):
     if filename_nonRL_is_available[i]:
         filename_RL_list_available.append(filename_RL_list[i])
         filename_nonRL_list_available.append(filename_nonRL_list[i])
 filename_RL_list    = filename_RL_list_available
 filename_nonRL_list = filename_nonRL_list_available
-n_RL = len(filename_RL_list); n_nonRL = n_RL
-print(f"Datasets RL and non-RL have now {n_RL} files each")
+N = len(filename_RL_list)
+print(f"Datasets RL and non-RL have now {N} files each")
 
 # ----------- Get RL and non-RL data ------------
 
@@ -176,10 +198,9 @@ if not os.path.isfile(filename_ref):
 
 print("\nImporting data from files...")
 
-print("\nImporting data from RL files:")
-
-for i_RL in range(n_RL):
-    filename_RL = filename_RL_list[i_RL]
+print("\nImporting data from RL files:\n")
+for i in range(N):
+    filename_RL = filename_RL_list[i]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
         averaging_time_RL_aux    = data_file.attrs["AveragingTime"][0] - dt_phys
@@ -191,37 +212,36 @@ for i_RL in range(n_RL):
         favre_vffwff_data_RL_aux = data_file['favre_vffwff'][1:-1,1:-1,1:-1]
         favre_wffwff_data_RL_aux = data_file['favre_wffwff'][1:-1,1:-1,1:-1]
     # Initialize allocation arrays
-    if i_RL == 0:
+    if i == 0:
         num_points_x      = favre_uffuff_data_RL_aux[0,0,:].size
         num_points_y      = favre_uffuff_data_RL_aux[0,:,0].size
         num_points_z      = favre_uffuff_data_RL_aux[:,0,0].size
         num_points_xz     = num_points_x*num_points_z
         num_points_y_half = int(0.5*num_points_y)
-        averaging_time_RL = averaging_time_RL_aux
-        y_data_RL            = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        favre_uffuff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        favre_uffvff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        favre_uffwff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])         
-        favre_vffvff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
-        favre_vffwff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])            
-        favre_wffwff_data_RL = np.zeros([n_RL, num_points_z, num_points_y, num_points_x])  
+        averaging_time_RL = np.zeros(N)
+        y_data_RL            = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_uffuff_data_RL = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_uffvff_data_RL = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_uffwff_data_RL = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_vffvff_data_RL = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        favre_vffwff_data_RL = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        favre_wffwff_data_RL = np.zeros([N, num_points_z, num_points_y, num_points_x])  
     # Fill allocation arrays
-    y_data_RL[i_RL,:,:,:]            = y_data_RL_aux
-    favre_uffuff_data_RL[i_RL,:,:,:] = favre_uffuff_data_RL_aux
-    favre_uffvff_data_RL[i_RL,:,:,:] = favre_uffvff_data_RL_aux
-    favre_uffwff_data_RL[i_RL,:,:,:] = favre_uffwff_data_RL_aux
-    favre_vffvff_data_RL[i_RL,:,:,:] = favre_vffvff_data_RL_aux
-    favre_vffwff_data_RL[i_RL,:,:,:] = favre_vffwff_data_RL_aux
-    favre_wffwff_data_RL[i_RL,:,:,:] = favre_wffwff_data_RL_aux
-    # Check same averaging time
-    if not np.isclose(averaging_time_RL, averaging_time_RL_aux, atol=1e-8):
-        raise ValueError("Averaging time should be equal for all RL h5 files")
+    averaging_time_RL[i]          = averaging_time_RL_aux
+    y_data_RL[i,:,:,:]            = y_data_RL_aux
+    favre_uffuff_data_RL[i,:,:,:] = favre_uffuff_data_RL_aux
+    favre_uffvff_data_RL[i,:,:,:] = favre_uffvff_data_RL_aux
+    favre_uffwff_data_RL[i,:,:,:] = favre_uffwff_data_RL_aux
+    favre_vffvff_data_RL[i,:,:,:] = favre_vffvff_data_RL_aux
+    favre_vffwff_data_RL[i,:,:,:] = favre_vffwff_data_RL_aux
+    favre_wffwff_data_RL[i,:,:,:] = favre_wffwff_data_RL_aux
     # Logging
-    print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL:.6f}")
+    print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL_aux:.6f}")
 
 # --- Get non-RL (non-converged) data from h5 file ---
-for i_nonRL in range(n_nonRL):
-    filename_nonRL = filename_nonRL_list[i_nonRL]
+print("\nImporting data from non-RL files:\n")
+for i in range(N):
+    filename_nonRL = filename_nonRL_list[i]
     with h5py.File( filename_nonRL, 'r' ) as data_file:
         #list( data_file.keys() )
         averaging_time_nonRL_aux    = data_file.attrs["AveragingTime"][0] - dt_phys
@@ -233,33 +253,33 @@ for i_nonRL in range(n_nonRL):
         favre_vffwff_data_nonRL_aux = data_file['favre_vffwff'][1:-1,1:-1,1:-1]
         favre_wffwff_data_nonRL_aux = data_file['favre_wffwff'][1:-1,1:-1,1:-1]
     # Initialize allocation arrays
-    if i_nonRL == 0:
+    if i == 0:
         num_points_x      = favre_uffuff_data_nonRL_aux[0,0,:].size
         num_points_y      = favre_uffuff_data_nonRL_aux[0,:,0].size
         num_points_z      = favre_uffuff_data_nonRL_aux[:,0,0].size
         num_points_xz     = num_points_x*num_points_z
         num_points_y_half = int(0.5*num_points_y)
-        averaging_time_nonRL    = np.zeros(n_nonRL)
-        y_data_nonRL            = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        favre_uffuff_data_nonRL = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        favre_uffvff_data_nonRL = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        favre_uffwff_data_nonRL = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])         
-        favre_vffvff_data_nonRL = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])            
-        favre_vffwff_data_nonRL = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])            
-        favre_wffwff_data_nonRL = np.zeros([n_nonRL, num_points_z, num_points_y, num_points_x])  
+        averaging_time_nonRL    = np.zeros(N)
+        y_data_nonRL            = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_uffuff_data_nonRL = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_uffvff_data_nonRL = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_uffwff_data_nonRL = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        favre_vffvff_data_nonRL = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        favre_vffwff_data_nonRL = np.zeros([N, num_points_z, num_points_y, num_points_x])            
+        favre_wffwff_data_nonRL = np.zeros([N, num_points_z, num_points_y, num_points_x])  
     # Fill allocation arrays
-    averaging_time_nonRL[i_nonRL]          = averaging_time_nonRL_aux
-    y_data_nonRL[i_nonRL,:,:,:]            = y_data_nonRL_aux
-    favre_uffuff_data_nonRL[i_nonRL,:,:,:] = favre_uffuff_data_nonRL_aux
-    favre_uffvff_data_nonRL[i_nonRL,:,:,:] = favre_uffvff_data_nonRL_aux
-    favre_uffwff_data_nonRL[i_nonRL,:,:,:] = favre_uffwff_data_nonRL_aux
-    favre_vffvff_data_nonRL[i_nonRL,:,:,:] = favre_vffvff_data_nonRL_aux
-    favre_vffwff_data_nonRL[i_nonRL,:,:,:] = favre_vffwff_data_nonRL_aux
-    favre_wffwff_data_nonRL[i_nonRL,:,:,:] = favre_wffwff_data_nonRL_aux
-    print(f"RL non-converged data imported from file '{filename_nonRL}' - averaging time: {averaging_time_nonRL_aux:.6f}")
+    averaging_time_nonRL[i]          = averaging_time_nonRL_aux
+    y_data_nonRL[i,:,:,:]            = y_data_nonRL_aux
+    favre_uffuff_data_nonRL[i,:,:,:] = favre_uffuff_data_nonRL_aux
+    favre_uffvff_data_nonRL[i,:,:,:] = favre_uffvff_data_nonRL_aux
+    favre_uffwff_data_nonRL[i,:,:,:] = favre_uffwff_data_nonRL_aux
+    favre_vffvff_data_nonRL[i,:,:,:] = favre_vffvff_data_nonRL_aux
+    favre_vffwff_data_nonRL[i,:,:,:] = favre_vffwff_data_nonRL_aux
+    favre_wffwff_data_nonRL[i,:,:,:] = favre_wffwff_data_nonRL_aux
+    print(f"non-RL non-converged data imported from file '{filename_nonRL}' - averaging time: {averaging_time_nonRL_aux:.6f}")
 
 # --- Get non-RL converged reference data from h5 file ---
-print(f"\nImporting non-RL converged reference data from file '{filename_ref}'...")
+print("\nImporting reference data (non-RL):\n")
 with h5py.File( filename_ref, 'r' ) as data_file:
     averaging_time_ref    = data_file.attrs["AveragingTime"][0]
     y_data_ref            = data_file['y'][1:-1,1:-1,1:-1]
@@ -269,7 +289,7 @@ with h5py.File( filename_ref, 'r' ) as data_file:
     favre_vffvff_data_ref = data_file['favre_vffvff'][1:-1,1:-1,1:-1]
     favre_vffwff_data_ref = data_file['favre_vffwff'][1:-1,1:-1,1:-1]
     favre_wffwff_data_ref = data_file['favre_wffwff'][1:-1,1:-1,1:-1]
-assert averaging_time_ref > averaging_time_RL, f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging time {averaging_time_RL:.6f}"
+assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging times from non-converged RL & non-RL"
 print(f"Non-RL reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
 print("Data imported successfully!")
 
@@ -278,14 +298,14 @@ print("Data imported successfully!")
 print("\nAveraging fields in space...")
 
 ### Allocate averaged variables
-y_plus_RL       = np.zeros([n_RL, num_points_y_half]);   y_plus_nonRL       = np.zeros([n_nonRL, num_points_y_half]);   y_plus_ref       = np.zeros(num_points_y_half)
-y_delta_RL      = np.zeros([n_RL, num_points_y_half]);   y_delta_nonRL      = np.zeros([n_nonRL, num_points_y_half]);   y_delta_ref      = np.zeros(num_points_y_half)
-favre_uffuff_RL = np.zeros([n_RL, num_points_y_half]);   favre_uffuff_nonRL = np.zeros([n_nonRL, num_points_y_half]);   favre_uffuff_ref = np.zeros(num_points_y_half)
-favre_uffvff_RL = np.zeros([n_RL, num_points_y_half]);   favre_uffvff_nonRL = np.zeros([n_nonRL, num_points_y_half]);   favre_uffvff_ref = np.zeros(num_points_y_half)
-favre_uffwff_RL = np.zeros([n_RL, num_points_y_half]);   favre_uffwff_nonRL = np.zeros([n_nonRL, num_points_y_half]);   favre_uffwff_ref = np.zeros(num_points_y_half)
-favre_vffvff_RL = np.zeros([n_RL, num_points_y_half]);   favre_vffvff_nonRL = np.zeros([n_nonRL, num_points_y_half]);   favre_vffvff_ref = np.zeros(num_points_y_half)
-favre_vffwff_RL = np.zeros([n_RL, num_points_y_half]);   favre_vffwff_nonRL = np.zeros([n_nonRL, num_points_y_half]);   favre_vffwff_ref = np.zeros(num_points_y_half)
-favre_wffwff_RL = np.zeros([n_RL, num_points_y_half]);   favre_wffwff_nonRL = np.zeros([n_nonRL, num_points_y_half]);   favre_wffwff_ref = np.zeros(num_points_y_half)
+y_plus_RL       = np.zeros([N, num_points_y_half]);   y_plus_nonRL       = np.zeros([N, num_points_y_half]);   y_plus_ref       = np.zeros(num_points_y_half)
+y_delta_RL      = np.zeros([N, num_points_y_half]);   y_delta_nonRL      = np.zeros([N, num_points_y_half]);   y_delta_ref      = np.zeros(num_points_y_half)
+favre_uffuff_RL = np.zeros([N, num_points_y_half]);   favre_uffuff_nonRL = np.zeros([N, num_points_y_half]);   favre_uffuff_ref = np.zeros(num_points_y_half)
+favre_uffvff_RL = np.zeros([N, num_points_y_half]);   favre_uffvff_nonRL = np.zeros([N, num_points_y_half]);   favre_uffvff_ref = np.zeros(num_points_y_half)
+favre_uffwff_RL = np.zeros([N, num_points_y_half]);   favre_uffwff_nonRL = np.zeros([N, num_points_y_half]);   favre_uffwff_ref = np.zeros(num_points_y_half)
+favre_vffvff_RL = np.zeros([N, num_points_y_half]);   favre_vffvff_nonRL = np.zeros([N, num_points_y_half]);   favre_vffvff_ref = np.zeros(num_points_y_half)
+favre_vffwff_RL = np.zeros([N, num_points_y_half]);   favre_vffwff_nonRL = np.zeros([N, num_points_y_half]);   favre_vffwff_ref = np.zeros(num_points_y_half)
+favre_wffwff_RL = np.zeros([N, num_points_y_half]);   favre_wffwff_nonRL = np.zeros([N, num_points_y_half]);   favre_wffwff_ref = np.zeros(num_points_y_half)
 ### Average variables in space
 for j in range( 0, num_points_y ):
     # log progress
@@ -300,34 +320,33 @@ for j in range( 0, num_points_y ):
         is_half_top = False
     for i in range( 0, num_points_x ):
         for k in range( 0, num_points_z ):
-            # RL data:
-            for i_RL in range(n_RL):
+            for n in range(N):
+                # RL data:
                 if is_half_top:
-                    y_plus_RL[i_RL,aux_j]   += ( 0.5/num_points_xz )*( 2*delta - y_data_RL[i_RL,k,j,i] )*( u_tau/nu_ref )
-                    y_delta_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*( 2*delta - y_data_RL[i_RL,k,j,i] )/delta
+                    y_plus_RL[n,aux_j]   += ( 0.5/num_points_xz )*( 2*delta - y_data_RL[n,k,j,i] )*( u_tau/nu_ref )
+                    y_delta_RL[n,aux_j]  += ( 0.5/num_points_xz )*( 2*delta - y_data_RL[n,k,j,i] )/delta
                 else:
-                    y_plus_RL[i_RL,aux_j]   += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]*( u_tau/nu_ref )
-                    y_delta_RL[i_RL,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[i_RL,k,j,i]/delta
-                favre_uffuff_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*favre_uffuff_data_RL[i_RL,k,j,i]
-                favre_uffvff_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*favre_uffvff_data_RL[i_RL,k,j,i]
-                favre_uffwff_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*favre_uffwff_data_RL[i_RL,k,j,i]
-                favre_vffvff_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*favre_vffvff_data_RL[i_RL,k,j,i]
-                favre_vffwff_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*favre_vffwff_data_RL[i_RL,k,j,i]
-                favre_wffwff_RL[i_RL,aux_j] += ( 0.5/num_points_xz )*favre_wffwff_data_RL[i_RL,k,j,i]
-            # non-RL data, non-converged:
-            for i_nonRL in range(n_nonRL):
+                    y_plus_RL[n,aux_j]   += ( 0.5/num_points_xz )*y_data_RL[n,k,j,i]*( u_tau/nu_ref )
+                    y_delta_RL[n,aux_j]  += ( 0.5/num_points_xz )*y_data_RL[n,k,j,i]/delta
+                favre_uffuff_RL[n,aux_j] += ( 0.5/num_points_xz )*favre_uffuff_data_RL[n,k,j,i]
+                favre_uffvff_RL[n,aux_j] += ( 0.5/num_points_xz )*favre_uffvff_data_RL[n,k,j,i]
+                favre_uffwff_RL[n,aux_j] += ( 0.5/num_points_xz )*favre_uffwff_data_RL[n,k,j,i]
+                favre_vffvff_RL[n,aux_j] += ( 0.5/num_points_xz )*favre_vffvff_data_RL[n,k,j,i]
+                favre_vffwff_RL[n,aux_j] += ( 0.5/num_points_xz )*favre_vffwff_data_RL[n,k,j,i]
+                favre_wffwff_RL[n,aux_j] += ( 0.5/num_points_xz )*favre_wffwff_data_RL[n,k,j,i]
+                # non-RL data, non-converged:
                 if is_half_top:
-                    y_plus_nonRL[i_nonRL,aux_j]   += ( 0.5/num_points_xz )*(2.0*delta - y_data_nonRL[i_nonRL,k,j,i])*(u_tau/nu_ref);    
-                    y_delta_nonRL[i_nonRL,aux_j]  += ( 0.5/num_points_xz )*(2.0*delta - y_data_nonRL[i_nonRL,k,j,i])/delta;             
+                    y_plus_nonRL[n,aux_j]   += ( 0.5/num_points_xz )*(2.0*delta - y_data_nonRL[n,k,j,i])*(u_tau/nu_ref);    
+                    y_delta_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*(2.0*delta - y_data_nonRL[n,k,j,i])/delta;             
                 else:
-                    y_plus_nonRL[i_nonRL,aux_j]   += ( 0.5/num_points_xz )*y_data_nonRL[i_nonRL,k,j,i]*( u_tau/nu_ref );    
-                    y_delta_nonRL[i_nonRL,aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[i_nonRL,k,j,i]/delta;               
-                favre_uffuff_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*favre_uffuff_data_nonRL[i_nonRL,k,j,i];          
-                favre_uffvff_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*favre_uffvff_data_nonRL[i_nonRL,k,j,i];          
-                favre_uffwff_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*favre_uffwff_data_nonRL[i_nonRL,k,j,i];          
-                favre_vffvff_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*favre_vffvff_data_nonRL[i_nonRL,k,j,i];          
-                favre_vffwff_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*favre_vffwff_data_nonRL[i_nonRL,k,j,i];          
-                favre_wffwff_nonRL[i_nonRL,aux_j] += ( 0.5/num_points_xz )*favre_wffwff_data_nonRL[i_nonRL,k,j,i];          
+                    y_plus_nonRL[n,aux_j]   += ( 0.5/num_points_xz )*y_data_nonRL[n,k,j,i]*( u_tau/nu_ref );    
+                    y_delta_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*y_data_nonRL[n,k,j,i]/delta;               
+                favre_uffuff_nonRL[n,aux_j] += ( 0.5/num_points_xz )*favre_uffuff_data_nonRL[n,k,j,i];          
+                favre_uffvff_nonRL[n,aux_j] += ( 0.5/num_points_xz )*favre_uffvff_data_nonRL[n,k,j,i];          
+                favre_uffwff_nonRL[n,aux_j] += ( 0.5/num_points_xz )*favre_uffwff_data_nonRL[n,k,j,i];          
+                favre_vffvff_nonRL[n,aux_j] += ( 0.5/num_points_xz )*favre_vffvff_data_nonRL[n,k,j,i];          
+                favre_vffwff_nonRL[n,aux_j] += ( 0.5/num_points_xz )*favre_vffwff_data_nonRL[n,k,j,i];          
+                favre_wffwff_nonRL[n,aux_j] += ( 0.5/num_points_xz )*favre_wffwff_data_nonRL[n,k,j,i];          
             # reference:
             if is_half_top:
                 y_plus_ref[aux_j]  += ( 0.5/num_points_xz )*(2.0*delta - y_data_ref[k,j,i])*(u_tau/nu_ref);  
@@ -342,13 +361,13 @@ for j in range( 0, num_points_y ):
             favre_wffwff_ref[aux_j] += ( 0.5/num_points_xz )*favre_wffwff_data_ref[k,j,i];          
 # Reduce avg_y_plus_RL along n_RL dimension (idem!)
 # > RL
-for i in range(1,n_RL):
+for i in range(1,N):
     if not np.allclose(y_plus_RL[0], y_plus_RL[i], atol=1e-6) or not np.allclose(y_delta_RL[0], y_delta_RL[i], atol=1e-6):
         raise ValueError("y-plus values of different RL h5 files should be equal!")
 y_plus_RL  = np.mean(y_plus_RL,  axis=0)
 y_delta_RL = np.mean(y_delta_RL, axis=0)
 # > non-RL
-for i in range(1,n_nonRL):
+for i in range(1,N):
     if not np.allclose(y_plus_nonRL[0], y_plus_nonRL[i], atol=1e-6) or not np.allclose(y_delta_nonRL[0], y_delta_nonRL[i], atol=1e-6):
         raise ValueError("y-plus values of different non-RL h5 files should be equal!")
 y_plus_nonRL  = np.mean(y_plus_nonRL,  axis=0)
@@ -360,29 +379,29 @@ print("Fields averaged successfully!")
 # ----------- Decompose Rij into d.o.f --------------
 
 print("\nDecomposing Rij into Rij dof...")
-Rkk_RL     = np.zeros([n_RL, num_points_y_half]);    Rkk_nonRL     = np.zeros([n_nonRL, num_points_y_half]);    Rkk_ref     = np.zeros(num_points_y_half)
-lambda1_RL = np.zeros([n_RL, num_points_y_half]);    lambda1_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda1_ref = np.zeros(num_points_y_half)
-lambda2_RL = np.zeros([n_RL, num_points_y_half]);    lambda2_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda2_ref = np.zeros(num_points_y_half)
-lambda3_RL = np.zeros([n_RL, num_points_y_half]);    lambda3_nonRL = np.zeros([n_nonRL, num_points_y_half]);    lambda3_ref = np.zeros(num_points_y_half)
-xmap1_RL   = np.zeros([n_RL, num_points_y_half]);    xmap1_nonRL   = np.zeros([n_nonRL, num_points_y_half]);    xmap1_ref   = np.zeros(num_points_y_half)
-xmap2_RL   = np.zeros([n_RL, num_points_y_half]);    xmap2_nonRL   = np.zeros([n_nonRL, num_points_y_half]);    xmap2_ref   = np.zeros(num_points_y_half)
-eigval_RL  = np.zeros([n_RL, num_points_y_half,3]);  eigval_nonRL  = np.zeros([n_nonRL, num_points_y_half,3]);  eigval_ref  = np.zeros([num_points_y_half,3])
+Rkk_RL     = np.zeros([N, num_points_y_half]);    Rkk_nonRL     = np.zeros([N, num_points_y_half]);    Rkk_ref     = np.zeros(num_points_y_half)
+lambda1_RL = np.zeros([N, num_points_y_half]);    lambda1_nonRL = np.zeros([N, num_points_y_half]);    lambda1_ref = np.zeros(num_points_y_half)
+lambda2_RL = np.zeros([N, num_points_y_half]);    lambda2_nonRL = np.zeros([N, num_points_y_half]);    lambda2_ref = np.zeros(num_points_y_half)
+lambda3_RL = np.zeros([N, num_points_y_half]);    lambda3_nonRL = np.zeros([N, num_points_y_half]);    lambda3_ref = np.zeros(num_points_y_half)
+xmap1_RL   = np.zeros([N, num_points_y_half]);    xmap1_nonRL   = np.zeros([N, num_points_y_half]);    xmap1_ref   = np.zeros(num_points_y_half)
+xmap2_RL   = np.zeros([N, num_points_y_half]);    xmap2_nonRL   = np.zeros([N, num_points_y_half]);    xmap2_ref   = np.zeros(num_points_y_half)
+eigval_RL  = np.zeros([N, num_points_y_half,3]);  eigval_nonRL  = np.zeros([N, num_points_y_half,3]);  eigval_ref  = np.zeros([num_points_y_half,3])
 
 # RL data
-for i_RL in range(n_RL):
-    ( Rkk_RL[i_RL], lambda1_RL[i_RL], lambda2_RL[i_RL], lambda3_RL[i_RL], xmap1_RL[i_RL], xmap2_RL[i_RL] ) \
-        = compute_reynolds_stress_dof( favre_uffuff_RL[i_RL], favre_uffvff_RL[i_RL], favre_uffwff_RL[i_RL], favre_vffvff_RL[i_RL], favre_vffwff_RL[i_RL], favre_wffwff_RL[i_RL], verbose=verbose )
-    eigval_RL[i_RL,:,0] = lambda1_RL[i_RL]
-    eigval_RL[i_RL,:,1] = lambda2_RL[i_RL]
-    eigval_RL[i_RL,:,2] = lambda3_RL[i_RL]  
+for i in range(N):
+    ( Rkk_RL[i], lambda1_RL[i], lambda2_RL[i], lambda3_RL[i], xmap1_RL[i], xmap2_RL[i] ) \
+        = compute_reynolds_stress_dof( favre_uffuff_RL[i], favre_uffvff_RL[i], favre_uffwff_RL[i], favre_vffvff_RL[i], favre_vffwff_RL[i], favre_wffwff_RL[i], verbose=verbose )
+    eigval_RL[i,:,0] = lambda1_RL[i]
+    eigval_RL[i,:,1] = lambda2_RL[i]
+    eigval_RL[i,:,2] = lambda3_RL[i]  
 
 # non-RL non-converged data
-for i_nonRL in range(n_nonRL):
-    ( Rkk_nonRL[i_nonRL], lambda1_nonRL[i_nonRL], lambda2_nonRL[i_nonRL], lambda3_nonRL[i_nonRL], xmap1_nonRL[i_nonRL], xmap2_nonRL[i_nonRL] ) \
-        = compute_reynolds_stress_dof( favre_uffuff_nonRL[i_nonRL], favre_uffvff_nonRL[i_nonRL], favre_uffwff_nonRL[i_nonRL], favre_vffvff_nonRL[i_nonRL], favre_vffwff_nonRL[i_nonRL], favre_wffwff_nonRL[i_nonRL], verbose=verbose )
-    eigval_nonRL[i_nonRL,:,0] = lambda1_nonRL[i_nonRL]
-    eigval_nonRL[i_nonRL,:,1] = lambda2_nonRL[i_nonRL]
-    eigval_nonRL[i_nonRL,:,2] = lambda3_nonRL[i_nonRL]
+for i in range(N):
+    ( Rkk_nonRL[i], lambda1_nonRL[i], lambda2_nonRL[i], lambda3_nonRL[i], xmap1_nonRL[i], xmap2_nonRL[i] ) \
+        = compute_reynolds_stress_dof( favre_uffuff_nonRL[i], favre_uffvff_nonRL[i], favre_uffwff_nonRL[i], favre_vffvff_nonRL[i], favre_vffwff_nonRL[i], favre_wffwff_nonRL[i], verbose=verbose )
+    eigval_nonRL[i,:,0] = lambda1_nonRL[i]
+    eigval_nonRL[i,:,1] = lambda2_nonRL[i]
+    eigval_nonRL[i,:,2] = lambda3_nonRL[i]
 
 # non-RL converged reference data
 ( Rkk_ref, lambda1_ref, lambda2_ref, lambda3_ref, xmap1_ref, xmap2_ref ) \
@@ -402,23 +421,25 @@ print("Rij decomposed successfully!")
 print("\nBuilding triangle barycentric map plots...")
 #for i_RL in range(n_RL):
 #    visualizer.build_anisotropy_tensor_barycentric_xmap_triang(y_delta_RL,    xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_RL, f"anisotropy_tensor_barycentric_map_RL_{file_details_list[i_RL]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL, xmap1_nonRL[0], xmap2_nonRL[0], averaging_time_nonRL[0], f"anisotropy_tensor_barycentric_map_nonRL_{iteration_nonRL_list[0]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_ref,   xmap1_ref,      xmap2_ref,      averaging_time_ref,       "anisotropy_tensor_barycentric_map_ref")
+if run_mode == "eval":
+    visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_RL, xmap1_RL[1],    xmap2_RL[1],    averaging_time_RL[1],    f"anisotropy_tensor_barycentric_map_RL_{file_details_list[1]}")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL,  xmap1_nonRL[1], xmap2_nonRL[1], averaging_time_nonRL[1], f"anisotropy_tensor_barycentric_map_nonRL_{iteration_nonRL_list[1]}")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_ref,    xmap1_ref,      xmap2_ref,      averaging_time_ref,       "anisotropy_tensor_barycentric_map_ref")
 print("Triangle barycentric map plotted successfully!")
 
 # ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
 
 print("\nBuilding gif frames...")
 frames_rkk = []; frames_eig = []; frames_xmap_coord = []; frames_xmap_triang = []; 
-for i in range(n_RL):
+for i in range(N):
     # log progress
-    if i % (n_RL//10 or 1) == 0:
-        print(f"{i/n_RL*100:.0f}%")
+    if i % (N//10 or 1) == 0:
+        print(f"{i/N*100:.0f}%")
     # Build frames
-    frames_rkk         = visualizer.build_reynolds_stress_tensor_trace_frame(             frames_rkk,         y_delta_RL, y_delta_nonRL, y_delta_ref, Rkk_RL[i],    Rkk_nonRL[i],    Rkk_ref,    averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
-    frames_eig         = visualizer.build_anisotropy_tensor_eigenvalues_frame(            frames_eig,         y_delta_RL, y_delta_nonRL, y_delta_ref, eigval_RL[i], eigval_nonRL[i], eigval_ref, averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
-    frames_xmap_coord  = visualizer.build_anisotropy_tensor_barycentric_xmap_coord_frame( frames_xmap_coord,  y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref,     averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
-    frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref,     averaging_time_RL, averaging_time_nonRL[i], global_step_list[i])
+    frames_rkk         = visualizer.build_reynolds_stress_tensor_trace_frame(             frames_rkk,         y_delta_RL, y_delta_nonRL, y_delta_ref, Rkk_RL[i],    Rkk_nonRL[i],    Rkk_ref,    averaging_time_RL[i], averaging_time_nonRL[i], global_step_list[i])
+    frames_eig         = visualizer.build_anisotropy_tensor_eigenvalues_frame(            frames_eig,         y_delta_RL, y_delta_nonRL, y_delta_ref, eigval_RL[i], eigval_nonRL[i], eigval_ref, averaging_time_RL[i], averaging_time_nonRL[i], global_step_list[i])
+    frames_xmap_coord  = visualizer.build_anisotropy_tensor_barycentric_xmap_coord_frame( frames_xmap_coord,  y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref, averaging_time_RL[i], averaging_time_nonRL[i], global_step_list[i])
+    frames_xmap_triang = visualizer.build_anisotropy_tensor_barycentric_xmap_triang_frame(frames_xmap_triang, y_delta_RL, y_delta_nonRL, y_delta_ref, xmap1_RL[i],  xmap1_nonRL[i],  xmap1_ref,  xmap2_RL[i], xmap2_nonRL[i], xmap2_ref, averaging_time_RL[i], averaging_time_nonRL[i], global_step_list[i])
 
 print("Building gifs from frames...")
 frames_dict = {'anisotropy_tensor_Rkk':frames_rkk, 'anisotropy_tensor_eigenvalues':frames_eig, 'anisotropy_tensor_barycentric_map_coord':frames_xmap_coord, 'anisotropy_tensor_barycentric_map_triangle':frames_xmap_triang}
