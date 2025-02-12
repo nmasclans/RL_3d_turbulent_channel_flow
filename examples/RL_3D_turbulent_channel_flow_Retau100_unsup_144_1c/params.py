@@ -8,14 +8,15 @@ t_episode_train = round(1.0 + t_action + dt_phys, 8)
 t_episode_eval = 1.0
 cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
-mode = "train"          # "train" or "eval"
+run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
     # smartsim params
     "run_id": "",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
-    "rl_case_path": os.environ["RL_CASE_PATH"],
+    "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
+    "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
@@ -50,11 +51,10 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-    "mode": mode,
     "num_episodes": 408,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
-    "t_episode": t_episode_train if mode == "train" else t_episode_eval,
+    "t_episode": t_episode_train if run_mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-2.0, 2.0),
     "action_dim": 6,
@@ -112,7 +112,7 @@ params = {
 env_params = {
     "rhea_exe": params["rhea_exe"],
     "rhea_case_path": params["rhea_case_path"],
-    "rl_case_path": params["rl_case_path"],
+    "rl_case_path": params["train_rl_case_path"] if run_mode == "train" else params["eval_rl_case_path"],
     "launcher": params["launcher"],
     "run_command": params["run_command"],
     "mpirun_mca": params["mpirun_mca"],
