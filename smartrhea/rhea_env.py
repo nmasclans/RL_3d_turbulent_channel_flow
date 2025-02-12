@@ -171,14 +171,13 @@ class RheaEnv(py_environment.PyEnvironment):
         # manage directories
         if not os.path.exists(self.dump_data_path):
             os.makedirs(self.dump_data_path)
-        if self.mode == "eval" and os.path.exists(self.dump_data_path):
-            counter = 0
-            path = os.path.join(self.dump_data_path, f"eval_{counter}")
-            while os.path.exists(path):
-                counter += 1
-                path = os.path.join(self.dump_data_path, f"eval_{counter}")
-            self.dump_data_path = path
-            logger.info(f"Evaluation data path: `{self.dump_data_path}`")
+        if self.mode == "eval":
+            if os.path.exists(self.dump_data_path):
+                logger.warning(f"Evaluation data path already exists: `{self.dump_data_path}`")
+                logger.warning(f"Removing content of evaluation data path...")
+                delete_all_files_in_dir(self.dump_data_path)
+            else:
+                os.makedirs(self.dump_data_path)
         if self.dump_data_flag:
             if not os.path.exists(os.path.join(self.dump_data_path, "state")):
                 os.makedirs(os.path.join(self.dump_data_path, "state"))
@@ -856,11 +855,7 @@ class RheaEnv(py_environment.PyEnvironment):
 
     def action_spec(self):
         return self._action_spec    
-
-
-    def get_dump_data_path(self):
-        return self.dump_data_path
-
+    
 
     @property
     def batched(self):
