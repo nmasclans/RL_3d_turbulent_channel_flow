@@ -15,8 +15,10 @@ trap cleanup SIGINT SIGTERM
 REPO_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
 export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144_1d
-export RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144_1d
+export TRAIN_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_unsup_144_1d
+export EVAL_RL_CASE_PATH=""
 export SMARTRHEA_PATH=$REPO_DIR/smartrhea
+export RUN_MODE=train 
 
 # add shared dynamic libraries
 export SMARTREDIS_PATH=/apps/smartredis/0.4.0
@@ -40,9 +42,9 @@ rm -f temporal_point_probe_*.csv
 echo ">>> Compiling ProjectRHEA..."
 cd "$RHEA_CASE_PATH"
 make clean
-make RL_CASE_PATH=$RL_CASE_PATH RHEA_PATH=$RHEA_PATH
+make RL_CASE_PATH=$TRAIN_RL_CASE_PATH RHEA_PATH=$RHEA_PATH
 echo ">>> ProjectRHEA compiled!"
-cd "$RL_CASE_PATH"
+cd "$TRAIN_RL_CASE_PATH"
 
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"
