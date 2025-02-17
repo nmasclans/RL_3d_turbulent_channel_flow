@@ -1,21 +1,23 @@
-import random, os, numpy as np
+import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 5e-5         # not taken from here, defined in myRHEA.cpp
 t_action = 0.01         # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.0 + t_action + dt_phys, 8)
-t_episode_eval = 1.0
-cfd_n_envs = 8          # num. cfd simulations run in parallel
+t_episode_eval  = round(1.0 + t_action + dt_phys, 8)
+cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
-mode = "train"          # "train" or "eval"
+run_mode = os.environ["RUN_MODE"]
 
 params = {
     # smartsim params
-    "run_id": "",
+    "run_id": "2025-02-12--15-42-29--553b",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
-    "rl_case_path": os.environ["RL_CASE_PATH"],
+    "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
+    "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
+    "eval_checkpoint_step": 80,
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
@@ -50,15 +52,14 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-    "mode": mode,
-    "num_episodes": 100000,
+    "num_episodes": 408,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
-    "t_episode": t_episode_train if mode == "train" else t_episode_eval,
+    "t_episode": t_episode_train if run_mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-2.0, 2.0),
     "action_dim": 6,
-    "state_dim": 3,
+    "state_dim": 7,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file.h5", # 3: random. 1: restart 1. 2: restart 2     # TODO: change this if we want to use several restart files
@@ -96,7 +97,7 @@ params = {
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
     "summary_interval": 1, # write to tensorboard interval [epochs]
-    "seed": 16,
+    "seed": int(time.time()%(2**32)),
     "ckpt_num": int(1e6),
     "ckpt_interval": 1,
     #"do_profile": False,               # TODO: remove if not used
@@ -112,7 +113,7 @@ params = {
 env_params = {
     "rhea_exe": params["rhea_exe"],
     "rhea_case_path": params["rhea_case_path"],
-    "rl_case_path": params["rl_case_path"],
+    "rl_case_path": params["train_rl_case_path"] if run_mode == "train" else params["eval_rl_case_path"],
     "launcher": params["launcher"],
     "run_command": params["run_command"],
     "mpirun_mca": params["mpirun_mca"],

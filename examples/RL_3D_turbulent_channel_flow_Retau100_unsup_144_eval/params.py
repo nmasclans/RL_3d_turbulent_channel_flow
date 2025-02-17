@@ -12,12 +12,12 @@ run_mode = os.environ["RUN_MODE"]
 
 params = {
     # smartsim params
-    "run_id": "2025-02-06--10-19-54--d01b",
+    "run_id": "2025-02-12--15-42-29--553b",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 248,
+    "eval_checkpoint_step": 80,
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
