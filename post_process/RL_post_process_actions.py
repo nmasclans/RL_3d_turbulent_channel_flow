@@ -28,12 +28,17 @@ try :
     ensemble   = sys.argv[1]
     train_name = sys.argv[2]
     case_dir   = sys.argv[3]
-    run_mode   = sys.argv[4] if len(sys.argv) > 4 else None
-    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}")
-    if run_mode == "eval":
-        print("Run mode is set to evaluation")
+    run_mode   = sys.argv[4]
+    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}")
 except :
     raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <case_dir>")
+
+if run_mode == "train":
+    print("Run mode is set to training")
+elif run_mode == "eval":
+    print("Run mode is set to evaluation")
+else: 
+    raise ValueError(f"Unrecognized input argument run_mode = `{run_mode}`")
 
 # --- Simulation parameters ---
 restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
@@ -44,12 +49,8 @@ action_dim = 6
 
 # --- Post-processing parameters ---
 verbose = False
-if run_mode != "eval":
-    action_data_dir = f"{case_dir}/train/{train_name}/action/"
-    time_data_dir   = f"{case_dir}/train/{train_name}/time/"
-else:
-    action_data_dir = f"{case_dir}/eval/{train_name}/action/"
-    time_data_dir   = f"{case_dir}/eval/{train_name}/time/"
+action_data_dir = f"{case_dir}/{run_mode}/{train_name}/action/"
+time_data_dir   = f"{case_dir}/{run_mode}/{train_name}/time/"
 
 # --- Post-processing directory ---
 postDir = train_name

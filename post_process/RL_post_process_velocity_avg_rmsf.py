@@ -26,13 +26,18 @@ try :
     dt_phys         = float(sys.argv[5])
     t_episode_train = float(sys.argv[6])
     case_dir        = sys.argv[7]
-    run_mode        = sys.argv[8] if len(sys.argv) > 8 else None
-    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir}")
-    if run_mode == "eval":
-        print("Run mode is set to evaluation")
+    run_mode        = sys.argv[8]
+    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
 except :
-    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
+    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <run_mode>")
 
+if run_mode == "train":
+    print("Run mode is set to training")
+elif run_mode == "eval":
+    print("Run mode is set to evaluation")
+else: 
+    raise ValueError(f"Unrecognized input argument run_mode = `{run_mode}`")
+    
 # --- Case parameters ---
 rho_0   = 1.0				# Reference density [kg/m3]
 u_tau   = 1.0				# Friction velocity [m/s]
@@ -50,7 +55,7 @@ filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
     iteration_max_nonRL = 3790000
-else:
+else:   # run_mode == "eval"
     iteration_max_nonRL = 3860000
 max_length_legend_RL = 10
 
@@ -62,7 +67,7 @@ num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. glo
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
 if run_mode == "train":
     iteration_restart_data_file  = 3210000
-else:
+else:   # run_mode == "eval"
     iteration_restart_data_file  = 2840000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
 assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
@@ -121,9 +126,9 @@ N = len(filename_RL_list)
 
 # --- non-RL filenames ---
 train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
-if run_mode != "eval":
+if run_mode == "train":
     iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
-else:
+else:   # run_mode == "eval"
     iteration_nonRL_list = [ iteration_end_train_step ]
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
 

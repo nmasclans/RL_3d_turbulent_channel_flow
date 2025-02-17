@@ -41,12 +41,17 @@ try :
     Re_tau     = float(sys.argv[4])     # Friction Reynolds number [-]
     dt_phys    = float(sys.argv[5])
     case_dir   = sys.argv[6]
-    run_mode        = sys.argv[7] if len(sys.argv) > 7 else None
-    print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys}\n- Case directory: {case_dir}")
-    if run_mode == "eval":
-        print("Run mode is set to evaluation")
+    run_mode   = sys.argv[7]
+    print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
+
+if run_mode == "train":
+    print("Run mode is set to training")
+elif run_mode == "eval":
+    print("Run mode is set to evaluation")
+else: 
+    raise ValueError(f"Unrecognized input argument run_mode = `{run_mode}`")
 
 # --- Case parameters ---
 rho_0   = 1.0				# Reference density [kg/m3]
@@ -132,9 +137,9 @@ global_step_num_list = global_step_list
 
 # --- non-RL filenames ---
 train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
-if run_mode != "eval":
+if run_mode == "train":
     iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
-else:
+else:   # run_mode == "eval"
     iteration_nonRL_list = [ iteration_end_train_step ]
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
 print("\nnon-RL files:")
