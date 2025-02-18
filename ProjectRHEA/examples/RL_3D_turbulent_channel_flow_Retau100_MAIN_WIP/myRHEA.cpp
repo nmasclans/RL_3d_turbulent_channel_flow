@@ -2046,6 +2046,8 @@ void myRHEA::calculateReward() {
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Reward weight coefficients
+    double b_param = 3.0;
+    double d_param = 0.0;
     double c1 = 10.0;
     double c2 = 0.01;
     double c3 = 0.01;
@@ -2096,13 +2098,13 @@ void myRHEA::calculateReward() {
     l2_rl_f_rhov        = std::sqrt( l2_rl_f_rhov / length_y );
     l2_rl_f_rhow        = std::sqrt( l2_rl_f_rhow / length_y );
     l2_rl_f             = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local = ( 3.0 - (   ( c1 * l2_err_avg_u  / l2_avg_u_reference ) \
-                             + ( c2 * l2_err_avg_v ) \
-                             + ( c3 * l2_err_avg_w ) \
-                             + ( c4 * l2_err_rmsf_u / l2_rmsf_u_reference ) \
-                             + ( c5 * l2_err_rmsf_v / l2_rmsf_v_reference ) \
-                             + ( c6 * l2_err_rmsf_w / l2_rmsf_w_reference ) \
-                             + ( c7 * l2_rl_f * 1.0 ) ) ) * std::pow(current_time - begin_actuation_time, 3.0);
+    reward_local = ( b_param - (   ( c1 * l2_err_avg_u  / l2_avg_u_reference ) \
+                                 + ( c2 * l2_err_avg_v ) \
+                                 + ( c3 * l2_err_avg_w ) \
+                                 + ( c4 * l2_err_rmsf_u / l2_rmsf_u_reference ) \
+                                 + ( c5 * l2_err_rmsf_v / l2_rmsf_v_reference ) \
+                                 + ( c6 * l2_err_rmsf_w / l2_rmsf_w_reference ) \
+                                 + ( c7 * l2_rl_f * 1.0 ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
          << c1 * l2_err_avg_u  / l2_avg_u_reference << " " 
@@ -2112,7 +2114,7 @@ void myRHEA::calculateReward() {
 	     << c5 * l2_err_rmsf_v / l2_rmsf_v_reference << " "
 	     << c6 * l2_err_rmsf_w / l2_rmsf_w_reference << " "
          << c7 * l2_rl_f << endl
-	     << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
+	     << "reward scaler dt_RL: " <<  std::pow(current_time - begin_actuation_time, d_param) << endl;
 
 #else                           /// Unsupervised Reward
     /// Initialize variables
@@ -2164,13 +2166,13 @@ void myRHEA::calculateReward() {
     l2_rl_f_rhov       = std::sqrt( l2_rl_f_rhov / total_volume_local );
     l2_rl_f_rhow       = std::sqrt( l2_rl_f_rhow / total_volume_local );
     l2_rl_f            = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local       = ( 3.0 - (   ( c1 * l2_d_avg_u / l2_avg_u_previous ) \
+    reward_local       = ( b_param - (   ( c1 * l2_d_avg_u / l2_avg_u_previous ) \
                                    + ( c2 * l2_d_avg_v ) \
                                    + ( c3 * l2_d_avg_w ) \
                                    + ( c4 * l2_d_rmsf_u / l2_rmsf_u_previous ) \
                                    + ( c5 * l2_d_rmsf_v / l2_rmsf_v_previous ) \
                                    + ( c6 * l2_d_rmsf_w / l2_rmsf_w_previous ) \
-                                   + ( c7 * l2_rl_f ) ) ) * std::pow(current_time - begin_actuation_time, 3.0);
+                                   + ( c7 * l2_rl_f ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
 
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
@@ -2183,7 +2185,7 @@ void myRHEA::calculateReward() {
          << c5 * l2_d_rmsf_v / l2_rmsf_v_previous << " " 
          << c6 * l2_d_rmsf_w / l2_rmsf_w_previous << " " 
          << c7 * l2_rl_f << endl
-         << "reward scaler dt_RL: " << current_time - begin_actuation_time << endl;
+         << "reward scaler dt_RL: " << std::pow(current_time - begin_actuation_time, d_param) << endl;
     
     /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
