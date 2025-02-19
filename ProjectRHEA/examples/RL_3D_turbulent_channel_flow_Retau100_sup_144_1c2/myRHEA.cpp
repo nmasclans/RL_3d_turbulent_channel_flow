@@ -2052,8 +2052,8 @@ void myRHEA::calculateReward() {
     double c2 = 0.01;
     double c3 = 0.01;
     double c4 = 1.0;
-    double c5 = 1.0;
-    double c6 = 1.0;
+    double c5 = 0.1;
+    double c6 = 0.1;
     double c7 = 0.01;    // action penalization coefficient
 
 #if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
