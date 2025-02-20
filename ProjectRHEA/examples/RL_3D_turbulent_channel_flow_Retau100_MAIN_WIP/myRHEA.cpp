@@ -13,6 +13,7 @@ using namespace std;
 ////////// COMPILATION DIRECTIVES //////////
 /// TODO: move these env parameters to an .h to be included by SmartRedisManager.cpp & .h files 
 #define _FEEDBACK_LOOP_BODY_FORCE_ 1				/// Activate feedback loop for the body force moving the flow
+#define _CORRECT_U_BULK_ 1                          /// Activate correction of u_bulk
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _RL_CONTROL_IS_SUPERVISED_ 1
@@ -54,6 +55,9 @@ const double alpha_P    = 0.1;                      /// Magnitude of pressure pe
 const double fixed_time_step = 1.0e-4;              /// Time step value [s]
 const int cout_precision = 10;		                /// Output precision (fixed) 
 
+#if _CORRECT_U_BULK_
+const double u_bulk_reference = 14.665;
+#endif
 #if _FEEDBACK_LOOP_BODY_FORCE_
 /// Estimated uniform body force to drive the flow
 double controller_output = tau_w/delta;			    /// Initialize controller output
@@ -407,6 +411,41 @@ void myRHEA::calculateSourceTerms() {
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     cout << fixed << setprecision(cout_precision);
 
+#if _CORRECT_U_BULK_
+    double delta_x, delta_y, delta_z, delta_volume;
+    double local_volume = 0.0;
+    double local_u_volume = 0.0;
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                /// Geometric stuff
+                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                delta_volume =  delta_x * delta_y * delta_z;
+                /// Update values
+                local_volume += delta_volume;
+                local_u_volume += u_field[I1D(i,j,k)] * delta_volume;
+            }
+        }
+    }
+    /// Communicate local values to obtain global & average values
+    double global_volume = 0.0;
+    double global_u_volume = 0.0;
+    MPI_Allreduce(&local_volume, &global_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(&local_u_volume, &global_u_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    /// Calculate u_bulk numeric
+    double u_bulk_numeric = global_u_volume / global_volume;
+    /// Correct flow flux
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                u_field[I1D(i+1,j,k)] += (u_bulk_reference - u_bulk_numeric);
+            }
+        }
+    }
+#endif /// _CORRECT_U_BULK_
+
 #if _FEEDBACK_LOOP_BODY_FORCE_
     /// Evaluate numerical shear stress at walls
 
@@ -468,10 +507,10 @@ void myRHEA::calculateSourceTerms() {
     double global_avg_u_inner_w    = global_sum_u_inner_w/global_number_grid_points_w;   
 
     /// Calculate delta_y
-    double delta_y = mesh->getGloby(1) - mesh->getGloby(0);
+    double delta_y_wall = mesh->getGloby(1) - mesh->getGloby(0);
 
     /// Calculate tau_wall_numerical
-    double tau_w_numerical = mu*( global_avg_u_inner_w - global_avg_u_boundary_w )/delta_y;
+    double tau_w_numerical = mu*( global_avg_u_inner_w - global_avg_u_boundary_w )/delta_y_wall;
     
     /// Update controller variables
     controller_error   = ( tau_w - tau_w_numerical )/delta;
