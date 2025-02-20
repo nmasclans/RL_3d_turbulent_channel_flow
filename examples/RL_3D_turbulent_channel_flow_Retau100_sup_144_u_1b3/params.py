@@ -73,6 +73,9 @@ params = {
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence
+    # > A higher value for entropy_regularization promotes more exploration, while a lower value
+    #  reduces exploration, leading the policy to become more deterministic. Therefore, to decrease
+    #  exploration, you should set a smaller value for entropy_regularization
     # Recommended: 0.01 - 0.05, or 0.01 - 0.02
     "policy_l2_reg": 1e-5,
     # Regularization coefficient for the policy network to prevent overfitting
