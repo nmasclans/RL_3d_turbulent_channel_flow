@@ -28,6 +28,9 @@ class myRHEA : public FlowSolverRHEA {
 
 	////////// SOLVER METHODS //////////
         
+        /// Execute (aggregated method) RHEA
+        void execute() override;
+
         /// Set initial conditions: u, v, w, P and T ... needs to be modified/overwritten according to the problem under consideration
         void setInitialConditions() override;
 
@@ -48,6 +51,9 @@ class myRHEA : public FlowSolverRHEA {
 
         /// Output temporal point probes data
         void outputTemporalPointProbesData() override;
+
+        /// Apply correction to streamwise bulk velocity (instantaneous vel.)
+        void correctStreamwiseBulkVelocity();
 
     protected:
 

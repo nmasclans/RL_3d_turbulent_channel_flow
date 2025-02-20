@@ -209,6 +209,302 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 };
 
 
+void myRHEA::execute() {
+    
+    /// Start timer: execute
+    timers->start( "execute" );
+
+    int my_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    /// Set output (cout) precision
+    cout.precision( cout_precision );
+
+    /// Start RHEA simulation
+    if( my_rank == 0 ) cout << endl << "RHEA (v" << version_number << "): START SIMULATION" << endl;
+
+    /// Initialize variables from restart file or by setting initial conditions
+    if( use_restart ) {
+
+        /// Initialize from restart file
+        this->initializeFromRestart();
+
+        if( artificial_compressibility_method ) {
+
+            /// Calculate thermodynamic (bulk) pressure
+            P_thermo = this->calculateVolumeAveragedPressure();
+
+            /// Calculate alpha value of artificial compressibility method
+            alpha_acm = this->calculateAlphaArtificialCompressibilityMethod();
+
+	    /// Calculate artificially modified thermodynamics
+            this->calculateArtificiallyModifiedThermodynamics();
+
+	    /// Calculate artificially modified transport coefficients
+            this->calculateArtificiallyModifiedTransportCoefficients();
+
+	    }
+
+    } else {
+
+        /// Set initial conditions
+        this->setInitialConditions();
+
+        /// Initialize thermodynamics
+        this->initializeThermodynamics();
+
+        if( artificial_compressibility_method ) {
+
+            /// Calculate thermodynamic (bulk) pressure
+            P_thermo = this->calculateVolumeAveragedPressure();
+
+            /// Calculate alpha value of artificial compressibility method
+            alpha_acm = this->calculateAlphaArtificialCompressibilityMethod();
+
+	    /// Calculate artificially modified thermodynamics
+            this->calculateArtificiallyModifiedThermodynamics();	    
+
+	    /// Calculate artificially modified transport coefficients
+            this->calculateArtificiallyModifiedTransportCoefficients();
+
+	    } else {
+
+            /// Calculate transport coefficients
+            this->calculateTransportCoefficients();
+
+	    }
+
+    }
+
+    /// Calculate conserved variables from primitive variables
+    this->primitiveToConservedVariables();
+
+    /// Update previous state of conserved variables
+    this->updatePreviousStateConservedVariables();    
+    
+    /// Start timer: time_iteration_loop
+    timers->start( "time_iteration_loop" );
+
+    /// Iterate flow solver RHEA in time
+    for(int time_iter = current_time_iter; time_iter < final_time_iter; time_iter++) {
+
+        /// Start timer: calculate_time_step
+        timers->start( "calculate_time_step" );
+
+        /// Calculate time step
+        this->calculateTimeStep();
+        if( ( current_time + delta_t ) > final_time ) delta_t = final_time - current_time;
+
+        /// Stop timer: calculate_time_step
+        timers->stop( "calculate_time_step" );
+
+        /// Stop timer: execute
+        timers->stop( "execute" );
+
+        /// Start timer: output_solver_state
+        timers->start( "output_solver_state" );
+
+        /// Print time iteration information (if criterion satisfied)
+        if( ( current_time_iter%print_frequency_iter == 0 ) and ( my_rank == 0 ) ) {
+            cout << endl << "Time iteration " << current_time_iter << ": " 
+                 << "time = " << scientific << current_time << " [s], "
+                 << "time-step = " << scientific << delta_t << " [s], "
+                 << "wall-clock time = " << scientific << timers->getAccumulatedMaxTime( "execute" )/3600.0 << " [h]" << endl;
+        }
+
+        /// Output current state data to file (if criterion satisfied)
+        if( current_time_iter%output_frequency_iter == 0 ) this->outputCurrentStateData();
+
+        /// Output current 2d slices state data to file (if criterion satisfied)
+        this->output2dSlicesCurrentStateData();
+        
+        /// Output temporal point probes data to files (if criterion satisfied)
+        this->outputTemporalPointProbesData();
+
+        /// Stop timer: output_solver_state
+        timers->stop( "output_solver_state" );
+
+        /// Start timer: execute
+        timers->start( "execute" );
+
+#if _CORRECT_U_BULK_
+        /// Correct streamwise bulk velocity
+        this->correctStreamwiseBulkVelocity();
+#endif
+
+        /// Start timer: rk_iteration_loop
+        timers->start( "rk_iteration_loop" );
+
+        /// Runge-Kutta time-integration steps
+        for(rk_time_stage = 1; rk_time_stage <= rk_number_stages; rk_time_stage++) {
+
+            /// Start timer: calculate_thermophysical_properties
+            timers->start( "calculate_thermophysical_properties" );
+
+            if( artificial_compressibility_method ) {
+
+	        /// Calculate artificially modified transport coefficients
+                this->calculateArtificiallyModifiedTransportCoefficients();
+
+	        } else {
+
+            /// Calculate transport coefficients
+            this->calculateTransportCoefficients();
+
+	        }
+
+            /// Stop timer: calculate_thermophysical_properties
+            timers->stop( "calculate_thermophysical_properties" );
+
+            /// Start timer: calculate_inviscid_fluxes
+            timers->start( "calculate_inviscid_fluxes" );
+
+            /// Calculate inviscid fluxes
+            this->calculateInviscidFluxes();
+
+            /// Stop timer: calculate_inviscid_fluxes
+            timers->stop( "calculate_inviscid_fluxes" );
+
+            /// Start timer: calculate_viscous_fluxes
+            timers->start( "calculate_viscous_fluxes" );
+
+            /// Calculate viscous fluxes
+            this->calculateViscousFluxes();
+
+            /// Stop timer: calculate_viscous_fluxes
+            timers->stop( "calculate_viscous_fluxes" );
+
+            /// Start timer: calculate_source_terms
+            timers->start( "calculate_source_terms" );
+
+            /// Calculate source terms
+            this->calculateSourceTerms();
+
+            /// Stop timer: calculate_source_terms
+            timers->stop( "calculate_source_terms" );
+
+            /// Start timer: time_advance_conserved_variables
+            timers->start( "time_advance_conserved_variables" );
+
+            /// Advance conserved variables in time
+            this->timeAdvanceConservedVariables();
+
+            /// Stop timer: time_advance_conserved_variables
+            timers->stop( "time_advance_conserved_variables" );
+
+            /// Start timer: conserved_to_primitive_variables
+            timers->start( "conserved_to_primitive_variables" );
+
+            /// Calculate primitive variables from conserved variables
+            this->conservedToPrimitiveVariables();
+
+            /// Stop timer: conserved_to_primitive_variables
+            timers->stop( "conserved_to_primitive_variables" );
+
+            /// Start timer: calculate_thermodynamics_from_primitive_variables
+            timers->start( "calculate_thermodynamics_from_primitive_variables" );
+
+            /// Calculate thermodynamics from primitive variables
+            this->calculateThermodynamicsFromPrimitiveVariables();
+
+            if( artificial_compressibility_method ) {
+
+                /// Calculate thermodynamic (bulk) pressure
+                P_thermo = this->calculateVolumeAveragedPressure();
+
+                /// Calculate alpha value of artificial compressibility method
+                alpha_acm = this->calculateAlphaArtificialCompressibilityMethod();
+
+                /// Calculate artificially modified thermodynamics
+                this->calculateArtificiallyModifiedThermodynamics();	    
+
+            }
+
+            /// Stop timer: calculate_thermodynamics_from_primitive_variables
+            timers->stop( "calculate_thermodynamics_from_primitive_variables" );
+
+            /// Start timer: update_boundaries
+            timers->start( "update_boundaries" );
+
+            /// Update boundary values
+            this->updateBoundaries();
+            
+            /// Stop timer: update_boundaries
+            timers->stop( "update_boundaries" );
+
+        }
+
+        /// Stop timer: rk_iteration_loop
+        timers->stop( "rk_iteration_loop" );
+
+        /// Start timer: update_time_averaged_quantities
+        timers->start( "update_time_averaged_quantities" );
+
+        /// Update time-averaged quantities
+        if( time_averaging_active ) this->updateTimeAveragedQuantities();
+
+        /// Stop timer: update_time_averaged_quantities
+        timers->stop( "update_time_averaged_quantities" );
+
+        /// Start timer: temporal_hook_function
+        timers->start( "temporal_hook_function" );
+
+        /// Temporal hook function
+        this->temporalHookFunction();
+
+        /// Stop timer: temporal_hook_function
+        timers->stop( "temporal_hook_function" );
+
+        /// Start timer: update_previous_state_conserved_variables
+        timers->start( "update_previous_state_conserved_variables" );
+
+        /// Update previous state of conserved variables
+        this->updatePreviousStateConservedVariables();
+
+        /// Update time and time iteration
+        current_time += delta_t;
+        current_time_iter += 1;
+
+        /// Check if simulation is completed: current_time > final_time
+        if( current_time >= final_time ) break;
+
+        /// Stop timer: update_previous_state_conserved_variables
+        timers->stop( "update_previous_state_conserved_variables" );
+
+    }
+
+    /// Stop timer: time_iteration_loop
+    timers->stop( "time_iteration_loop" );
+
+    /// Print timers information
+    if( print_timers ) timers->printTimers( timers_information_file );
+
+    /// Print time advancement information
+    if( my_rank == 0 ) {
+        cout << "Time advancement completed -> " 
+            << "iteration = " << current_time_iter << ", "
+            << "time = " << scientific << current_time << " [s]" << endl;
+    }
+
+    /// Output current state data to file
+    this->outputCurrentStateData();
+
+    /// Output current 2d slices state data to file (if criterion satisfied)
+    this->output2dSlicesCurrentStateData();
+        
+    /// Output temporal point probes data to files (if criterion satisfied)
+    this->outputTemporalPointProbesData();
+
+    /// End RHEA simulation
+    if( my_rank == 0 ) cout << endl << "RHEA (v" << version_number << "): END SIMULATION" << endl;
+    
+    /// Stop timer: execute
+    timers->stop( "execute" );
+
+};
+
+
 void myRHEA::initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered, const string &global_step) {
 
     /// Logging
@@ -410,41 +706,6 @@ void myRHEA::calculateSourceTerms() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     cout << fixed << setprecision(cout_precision);
-
-#if _CORRECT_U_BULK_
-    double delta_x, delta_y, delta_z, delta_volume;
-    double local_volume = 0.0;
-    double local_u_volume = 0.0;
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                /// Geometric stuff
-                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
-                delta_volume =  delta_x * delta_y * delta_z;
-                /// Update values
-                local_volume += delta_volume;
-                local_u_volume += u_field[I1D(i,j,k)] * delta_volume;
-            }
-        }
-    }
-    /// Communicate local values to obtain global & average values
-    double global_volume = 0.0;
-    double global_u_volume = 0.0;
-    MPI_Allreduce(&local_volume, &global_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(&local_u_volume, &global_u_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    /// Calculate u_bulk numeric
-    double u_bulk_numeric = global_u_volume / global_volume;
-    /// Correct flow flux
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                u_field[I1D(i,j,k)] += (u_bulk_reference - u_bulk_numeric);
-            }
-        }
-    }
-#endif /// _CORRECT_U_BULK_
 
 #if _FEEDBACK_LOOP_BODY_FORCE_
     /// Evaluate numerical shear stress at walls
@@ -1249,6 +1510,42 @@ void myRHEA::outputTemporalPointProbesData() {
 
 };
 
+void myRHEA::correctStreamwiseBulkVelocity() {
+
+    double delta_x, delta_y, delta_z, delta_volume;
+    double local_volume = 0.0;
+    double local_u_volume = 0.0;
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                /// Geometric stuff
+                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                delta_volume =  delta_x * delta_y * delta_z;
+                /// Update values
+                local_volume += delta_volume;
+                local_u_volume += u_field[I1D(i,j,k)] * delta_volume;
+            }
+        }
+    }
+    /// Communicate local values to obtain global & average values
+    double global_volume = 0.0;
+    double global_u_volume = 0.0;
+    MPI_Allreduce(&local_volume, &global_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(&local_u_volume, &global_u_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    /// Calculate u_bulk numeric
+    double u_bulk_numeric = global_u_volume / global_volume;
+    /// Correct flow flux
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                u_field[I1D(i,j,k)] += (u_bulk_reference - u_bulk_numeric);
+            }
+        }
+    }
+
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
@@ -1707,11 +2004,11 @@ void myRHEA::preproceWitnessPoints() {
     
     // Each mpi process updates attribute 'state_local_size2'
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, ||avg_v||_2, ||avg_w||_2, ||rmsf_u||_2, ||rmsf_v||_2, ||rmsf_w||_2, t_RL )
-    this->state_local_size2 = 7 * state_local_size2_counter;
+    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, y / delta )
+    this->state_local_size2 = 2 * state_local_size2_counter;
 #else
-    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2, ||avg_v||_2, ||avg_w||_2, ||rmsf_u||_2, ||rmsf_v||_2, ||rmsf_w||_2, )
-    this->state_local_size2 = 6 * state_local_size2_counter;
+    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2 )
+    this->state_local_size2 = 1 * state_local_size2_counter;
 #endif
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
@@ -2025,25 +2322,15 @@ void myRHEA::updateState() {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
                     state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)],  2.0);
-                    state_local[state_local_size2_counter+1] += std::pow(avg_v_field[I1D(i,j_index,k)],  2.0);
-                    state_local[state_local_size2_counter+2] += std::pow(avg_w_field[I1D(i,j_index,k)],  2.0);
-                    state_local[state_local_size2_counter+3] += std::pow(rmsf_u_field[I1D(i,j_index,k)], 2.0);
-                    state_local[state_local_size2_counter+4] += std::pow(rmsf_v_field[I1D(i,j_index,k)], 2.0);
-                    state_local[state_local_size2_counter+5] += std::pow(rmsf_w_field[I1D(i,j_index,k)], 2.0);
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-                    state_local[state_local_size2_counter+6] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
                     xz_slice_points_counter += 1;
                 }
             }
-            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
-            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter );
-            state_local[state_local_size2_counter+3] = std::sqrt( state_local[state_local_size2_counter+3] / xz_slice_points_counter );
-            state_local[state_local_size2_counter+4] = std::sqrt( state_local[state_local_size2_counter+4] / xz_slice_points_counter );
-            state_local[state_local_size2_counter+5] = std::sqrt( state_local[state_local_size2_counter+5] / xz_slice_points_counter );
+            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter ) / u_tau;
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+6] = std::sqrt( state_local[state_local_size2_counter+6] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 
 #else ///  _WITNESS_XZ_SLICES_ 0
@@ -2052,22 +2339,17 @@ void myRHEA::updateState() {
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
-            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+1] = avg_v_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+2] = avg_w_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+3] = rmsf_u_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+4] = rmsf_v_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+5] = rmsf_w_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)] / u_tau;
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+6] = y_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+1] = y_field[I1D(i_index,j_index,k_index)] / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local_size2_counter += 7;
+            state_local_size2_counter += 2;
 #else
-            state_local_size2_counter += 6;
+            state_local_size2_counter += 1;
 #endif
         }
     }
@@ -2085,14 +2367,14 @@ void myRHEA::calculateReward() {
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Reward weight coefficients
-    double b_param = 3.0;
+    double b_param = 1.0;
     double d_param = 0.0;
     double c1 = 10.0;
-    double c2 = 0.01;
-    double c3 = 0.01;
-    double c4 = 1.0;
-    double c5 = 1.0;
-    double c6 = 1.0;
+    double c2 = 0.0;
+    double c3 = 0.0;
+    double c4 = 0.0;
+    double c5 = 0.0;
+    double c6 = 0.0;
     double c7 = 0.1;    // action penalization coefficient
 
 #if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
