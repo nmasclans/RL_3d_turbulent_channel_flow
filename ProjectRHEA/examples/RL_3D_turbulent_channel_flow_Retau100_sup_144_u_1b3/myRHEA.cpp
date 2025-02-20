@@ -440,7 +440,7 @@ void myRHEA::calculateSourceTerms() {
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                u_field[I1D(i+1,j,k)] += (u_bulk_reference - u_bulk_numeric);
+                u_field[I1D(i,j,k)] += (u_bulk_reference - u_bulk_numeric);
             }
         }
     }
