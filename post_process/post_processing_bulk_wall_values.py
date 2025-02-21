@@ -63,7 +63,7 @@ sum_surface = 0.0
 for i in range( 1, num_points_x-1 ):
     for k in range( 1, num_points_z-1 ):
         # Bottom wall
-        j = 0;
+        j = 0
         delta_x = 0.5*( x_data[k,j,i+1] - x_data[k,j,i-1] )
         delta_z = 0.5*( z_data[k+1,j,i] - z_data[k-1,j,i] )
         delta_surface = delta_x*delta_z
