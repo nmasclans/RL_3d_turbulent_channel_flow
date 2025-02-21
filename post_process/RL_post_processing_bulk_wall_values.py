@@ -282,7 +282,7 @@ for i in range( 1, num_points_x-1 ):
 avg_u_b_RL    = sum_avg_u_volume_RL    / sum_volume;            u_b_RL    = sum_u_volume_RL    / sum_volume
 avg_u_b_nonRL = sum_avg_u_volume_nonRL / sum_volume;            u_b_nonRL = sum_u_volume_nonRL / sum_volume
 avg_u_b_ref   = sum_avg_u_volume_ref   / sum_volume;            u_b_ref   = sum_u_volume_ref   / sum_volume
-print("\n\n\n")
+print("\n----------------------------------------------------------------------------------------------------")
 print( "\nREFERENCE Numerical avg_u_bulk:", avg_u_b_ref );      print( "\nREFERENCE Numerical instantaneous u_bulk:", u_b_ref )    
 print( "\nRL Numerical avg_u_bulk:",        avg_u_b_RL );       print( "\nRL Numerical instantaneous u_bulk:",        u_b_RL )    
 print( "\nnon-RL Numerical avg_u_bulk:",    avg_u_b_nonRL );    print( "\nnon-RL Numerical instantaneous u_bulk:",    u_b_nonRL )        
@@ -341,7 +341,7 @@ tau_w_num_ref   = mu_ref * (avg_u_inner_ref   - avg_u_boundary_ref)   / (y_data[
 u_tau_num_RL    = np.sqrt(tau_w_num_RL    / rho_0) 
 u_tau_num_nonRL = np.sqrt(tau_w_num_nonRL / rho_0) 
 u_tau_num_ref   = np.sqrt(tau_w_num_ref   / rho_0) 
-print("\n\n\n")
+print("\n----------------------------------------------------------------------------------------------------")
 print("\nREFERENCE Numerical tau_w:", tau_w_num_ref)
 print("REFERENCE Numerical u_tau:", u_tau_num_ref)
 print("\nRL Numerical tau_w:", tau_w_num_RL)
@@ -359,15 +359,16 @@ plt.plot( averaging_time_nonRL, u_b_nonRL,             linestyle = '--',        
 plt.plot( averaging_time_nonRL, u_b_RL,                linestyle=':', marker = '^', markersize = 2, linewidth = 2, color = plt.cm.tab10(1), label = r'RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical $u^{+}_b$' )
-plt.ylim(14,14.8)
-plt.yticks(np.arange(14,14.8,0.1))
-plt.grid(which='major',axis='y')
+#plt.ylim(14,14.8)
+#plt.yticks(np.arange(14,14.8,0.1))
+#plt.grid(which='major',axis='y')
+plt.grid(which='both',axis='y')
 plt.tick_params( axis = 'both', pad = 7.5 )
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 filename = f'{postDir}/numerical_u_bulk_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
-print(f"Build plot: '{filename}'")
+print(f"\nBuild plot: '{filename}'")
 
 # --- avg_u_bulk plot ---
 plt.plot( averaging_time_nonRL, avg_u_b_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
@@ -383,7 +384,27 @@ plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 filename = f'{postDir}/numerical_avg_u_bulk_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
-print(f"Build plot: '{filename}'")
+print(f"\nBuild plot: '{filename}'")
+
+# --- avg_u_bulk & (inst) u_bulk plot ---
+plt.plot( averaging_time_nonRL, avg_u_b_ref * np.ones(N),  linestyle = '-',                                zorder = 1, linewidth = 1, color = "k",             label = r'$\overline{u}^{+}_b$ Reference' )
+plt.plot( averaging_time_nonRL, avg_u_b_nonRL,             linestyle = '-',                                zorder = 1, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}_b$ non-RL' )
+plt.plot( averaging_time_nonRL, avg_u_b_RL,                linestyle = '-', marker = 'v', markersize = 2,  zorder = 1, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{u}^{+}_b$ RL' )
+plt.plot( averaging_time_nonRL, u_b_ref * np.ones(N),      linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
+plt.plot( averaging_time_nonRL, u_b_nonRL,                 linestyle = '--',                               zorder = 0, linewidth = 1, color = plt.cm.tab10(0), label = r'${u}^{+}_b$ non-RL' )
+plt.plot( averaging_time_nonRL, u_b_RL,                    linestyle = '--', marker = '^', markersize = 2, zorder = 0, linewidth = 1, color = plt.cm.tab10(1), label = r'${u}^{+}_b$ RL' )
+plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
+plt.ylabel( r'Numerical avg. $\overline{u}^{+}_b$ and inst. $\overline{u}^{+}_b$' )
+#plt.ylim(14,14.8)
+#plt.yticks(np.arange(14,14.8,0.1))
+#plt.grid(which='major',axis='y')
+plt.grid(which='both',axis='y')
+plt.tick_params( axis = 'both', pad = 7.5 )
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+filename = f'{postDir}/numerical_inst_avg_u_bulk_{iteration}_ensemble{ensemble}.jpg'
+plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+plt.clf()
+print(f"\nBuild plot: '{filename}'")
 
 # --- tau_w plot ---
 plt.plot( averaging_time_nonRL, tau_w_num_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
@@ -397,7 +418,7 @@ plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/numerical_tau_w_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
-print(f"Build plot: '{filename}'")
+print(f"\nBuild plot: '{filename}'")
 
 # --- u_tau plot ---
 plt.plot( averaging_time_nonRL, u_tau_num_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
@@ -411,4 +432,4 @@ plt.tick_params( axis = 'both', pad = 7.5 )
 filename = f'{postDir}/numerical_u_tau_{iteration}_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
-print(f"Build plot: '{filename}'")
+print(f"\nBuild plot: '{filename}'")
