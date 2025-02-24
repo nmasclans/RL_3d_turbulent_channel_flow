@@ -2267,6 +2267,9 @@ void myRHEA::getControlCubes() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void myRHEA::initializeFromRestart() {
+
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Call the parent class method
     FlowSolverRHEA::initializeFromRestart();
@@ -2308,10 +2311,8 @@ void myRHEA::initializeFromRestart() {
             cout << "[myRHEA::initializeFromRestart] Reset 1st-order statistics (avg. fields) with instantaneous values!" << endl; 
         }
     }
-    
+
     // Logging
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     if (my_rank == 0) {
         cout << fixed << setprecision(cout_precision);
         cout << "[myRHEA::initializeFromRestart] From restart current_time = " << scientific << current_time 
