@@ -2277,6 +2277,38 @@ void myRHEA::initializeFromRestart() {
     previous_actuation_time += current_time;
     final_time              += current_time;
 
+    // Initialize 1st-order statistics with instantaneous fields 
+    if( reset_time_averaging ){
+        for(int i = topo->iter_common[_ALL_][_INIX_]; i <= topo->iter_common[_ALL_][_ENDX_]; i++) {
+            for(int j = topo->iter_common[_ALL_][_INIY_]; j <= topo->iter_common[_ALL_][_ENDY_]; j++) {
+                for(int k = topo->iter_common[_ALL_][_INIZ_]; k <= topo->iter_common[_ALL_][_ENDZ_]; k++) {
+                    avg_rho_field[I1D(i,j,k)]       = rho_field[I1D(i,j,k)];
+                    avg_rhou_field[I1D(i,j,k)]      = rho_field[I1D(i,j,k)] * u_field[I1D(i,j,k)];
+                    avg_rhov_field[I1D(i,j,k)]      = rho_field[I1D(i,j,k)] * v_field[I1D(i,j,k)];
+                    avg_rhow_field[I1D(i,j,k)]      = rho_field[I1D(i,j,k)] * w_field[I1D(i,j,k)];
+                    avg_rhoE_field[I1D(i,j,k)]      = rho_field[I1D(i,j,k)] * E_field[I1D(i,j,k)];
+                    avg_rhoP_field[I1D(i,j,k)]      = rho_field[I1D(i,j,k)] * P_field[I1D(i,j,k)];
+                    avg_rhoT_field[I1D(i,j,k)]      = rho_field[I1D(i,j,k)] * T_field[I1D(i,j,k)];
+                    avg_u_field[I1D(i,j,k)]         = u_field[I1D(i,j,k)];
+                    avg_v_field[I1D(i,j,k)]         = v_field[I1D(i,j,k)];
+                    avg_w_field[I1D(i,j,k)]         = w_field[I1D(i,j,k)];
+                    avg_E_field[I1D(i,j,k)]         = E_field[I1D(i,j,k)];
+                    avg_P_field[I1D(i,j,k)]         = P_field[I1D(i,j,k)];
+                    avg_T_field[I1D(i,j,k)]         = T_field[I1D(i,j,k)];
+                    avg_sos_field[I1D(i,j,k)]       = sos_field[I1D(i,j,k)];
+                    avg_mu_field[I1D(i,j,k)]        = mu_field[I1D(i,j,k)];
+                    avg_kappa_field[I1D(i,j,k)]     = kappa_field[I1D(i,j,k)];
+                    avg_c_v_field[I1D(i,j,k)]       = c_v_field[I1D(i,j,k)];
+                    avg_c_p_field[I1D(i,j,k)]       = c_p_field[I1D(i,j,k)];
+                }
+            }
+        }
+        // Logging
+        if (my_rank == 0){
+            cout << "[myRHEA::initializeFromRestart] Reset 1st-order statistics (avg. fields) with instantaneous values!" << endl; 
+        }
+    }
+    
     // Logging
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
