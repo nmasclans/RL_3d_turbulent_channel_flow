@@ -395,10 +395,9 @@ plt.plot( averaging_time_nonRL, u_b_nonRL,                 linestyle = '--',    
 plt.plot( averaging_time_nonRL, u_b_RL,                    linestyle = '--', marker = '^', markersize = 2, zorder = 0, linewidth = 1, color = plt.cm.tab10(1), label = r'${u}^{+}_b$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical avg. $\overline{u}^{+}_b$ and inst. $\overline{u}^{+}_b$' )
-#plt.ylim(14,14.8)
-#plt.yticks(np.arange(14,14.8,0.1))
-#plt.grid(which='major',axis='y')
-plt.grid(which='both',axis='y')
+plt.ylim(12,17)
+plt.yticks(np.arange(12,17,1.0))
+plt.grid(which='major',axis='y')
 plt.tick_params( axis = 'both', pad = 7.5 )
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 filename = f'{postDir}/numerical_inst_avg_u_bulk_{iteration}_ensemble{ensemble}.jpg'
