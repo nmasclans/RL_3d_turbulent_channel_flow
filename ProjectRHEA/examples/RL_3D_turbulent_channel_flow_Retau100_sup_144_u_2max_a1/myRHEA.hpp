@@ -44,7 +44,7 @@ class myRHEA : public FlowSolverRHEA {
         void calculateTimeStep() override;
 
         /// Output current solver state data, in dedicated RL directory '$RL_CASE_PATH/rhea_exp/output_data'
-        void outputCurrentStateDataRL( std::string path);
+        void outputCurrentStateDataRL();
 
         /// Advance conserved variables in time
         void timeAdvanceConservedVariables() override;
@@ -57,7 +57,7 @@ class myRHEA : public FlowSolverRHEA {
 
     protected:
 
-        // RL variables
+        // RL field variables
         DistributedArray rl_f_rhou_field;
         DistributedArray rl_f_rhov_field;
         DistributedArray rl_f_rhow_field;
@@ -122,6 +122,9 @@ class myRHEA : public FlowSolverRHEA {
         double reward_local;
         std::vector<double> action_global;
         std::vector<double> state_local;
+
+        // RL early episode termination variable
+        bool rl_early_episode_termination;            /// only if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
 
         void initRLParams(const string &tag, const string &restart_data_file, const string &t_action, const string &t_episode, const string &t_begin_control, const string &db_clustered, const string &global_step);
         void initSmartRedis();
