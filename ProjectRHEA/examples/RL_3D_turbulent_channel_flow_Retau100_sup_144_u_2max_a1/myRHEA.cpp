@@ -22,8 +22,8 @@ using namespace std;
 #define _WITNESS_XZ_SLICES_ 1
 #define _INCLUDE_YCOORD_INTO_RL_STATE_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
-#if defined(_RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_) && !defined(_CORRECT_U_BULK_)
-#error "_RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ requires _CORRECT_U_BULK_ to be defined."
+#if (_RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ == 1) && (_CORRECT_U_BULK_ != 1)
+#error "_RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1 requires _CORRECT_U_BULK_ to be set to 1."
 #endif
 
 /// Pi number
