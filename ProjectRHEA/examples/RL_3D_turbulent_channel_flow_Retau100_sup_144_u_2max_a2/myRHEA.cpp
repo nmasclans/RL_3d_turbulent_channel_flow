@@ -647,6 +647,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     first_actuation_time_done   = false;
     first_actuation_period_done = false;
 #endif
+    last_communication          = false;
 
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
     rl_early_episode_termination = false;
@@ -892,6 +893,10 @@ void myRHEA::calculateSourceTerms() {
                     
                     // SmartRedis communications 
                     // Writing state, reward, time
+                    if (last_communication) {
+                        if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Last smart redis communication at time: " << current_time << ", iteration: " << current_time_iter << endl;
+                        if (tag == "0") this->outputCurrentStateDataRL(); /// Save state before episode termination
+                    }
                     updateState();
                     manager->writeState(state_local, state_key);
                     calculateReward();                              /// update 'reward_local' attribute
@@ -906,6 +911,7 @@ void myRHEA::calculateSourceTerms() {
                         if (tag == "0") this->outputCurrentStateDataRL(); /// Save state before episode termination
                         if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Set RL Step '0' to terminate episode at time: " << current_time << ", iteration: " << current_time_iter << endl;
                         manager->writeStepType(0, step_type_key);
+                        last_communication = true;
                     }
 
                     MPI_Barrier(MPI_COMM_WORLD);

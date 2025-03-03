@@ -116,6 +116,7 @@ class myRHEA : public FlowSolverRHEA {
         bool db_clustered;
         bool first_actuation_time_done;
         bool first_actuation_period_done;
+        bool last_communication;
         int n_rl_envs;
         int state_local_size2;                   /// or nwitPar
         int action_global_size2;                 /// or nRectangleControl
