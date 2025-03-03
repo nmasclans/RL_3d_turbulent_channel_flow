@@ -501,7 +501,7 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             )
             logger.debug(f"Collect environment started, with global_step: {global_step_val}")
             collect_driver.run()
-            logger.debug(f"Collect environment run, with global_step: {global_step_val}")
+            logger.debug(f"Collect environment finished run, with global_step: {global_step_val}")
             env.stop()
             logger.debug(f"Collect environment stopped, with global_step: {global_step_val}")
             collect_time += time.time() - start_time
