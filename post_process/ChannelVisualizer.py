@@ -1048,6 +1048,31 @@ class ChannelVisualizer():
             print(f"\nMAKING GIF PDF reward {i_rew} along RL GLOBAL STEPS in {filename}" )
             frames_dict_pdf[i_rew][0].save(filename, save_all=True, append_images=frames_dict_pdf[i_rew][1:], duration=1000, loop=0)    
 
+
+# ------------------------------------------------------------------------
+
+    def build_avg_u_bulk_frames(self, frames_plot, avg_time, avg_u_bulk_num, avg_u_bulk_ref, global_step, xlim, ylim):
+        # Build figure
+        fig, ax = plt.subplots()
+        plt.clf()
+        plt.hlines(avg_u_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2,  color='black', label=r"Reference")
+        plt.scatter(avg_time, avg_u_bulk_num,         marker = '^',   s = 2,        color=plt.cm.tab10(1), label=r"RL")
+        plt.xlabel( r'Averaging time $t_{avg}^+$', fontsize=16)
+        plt.ylabel( r'$\overline{u}^{+}_b$', fontsize=16)
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.grid(which='major',axis='y')
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=16)
+        plt.title(f"RL step = {global_step}", fontsize=16)
+        plt.tight_layout()        
+        # Transform figure to image
+        fig.canvas.draw()
+        img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        frames_plot.append(img)
+        plt.close(fig)
+        return frames_plot
+
 # ------------------------------------------------------------------------
 
     def build_main_gifs_from_frames(self, frames_dict):
