@@ -499,11 +499,11 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
                 restart_file=params["restart_file"], # TODO: impl. sth if we want to use several restart files, i.e. if global_step_val > 0 else 1,
                 global_step=global_step_val,
             )
-            logger.debug(f"Collect environment started, with global_step: {global_step_val}")
+            logger.debug(f"{bcolors.OKBLUE}Collect environment started, with global_step: {global_step_val}{bcolors.ENDC}")
             collect_driver.run()
-            logger.debug(f"Collect environment finished run, with global_step: {global_step_val}")
+            logger.debug(f"{bcolors.OKBLUE}Collect environment finished run, with global_step: {global_step_val}{bcolors.ENDC}")
             env.stop()
-            logger.debug(f"Collect environment stopped, with global_step: {global_step_val}")
+            logger.debug(f"{bcolors.OKBLUE}Collect environment stopped, with global_step: {global_step_val}{bcolors.ENDC}")
             collect_time += time.time() - start_time
 
             start_time = time.time()
