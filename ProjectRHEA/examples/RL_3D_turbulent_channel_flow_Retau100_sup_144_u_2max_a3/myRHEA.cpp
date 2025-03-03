@@ -903,6 +903,8 @@ void myRHEA::calculateSourceTerms() {
                     /// action_local  = manager->getActionLocal();  /// action_local not used
                     /// Update & Write step size (from 1) to 0 if the next time that we require actuation value is the last one
                     if (current_time + 2.0 * actuation_period > final_time) {
+                        if (tag == "0") this->outputCurrentStateDataRL(); /// Save state before episode termination
+                        if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Set RL Step '0' to terminate episode at time: " << current_time << ", iteration: " << current_time_iter << endl;
                         manager->writeStepType(0, step_type_key);
                     }
 
@@ -1566,15 +1568,15 @@ void myRHEA::correctStreamwiseBulkVelocity() {
     }
 
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     if ( avg_u_bulk_numeric >= avg_u_bulk_max && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time = current_time + actuation_period + delta_t;
-        if (tag == "0") this->outputCurrentStateDataRL(); 
-        /// Logging
-        int my_rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk reached. Final time set to " << final_time << endl;
+        final_time = current_time + 2.0 * actuation_period + delta_t;
+        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk " << avg_u_bulk_max << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
+    } else {
+        if( my_rank == 0 ) cout << endl << "Numerical avg_u_bulk: " << avg_u_bulk_numeric << ", maximum avg_u_bulk: " << avg_u_bulk_max << ", time: " << current_time << ", final time: " << final_time << endl;
     }
 #endif /// of _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
 
@@ -2458,7 +2460,7 @@ void myRHEA::calculateReward() {
                                  + ( c4 * l2_err_rmsf_u / l2_rmsf_u_reference ) \
                                  + ( c5 * l2_err_rmsf_v / l2_rmsf_v_reference ) \
                                  + ( c6 * l2_err_rmsf_w / l2_rmsf_w_reference ) \
-                                 + ( c7 * l2_rl_f * 1.0 ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
+                                 + ( c7 * l2_rl_f ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
          << c1 * l2_err_avg_u  / l2_avg_u_reference << " " 
