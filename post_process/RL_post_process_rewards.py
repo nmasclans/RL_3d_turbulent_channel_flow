@@ -45,7 +45,6 @@ restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
 restart_data_file_averaging_time = 2.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0    = restart_data_file_time - restart_data_file_averaging_time 
 rl_n_envs  = 8   # num. actuators (control cubes) per cfd simulation 
-reward_dim = 1
 
 # --- Post-processing parameters ---
 verbose = False
@@ -124,61 +123,59 @@ for file in time_filepath_list:
 # --- Get local_reward, reward & time data from txt files ---
 print("\nImporting local_reward, reward & time data from txt files...")
 n_RL = len(local_reward_filepath_list)
+local_reward_dict = dict.fromkeys(np.arange(n_RL))
+reward_dict       = dict.fromkeys(np.arange(n_RL))
+avg_time_dict     = dict.fromkeys(np.arange(n_RL))
+local_reward_min  = 1e8;    local_reward_max = -1e8
+reward_min        = 1e8;    reward_max       = -1e8
+avg_time_min      = 1e8;    avg_time_max     = -1e8
 for i_RL in range(n_RL):
     
     # Read data
-    local_reward_file      = local_reward_filepath_list[i_RL]
-    reward_file            = reward_filepath_list[i_RL]
-    time_file              = time_filepath_list[i_RL]
-    local_reward_data_aux = np.loadtxt(local_reward_file)
-    reward_data_aux       = np.loadtxt(reward_file)
-    time_data_aux         = np.loadtxt(time_file)
-    num_time_steps_aux    = time_data_aux.shape[0]
-
-    # Allocate rewards data arrays
-    if i_RL == 0:
-        num_time_steps = num_time_steps_aux
-        local_reward_data = np.zeros((n_RL, num_time_steps, reward_dim, rl_n_envs))
-        reward_data       = np.zeros((n_RL, num_time_steps, reward_dim, rl_n_envs))
-    else:
-        if num_time_steps != num_time_steps_aux:
-            print(f"Warning: global step {global_step_list[i_RL]} has num. global steps {num_time_steps_aux} != {num_time_steps}")
-            print(f"Warning: not considered steps >= global step {global_step_list[i_RL]}")
-            break
+    local_reward_file = local_reward_filepath_list[i_RL]
+    reward_file       = reward_filepath_list[i_RL]
+    time_file         = time_filepath_list[i_RL]
+    local_reward_data = np.loadtxt(local_reward_file)
+    reward_data       = np.loadtxt(reward_file)
+    time_data         = np.loadtxt(time_file)
+    avg_time_data     = time_data - t_avg_0
+    num_time_steps    = time_data.shape[0]
 
     # Allocate data
-    local_reward_data[i_RL,:,:,:] = local_reward_data_aux.reshape(num_time_steps, reward_dim, rl_n_envs)
-    reward_data[i_RL,:,:,:]       = reward_data_aux.reshape(      num_time_steps, reward_dim, rl_n_envs)
-    if i_RL == 0:
-        time_data     = time_data_aux               # shape [num_time_steps]
-        avg_time_data = time_data_aux - t_avg_0     # shape [num_time_steps]
-    else:
-        assert np.allclose(time_data, time_data_aux, atol=1e-6)
+    local_reward_dict[i_RL] = local_reward_data.reshape(num_time_steps, rl_n_envs)
+    reward_dict[i_RL]       = reward_data.reshape(      num_time_steps, rl_n_envs)
+    avg_time_dict[i_RL]     = avg_time_data       # shape [num_time_steps]
+
+    # Update min & max values, if necessary
+    local_reward_min = np.min([local_reward_min, np.min(local_reward_data)])
+    local_reward_max = np.max([local_reward_max, np.max(local_reward_data)])
+    reward_min       = np.min([reward_min,       np.min(reward_data)])
+    reward_max       = np.max([reward_max,       np.max(reward_data)])
+    avg_time_min     = np.min([avg_time_min,     np.min(avg_time_data)])
+    avg_time_max     = np.max([avg_time_max,     np.max(avg_time_data)])
 
     # Logging    
     print(f"\nLocal reward data imported from file '{local_reward_file}'")
     print(f"\nReward data imported from file '{reward_file}'")
     print(f"Time data imported from file '{time_file}'")
 
-# Check if the for loop break due to incomplete global step
-if i_RL != (n_RL-1):
-    local_reward_data = local_reward_data[:i_RL,:,:,:]
-    reward_data       = reward_data[:i_RL,:,:,:]
-    n_RL = i_RL
 print("\nData imported successfully!")
 
 #-----------------------------------------------------------------------------------------
 #                    Local_reward and reward figures and gif frames 
 #-----------------------------------------------------------------------------------------
 
-local_reward_min  = int(np.min(local_reward_data))-1
-local_reward_max  = int(np.max(local_reward_data))+1
-reward_min        = int(np.min(reward_data))-1
+local_reward_min  = int(local_reward_min)-1
+local_reward_max  = int(local_reward_max)+1
+reward_min        = int(reward_min)-1
 reward_max        = int(np.max(reward_data))+1
-ylim_local_reward = [local_reward_min, local_reward_max]
-ylim_reward       = [reward_min, reward_max]
-print(f"\nLocal reward limits: {ylim_local_reward}")
-print(f"\nReward limits: {ylim_reward}")
+local_reward_lim  = [local_reward_min, local_reward_max]
+reward_lim        = [reward_min, reward_max]
+avg_time_lim      = [avg_time_min, avg_time_max]
+
+print(f"\nLocal reward limits: {local_reward_lim}")
+print(f"Reward limits: {reward_lim}")
+print(f"Averaging time limits: {avg_time_lim}")
 
 # ---------------------- Plot actions at each RL global step (specific ensemble) ---------------------- 
 
@@ -192,28 +189,22 @@ print(f"\nReward limits: {ylim_reward}")
 print("\nBuilding local_reward and reward gif frames...")
 
 # Allocate frames dictionary: empty list per each action dimension 
-frames_dict_scatter_local_reward = {}
-frames_dict_scatter_reward       = {}
-frames_dict_pdf_local_reward     = {}
-frames_dict_pdf_reward           = {}
-for i_rew in range(reward_dim):
-    frames_dict_scatter_local_reward[i_rew] = []
-    frames_dict_scatter_reward[i_rew]       = []
-    frames_dict_pdf_local_reward[i_rew]     = []
-    frames_dict_pdf_reward[i_rew]           = []
-
+frames_plot_local_reward = []
+frames_plot_reward       = []
+frames_pdf_local_reward  = []
+frames_pdf_reward        = []
 # Generate frames
 for i_RL in range(n_RL):
     # log progress
     if i_RL % (n_RL//10 or 1) == 0:
         print(f"{i_RL/n_RL*100:.0f}%")
     # Build frames
-    frames_dict_scatter_local_reward, frames_dict_pdf_local_reward = visualizer.build_rewards_frames(frames_dict_scatter_local_reward, frames_dict_pdf_local_reward, avg_time_data, local_reward_data[i_RL], global_step_list[i_RL], ylim_local_reward, "Local Reward")
-    frames_dict_scatter_reward,       frames_dict_pdf_reward       = visualizer.build_rewards_frames(frames_dict_scatter_reward,       frames_dict_pdf_reward,       avg_time_data, reward_data[i_RL],       global_step_list[i_RL], ylim_reward, "Reward")
+    frames_plot_local_reward, frames_pdf_local_reward = visualizer.build_rewards_frames(frames_plot_local_reward, frames_pdf_local_reward, avg_time_dict[i_RL], local_reward_dict[i_RL], avg_time_lim, local_reward_lim, global_step_list[i_RL], "Local Reward")
+    frames_plot_reward,       frames_pdf_reward       = visualizer.build_rewards_frames(frames_plot_reward,       frames_pdf_reward,       avg_time_dict[i_RL], reward_dict[i_RL],       avg_time_lim, reward_lim,       global_step_list[i_RL], "Reward")
 
 print("Building gifs from frames...")
-visualizer.build_rewards_gifs_from_frames(frames_dict_scatter_local_reward, frames_dict_pdf_local_reward, reward_dim, "reward_local")
-visualizer.build_rewards_gifs_from_frames(frames_dict_scatter_reward,       frames_dict_pdf_reward,       reward_dim, "reward")
+visualizer.build_rewards_gifs_from_frames(frames_plot_local_reward, frames_pdf_local_reward, "reward_local")
+visualizer.build_rewards_gifs_from_frames(frames_plot_reward,       frames_pdf_reward,       "reward")
 print("Gifs plotted successfully!")
 
 

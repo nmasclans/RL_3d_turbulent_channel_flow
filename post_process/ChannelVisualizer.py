@@ -599,7 +599,7 @@ class ChannelVisualizer():
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(rf"$\overline{{{vel_name}}}^{{+}}$")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
@@ -637,7 +637,7 @@ class ChannelVisualizer():
         plt.xlabel(r"$y^{+}$")
         plt.ylabel(rf"${vel_name}^{{+}}_{{\textrm{{rmsf}}}}$")
         plt.grid(axis="y")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
@@ -895,7 +895,7 @@ class ChannelVisualizer():
             plt.close()
         return figs_dict
 
-    def build_actions_scatter(self, avg_time, actions, global_step, ylim, ylabel_name=None):
+    def build_actions_scatter(self, avg_time, actions, avg_time_lim, actions_lim, global_step):
         """
         avg_time: np.array([num_time_steps])
         actions:  np.array([num_time_steps, action_dim, rl_n_envs])
@@ -908,12 +908,10 @@ class ChannelVisualizer():
             fig, ax = plt.subplots()
             for i_env in range(rl_n_envs):
                 plt.scatter(avg_time, actions[:,i_act,i_env], label=rf"RL env {i_env}")
-            plt.ylim(ylim)
+            plt.xlim(avg_time_lim)
+            plt.ylim(actions_lim)
             plt.xlabel("Averaging time", fontsize=16)
-            if ylabel_name is None:
-                plt.ylabel("Action " + action_dict[i_act], fontsize=16)
-            else:
-                plt.ylabel(ylabel_name, fontsize=16)
+            plt.ylabel("Action " + action_dict[i_act], fontsize=16)
             plt.grid(axis="y")
             plt.title(f"RL step = {global_step}", fontsize=16)
             plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -922,7 +920,7 @@ class ChannelVisualizer():
             plt.close()
         return figs_dict
     
-    def build_actions_pdf(self, actions, global_step, xlabel_name=None):
+    def build_actions_pdf(self, actions, actions_lim, global_step):
         """
         avg_time: np.array([num_time_steps])
         actions:  np.array([num_time_steps, action_dim, rl_n_envs])
@@ -946,11 +944,9 @@ class ChannelVisualizer():
                     bw_adjust=1.0,
                     label=rf"RL env {i_env}: $\mu$={mean:.2f}, $\sigma$={std_dev:.2f}"
                 )
+            plt.xlim(actions_lim)
             plt.ylim([0,1])
-            if xlabel_name is None:
-                plt.xlabel("Action " + action_dict[i_act], fontsize=16)
-            else:
-                plt.xlabel(xlabel_name, fontsize=16)
+            plt.xlabel("Action " + action_dict[i_act], fontsize=16)
             plt.ylabel("PDF", fontsize=16)
             plt.title(f"RL step = {global_step}", fontsize=16)
             plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -959,33 +955,14 @@ class ChannelVisualizer():
             plt.close()
         return figs_dict
     
-    def build_actions_fig(self, avg_time, actions, global_step, ylim):
-        """
-        avg_time: np.array([num_time_steps])
-        actions:  np.array([num_time_steps, action_dim, rl_n_envs])
-        """
-        print(f"\nMAKING PLOTS OF ACTIONS at RL global step = {global_step}")
-        figs_dict_scatter = self.build_actions_scatter(avg_time, actions, global_step, ylim)
-        figs_dict_pdf     = self.build_actions_pdf(actions, global_step)
-        action_dim = actions.shape[1]
-        for i_act in range(action_dim):
-            # Scatter plot
-            filename = os.path.join(self.postRlzDir, f"action{i_act}_scatter_step{global_step}")
-            figs_dict_scatter[i_act].savefig(filename)
-            print(f"DONE plot scatter action {i_act} at global_step = {global_step} in '{filename}'")
-            # pdf plot
-            filename = os.path.join(self.postRlzDir, f"action{i_act}_pdf_step{global_step}")
-            figs_dict_pdf[i_act].savefig(filename)
-            print(f"DONE plot pdf action {i_act} at global_step = {global_step} in '{filename}'")
-
-    def build_actions_frames(self, frames_dict_scatter, frames_dict_pdf, avg_time, actions, global_step, ylim):
+    def build_actions_frames(self, frames_dict_scatter, frames_dict_pdf, avg_time, actions, avg_time_lim, actions_lim, global_step):
         """
         frames_dict_scatter, frames_dict_pdf: dictionaries with keys 0, 1, ..., action_dim-1
         avg_time: np.array([num_time_steps])
         actions:  np.array([num_time_steps, action_dim, rl_n_envs])
         """
-        figs_dict_scatter = self.build_actions_scatter(avg_time, actions, global_step, ylim)
-        figs_dict_pdf     = self.build_actions_pdf(actions, global_step)
+        figs_dict_scatter = self.build_actions_scatter(avg_time, actions, avg_time_lim, actions_lim, global_step)
+        figs_dict_pdf     = self.build_actions_pdf(actions, actions_lim, global_step)
         action_dim = actions.shape[1]
         for i_act in range(action_dim):
             # Scatter frame
@@ -1001,7 +978,6 @@ class ChannelVisualizer():
         return frames_dict_scatter, frames_dict_pdf
     
     def build_action_gifs_from_frames(self, frames_dict_scatter, frames_dict_pdf, action_dim):
-
         for i_act in range(action_dim):
             # scatter gif
             filename = os.path.join(self.postRlzDir, f"action{i_act}_scatter_vs_global_steps.gif")
@@ -1014,47 +990,91 @@ class ChannelVisualizer():
 
 # ------------------------------------------------------------------------
 
-    def build_rewards_frames(self, frames_dict_scatter, frames_dict_pdf, avg_time, rewards, global_step, ylim, reward_name = 'Local Reward'):
+    def build_rewards_plot(self, avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name):
         """
-        frames_dict_scatter, frames_dict_pdf: dictionaries with keys 0, 1, ..., action_dim-1
         avg_time: np.array([num_time_steps])
-        rewards:  np.array([num_time_steps, reward_dim, rl_n_envs])
+        rewards:  np.array([num_time_steps, rl_n_envs])
         """
-        figs_dict_scatter = self.build_actions_plot(avg_time, rewards, global_step, ylim, reward_name)
-        figs_dict_pdf     = self.build_actions_pdf(rewards, global_step, reward_name)
-        reward_dim = rewards.shape[1]
-        for i_rew in range(reward_dim):
-            # Scatter frame
-            fig_scatter = figs_dict_scatter[i_rew]
-            fig_scatter.canvas.draw()
-            img_scatter = Image.frombytes("RGB", fig_scatter.canvas.get_width_height(), fig_scatter.canvas.tostring_rgb())
-            frames_dict_scatter[i_rew].append(img_scatter)
-            # Pdf frame
-            fig_pdf     = figs_dict_pdf[i_rew]
-            fig_pdf.canvas.draw()
-            img_pdf = Image.frombytes("RGB", fig_pdf.canvas.get_width_height(), fig_pdf.canvas.tostring_rgb())
-            frames_dict_pdf[i_rew].append(img_pdf)
-        return frames_dict_scatter, frames_dict_pdf
-    
-    def build_rewards_gifs_from_frames(self, frames_dict_scatter, frames_dict_pdf, reward_dim, reward_name = "local_reward"):
+        rl_n_envs  = rewards.shape[1]
+        fig, ax = plt.subplots()
+        for i_env in range(rl_n_envs):
+            plt.plot(avg_time, rewards[:,i_env], linewidth=2, label=rf"RL env {i_env}")
+        plt.xlim(avg_time_lim)
+        plt.ylim(rewards_lim)
+        plt.xlabel("Averaging time", fontsize=16)
+        plt.ylabel(reward_name, fontsize=16)
+        plt.grid(axis="y")
+        plt.title(f"RL step = {global_step}", fontsize=16)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        fig_plot = fig
+        plt.close()
+        return fig_plot
 
-        for i_rew in range(reward_dim):
-            # scatter gif
-            filename = os.path.join(self.postRlzDir, f"{reward_name}{i_rew}_scatter_vs_global_steps.gif")
-            print(f"\nMAKING GIF SCATTER reward {i_rew} along RL GLOBAL STEPS in {filename}" )
-            frames_dict_scatter[i_rew][0].save(filename, save_all=True, append_images=frames_dict_scatter[i_rew][1:], duration=1000, loop=0)    
-            # pdf gif
-            filename = os.path.join(self.postRlzDir, f"{reward_name}{i_rew}_pdf_vs_global_steps.gif")
-            print(f"\nMAKING GIF PDF reward {i_rew} along RL GLOBAL STEPS in {filename}" )
-            frames_dict_pdf[i_rew][0].save(filename, save_all=True, append_images=frames_dict_pdf[i_rew][1:], duration=1000, loop=0)    
+    def build_rewards_pdf(self, rewards, rewards_lim, global_step, reward_name):
+        """
+        avg_time: np.array([num_time_steps])
+        rewards:  np.array([num_time_steps, rl_n_envs])
+        """
+        import seaborn as sns
+        rl_n_envs  = rewards.shape[1]
+        fig, ax = plt.subplots()
+        for i_env in range(rl_n_envs):
+            rew = rewards[:, i_env]
+            mean = np.mean(rew)
+            std_dev = np.std(rew)
+            sns.kdeplot(
+                rew, 
+                ax=ax, 
+                fill=True, 
+                common_norm=False,  # Each env's KDE is independently normalized
+                bw_adjust=1.0,
+                label=rf"RL env {i_env}: $\mu$={mean:2.2f}, $\sigma$={std_dev:2.2f}"
+            )
+        plt.xlim(rewards_lim)
+        plt.ylim([0,0.5])
+        plt.xlabel(reward_name, fontsize=16)
+        plt.ylabel("PDF", fontsize=16)
+        plt.title(f"RL step = {global_step}", fontsize=16)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        fig_pdf = fig
+        plt.close()
+        return fig_pdf
 
+    def build_rewards_frames(self, frames_plot, frames_pdf, avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name = 'Local Reward'):
+        """
+        frames_plot, frames_pdf: lists of frames of different plots
+        avg_time: np.array([num_time_steps])
+        rewards:  np.array([num_time_steps, rl_n_envs])
+        """
+        fig_plot = self.build_rewards_plot(avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name)
+        fig_pdf  = self.build_rewards_pdf(rewards, rewards_lim, global_step, reward_name)
+        # Plot frame
+        fig_plot.canvas.draw()
+        img_plot = Image.frombytes("RGB", fig_plot.canvas.get_width_height(), fig_plot.canvas.tostring_rgb())
+        frames_plot.append(img_plot)
+        # Pdf frame
+        fig_pdf.canvas.draw()
+        img_pdf = Image.frombytes("RGB", fig_pdf.canvas.get_width_height(), fig_pdf.canvas.tostring_rgb())
+        frames_pdf.append(img_pdf)
+        return frames_plot, frames_pdf
+
+    def build_rewards_gifs_from_frames(self, frames_plot, frames_pdf, reward_name = "local_reward"):
+        # plot gif
+        filename = os.path.join(self.postRlzDir, f"{reward_name}_plot_vs_global_steps.gif")
+        print(f"\nMAKING GIF PLOT {reward_name} along RL GLOBAL STEPS in {filename}" )
+        frames_plot[0].save(filename, save_all=True, append_images=frames_plot[1:], duration=1000, loop=0)    
+        # pdf gif
+        filename = os.path.join(self.postRlzDir, f"{reward_name}_pdf_vs_global_steps.gif")
+        print(f"\nMAKING GIF PDF {reward_name} along RL GLOBAL STEPS in {filename}" )
+        frames_pdf[0].save(filename, save_all=True, append_images=frames_pdf[1:], duration=1000, loop=0)    
 
 # ------------------------------------------------------------------------
 
     def build_avg_u_bulk_frames(self, frames_plot, avg_time, avg_u_bulk_num, avg_u_bulk_ref, global_step, xlim, ylim):
         # Build figure
         fig, ax = plt.subplots()
-        plt.clf()
         plt.hlines(avg_u_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2,  color='black', label=r"Reference")
         plt.scatter(avg_time, avg_u_bulk_num,         marker = '^',   s = 2,        color=plt.cm.tab10(1), label=r"RL")
         plt.xlabel( r'Averaging time $t_{avg}^+$', fontsize=16)

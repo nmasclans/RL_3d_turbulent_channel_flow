@@ -19,7 +19,7 @@ from matplotlib import rc, rcParams
 # --- Get CASE parameters ---
 
 try :
-    iteration       = sys.argv[1]
+    iteration       = int(sys.argv[1])
     ensemble        = sys.argv[2]
     train_name      = sys.argv[3]
     Re_tau          = float(sys.argv[4])     # Friction Reynolds number [-]
@@ -45,6 +45,10 @@ delta   = 1.0				# Channel half-height [m]
 mu_ref  = rho_0*u_tau*delta/Re_tau	# Dynamic viscosity [Pa s]
 nu_ref  = mu_ref/rho_0			# Kinematic viscosity [m2/s]
 
+#--------------------------------------------------------------------------------------------
+
+# --- Training / Evaluation parameters ---
+
 # training post-processing directory
 postDir = train_name
 if not os.path.exists(postDir):
@@ -62,6 +66,7 @@ max_length_legend_RL = 10
 # RL parameters
 cfd_n_envs = 1
 rl_n_envs  = 8
+delta_iteration_nonRL            = 10000
 simulation_time_per_train_step   = t_episode_train                    # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
@@ -92,84 +97,76 @@ y_plus_actuators_boundaries = y_actuators_boundaries * Re_tau_theoretical
 
 # ----------- Build data h5 filenames ------------
 
-# --- RL filenames ---
-# Get 'file_details' & filename_RL
-pattern = f"{case_dir}/rhea_exp/output_data/RL_3d_turbulent_channel_flow_{iteration}_ensemble{ensemble}_*.h5"
-# Use glob to find all matching files
-matching_files = sorted(glob.glob(pattern))
-# List to store the extracted parts corresponding to "*"
-filename_RL_list  = []
-file_details_list = []
-step_num_list     = []
-# Check if files were found
-if matching_files:
-    print("\RL files:")
-    for file in matching_files:
-        # Store file
-        filename_RL_list.append(file)
-        # Extract the filename (without the directory)
-        base_filename = os.path.basename(file)
-        # Extract the part corresponding to "*"
-        # Split by "_" and get the last part before ".h5"
-        file_details = base_filename.split('_')[-1].replace('.h5', '')
-        # Add the extracted part to the list
-        file_details_list.append(file_details)
-        # Step number
-        step_num = int(file_details[4:])
-        step_num_list.append(step_num)
-        # Print the file and the extracted part
-        print(f"Filename: {base_filename}, File details: {file_details}, Step number: {step_num}")
-else:
-    print(f"No files found matching the pattern: {pattern}")
-global_step_num_list = step_num_list
-N = len(filename_RL_list)
-
-# --- non-RL filenames ---
-train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
-if run_mode == "train":
-    iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
-else:   # run_mode == "eval"
-    iteration_nonRL_list = [ iteration_end_train_step ]
-filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
-
-assert N == len(train_step_list)
-print("\nnon-RL files:")
-for i in range(N):
-    print("Filename:", filename_nonRL_list[i], ", Iteration:", iteration_nonRL_list[i])
-
 # --- non-RL converged reference filename ---
 filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 
 # --- non-RL restart data file
 filename_rst = f"{compareDatasetDir}/3d_turbulent_channel_flow_{iteration_restart_data_file}.h5"
 
-# Append restart data file to RL & non-RL files list
-# > RL lists:
-filename_RL_list.insert(0,filename_rst)
-file_details_list.insert(0,'restart')
-step_num_list.insert(0,'000000') 
-global_step_num_list.insert(0,'000000') 
-N = len(filename_RL_list)   # update N
-# > non-RL lists:
-filename_nonRL_list.insert(0,filename_rst)
-train_step_list.insert(0,0)
-iteration_nonRL_list.insert(0,iteration_restart_data_file)
-assert N == len(filename_nonRL_list)
+# --- RL filenames ---
 
-# --- Discard non-RL (and corresponding RL) snapshots if not available
-filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
-n_nonRL_is_available = sum(filename_nonRL_is_available)
-print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", N - n_nonRL_is_available)
-filename_RL_list_available = []
-filename_nonRL_list_available = []
-for i in range(N):
-    if filename_nonRL_is_available[i]:
-        filename_RL_list_available.append(filename_RL_list[i])
-        filename_nonRL_list_available.append(filename_nonRL_list[i])
-filename_RL_list    = filename_RL_list_available
-filename_nonRL_list = filename_nonRL_list_available
-N = len(filename_RL_list)   # update N
-print(f"Datasets RL and non-RL have now {N} files each")
+# Take the h5 file of each global step at iteration number 'iteration',
+# or smaller if early episode termination was activated for that step.
+# Note: the iteration at early episode termination must be smaller than maximum episode length 'iteration' 
+
+# Get filepath and file details of the last saved iteration of each global step
+pattern = f"{case_dir}/rhea_exp/output_data/RL_3d_turbulent_channel_flow_*_ensemble{ensemble}_step*.h5"
+matching_files = sorted(glob.glob(pattern))
+best_files = {}     # dict: {global_step: (iter_num, filepath)}
+if matching_files:
+    print("\RL files:")
+    for filepath in matching_files:
+        filename       = os.path.basename(filepath)
+        parts_filename = filename.split('_')
+        # Extract iteration and global step
+        try:
+            iter_num    = int(parts_filename[5])
+            global_step = int(parts_filename[-1].replace('.h5','')[4:])
+        except (IndexError, ValueError):
+            print(f"Skipping invalid file: {filename}, in filepath: {filepath}")
+            continue
+        # Keep only the file with the highes iteration for each global step, but >= iteration
+        if ( global_step not in best_files or iter_num > best_files[global_step][0] ) and (iter_num <= iteration):
+            best_files[global_step] = (iter_num, filepath)
+    
+    # Sort by global step
+    sorted_best_files = sorted(best_files.items())      # list of tuples: [(global_step, (iteration, filepath))]
+    filename_RL_list     = [file for _, (_, file) in sorted_best_files]
+    iteration_RL_list    = [iter for _, (iter, _) in sorted_best_files]
+    global_step_RL_list  = [step for step, (_, _) in sorted_best_files]
+
+    # Append restart data file to RL files list
+    filename_RL_list.insert(0,filename_rst)
+    iteration_RL_list.insert(0,iteration_restart_data_file) 
+    global_step_RL_list.insert(0,'restart file') 
+    N_RL = len(filename_RL_list)
+
+    # Print selected files
+    for i in range(N_RL):
+        print(f"\nFilename: {filename_RL_list[i]}, \nIteration: {iteration_RL_list[i]}, \nGlobal step: {global_step_RL_list[i]}")
+else:
+    print(f"No files found matching the pattern: {pattern}")
+
+iter_simulated   = [iter - iteration_restart_data_file for iter in iteration_RL_list]
+iter_accumulated = np.sum(iter_simulated)
+iter_max_nonRL   = iteration_restart_data_file + iter_accumulated
+print(f"\nA total of {iter_accumulated} iterations have been simulated through the RL episodes, \nwhich accounting for restart file {iteration_restart_data_file} iterations \nis equivalent to final non-RL {iter_max_nonRL} iterations.")
+iteration_max_nonRL = np.min([iter_max_nonRL, iteration_max_nonRL])
+print(f"Last non-RL iteration: {iteration_max_nonRL}")
+
+# --- non-RL filenames ---
+
+if run_mode == "train":
+    iteration_nonRL_list = np.arange(iteration_restart_data_file, iteration_max_nonRL, delta_iteration_nonRL)
+else:   # run_mode == "eval"
+    iteration_nonRL_list = [ iteration_end_train_step ]
+filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
+N_nonRL = len(filename_nonRL_list)
+print("\nnon-RL files:")
+for i in range(N_nonRL):
+    print("\nFilename:", filename_nonRL_list[i], ", \nIteration:", iteration_nonRL_list[i])
+
+#--------------------------------------------------------------------------------------------
 
 # ----------- Get RL and non-RL data ------------
 
@@ -191,7 +188,7 @@ if not os.path.isfile(filename_ref):
 print("\nImporting data from files...")
 
 print("\nImporting data from RL files:")
-for i in range(N):
+for i in range(N_RL):
     filename_RL = filename_RL_list[i]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
@@ -209,14 +206,14 @@ for i in range(N):
         num_points_y      = avg_u_data_RL_aux[0,:,0].size
         num_points_z      = avg_u_data_RL_aux[:,0,0].size
         num_points_xz     = num_points_x*num_points_z
-        averaging_time_RL = np.zeros(N)
-        y_data_RL         = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_v_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_w_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        rmsf_u_data_RL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
-        rmsf_v_data_RL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
-        rmsf_w_data_RL    = np.zeros([N, num_points_z, num_points_y, num_points_x])  
+        averaging_time_RL = np.zeros(N_RL)
+        y_data_RL         = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_RL     = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])         
+        avg_v_data_RL     = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])         
+        avg_w_data_RL     = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])         
+        rmsf_u_data_RL    = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])            
+        rmsf_v_data_RL    = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])            
+        rmsf_w_data_RL    = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])  
     # Fill allocation arrays
     averaging_time_RL[i]    = averaging_time_RL_aux
     y_data_RL[i,:,:,:]      = y_data_RL_aux
@@ -228,9 +225,12 @@ for i in range(N):
     rmsf_w_data_RL[i,:,:,:] = rmsf_w_data_RL_aux
     # Logging
     print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL_aux:.6f}")
+averaging_time_simulated_RL    = averaging_time_RL - averaging_time_RL[0]  # averaging_time_RL[0] is the restart file averaging time, t_avg_0
+averaging_time_simulated_RL[0] = averaging_time_RL[0]
+averaging_time_accum_RL        = np.cumsum(averaging_time_simulated_RL)
 
 print("\nImporting data from non-RL files:")
-for i in range(N):
+for i in range(N_nonRL):
     filename_nonRL = filename_nonRL_list[i]
     with h5py.File( filename_nonRL, 'r' ) as data_file:
         #list( data_file.keys() )
@@ -248,14 +248,14 @@ for i in range(N):
         num_points_y      = avg_u_data_nonRL_aux[0,:,0].size
         num_points_z      = avg_u_data_nonRL_aux[:,0,0].size
         num_points_xz     = num_points_x*num_points_z
-        averaging_time_nonRL = np.zeros(N)
-        y_data_nonRL         = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_v_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_w_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        rmsf_u_data_nonRL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
-        rmsf_v_data_nonRL    = np.zeros([N, num_points_z, num_points_y, num_points_x])            
-        rmsf_w_data_nonRL    = np.zeros([N, num_points_z, num_points_y, num_points_x])  
+        averaging_time_nonRL = np.zeros(N_nonRL)
+        y_data_nonRL         = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_nonRL     = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])         
+        avg_v_data_nonRL     = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])         
+        avg_w_data_nonRL     = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])         
+        rmsf_u_data_nonRL    = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])            
+        rmsf_v_data_nonRL    = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])            
+        rmsf_w_data_nonRL    = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])  
     # Fill allocation arrays
     averaging_time_nonRL[i]    = averaging_time_nonRL_aux
     y_data_nonRL[i,:,:,:]      = y_data_nonRL_aux
@@ -281,17 +281,22 @@ assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref >
 print(f"\nNon-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
 print("Data imported successfully!")
 
+### RL and non-RL data is taken at different cummulative averaging times, manage corresponding indices for non-available time instants
+averaging_time_all = np.unique(np.round(np.concatenate((averaging_time_nonRL, averaging_time_accum_RL)), decimals=3))
+idx_nonRL = np.searchsorted(averaging_time_nonRL, averaging_time_all, side='right')-1
+idx_RL    = np.searchsorted(averaging_time_accum_RL, averaging_time_all, side='right')-1
+N_all     = len(averaging_time_all)
 
 # -------------- Averaging fields using XZ symmetries --------------
 
 ### Allocate averaged variables
-y_plus_RL      = np.zeros( [N, int( 0.5*num_points_y )] ); y_plus_nonRL      = np.zeros( [N, int( 0.5*num_points_y )] );  y_plus_ref      = np.zeros( int( 0.5*num_points_y ) )
-avg_u_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_u_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
-avg_v_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_v_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_v_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
-avg_w_plus_RL  = np.zeros( [N, int( 0.5*num_points_y )] ); avg_w_plus_nonRL  = np.zeros( [N, int( 0.5*num_points_y )] );  avg_w_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
-rmsf_u_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_u_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_u_plus_ref = np.zeros( int( 0.5*num_points_y ) )
-rmsf_v_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_v_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_v_plus_ref = np.zeros( int( 0.5*num_points_y ) )
-rmsf_w_plus_RL = np.zeros( [N, int( 0.5*num_points_y )] ); rmsf_w_plus_nonRL = np.zeros( [N, int( 0.5*num_points_y )] );  rmsf_w_plus_ref = np.zeros( int( 0.5*num_points_y ) )
+y_plus_RL      = np.zeros( [N_RL, int( 0.5*num_points_y )] ); y_plus_nonRL      = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  y_plus_ref      = np.zeros( int( 0.5*num_points_y ) )
+avg_u_plus_RL  = np.zeros( [N_RL, int( 0.5*num_points_y )] ); avg_u_plus_nonRL  = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  avg_u_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
+avg_v_plus_RL  = np.zeros( [N_RL, int( 0.5*num_points_y )] ); avg_v_plus_nonRL  = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  avg_v_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
+avg_w_plus_RL  = np.zeros( [N_RL, int( 0.5*num_points_y )] ); avg_w_plus_nonRL  = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  avg_w_plus_ref  = np.zeros( int( 0.5*num_points_y ) )
+rmsf_u_plus_RL = np.zeros( [N_RL, int( 0.5*num_points_y )] ); rmsf_u_plus_nonRL = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  rmsf_u_plus_ref = np.zeros( int( 0.5*num_points_y ) )
+rmsf_v_plus_RL = np.zeros( [N_RL, int( 0.5*num_points_y )] ); rmsf_v_plus_nonRL = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  rmsf_v_plus_ref = np.zeros( int( 0.5*num_points_y ) )
+rmsf_w_plus_RL = np.zeros( [N_RL, int( 0.5*num_points_y )] ); rmsf_w_plus_nonRL = np.zeros( [N_nonRL, int( 0.5*num_points_y )] );  rmsf_w_plus_ref = np.zeros( int( 0.5*num_points_y ) )
 
 ### Average variables in space
 print("\nAveraging variables in space...")
@@ -306,7 +311,7 @@ for j in range( 0, num_points_y ):
             if( j > ( int( 0.5*num_points_y ) - 1 ) ):      # top-wall
                 aux_j = num_points_y - j - 1
             # RL data:
-            for n in range(N):
+            for n in range(N_RL):
                 if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
                     y_plus_RL[n,aux_j]  += ( 0.5/num_points_xz )*( 2.0 - y_data_RL[n,k,j,i] )*( u_tau/nu_ref )
                 else:                                       # bottom-wall
@@ -318,7 +323,7 @@ for j in range( 0, num_points_y ):
                 rmsf_v_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_v_data_RL[n,k,j,i]*( 1.0/u_tau )
                 rmsf_w_plus_RL[n,aux_j] += ( 0.5/num_points_xz )*rmsf_w_data_RL[n,k,j,i]*( 1.0/u_tau )
             # non-RL non-conv data:
-            for n in range(N):
+            for n in range(N_nonRL):
                 if( j > ( int( 0.5*num_points_y ) - 1 ) ):  # top-wall
                     y_plus_nonRL[n,aux_j]  += ( 0.5/num_points_xz )*(2.0 - y_data_nonRL[n,k,j,i])*( u_tau/nu_ref )
                 else:                                       # bottom-wall
@@ -346,7 +351,6 @@ print("Variables averaged successfully!")
 TKE_RL    = 0.5 * ( rmsf_u_plus_RL**2    + rmsf_v_plus_RL**2    + rmsf_w_plus_RL**2    )
 TKE_nonRL = 0.5 * ( rmsf_u_plus_nonRL**2 + rmsf_v_plus_nonRL**2 + rmsf_w_plus_nonRL**2 )
 TKE_ref   = 0.5 * ( rmsf_u_plus_ref**2   + rmsf_v_plus_ref**2   + rmsf_w_plus_ref**2   )
-
 
 # # -------------- Build plots avg-u and rmsf-u,v,w profiles --------------
 # 
@@ -533,7 +537,6 @@ TKE_ref   = 0.5 * ( rmsf_u_plus_ref**2   + rmsf_v_plus_ref**2   + rmsf_w_plus_re
 # # Clear plot
 # plt.clf()
 
-
 # ----------------- Plot Animation Frames of um, urmsf, Rij dof for increasing RL global step (specific iteration & ensemble) -----------------
 
 print("Building gif frames for u-avg and u,v,w-rmsf profiles...")
@@ -563,24 +566,24 @@ ylim_rmsf_u  = [rmsf_u_min, rmsf_u_max]
 ylim_rmsf_v  = [rmsf_v_min, rmsf_v_max]
 ylim_rmsf_w  = [rmsf_w_min, rmsf_w_max]
 print("Gifs y-limits:", ylim_avg_u, ylim_avg_v, ylim_avg_w, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
-for i in range(N):
+for i in range(N_all):
     # log progress
-    if i % (N//10 or 1) == 0:
-        print(f"{i/N*100:.0f}%")
+    if i % (N_all//10 or 1) == 0:
+        print(f"{i/N_all*100:.0f}%")
     # Build frames
-    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_u_plus_RL[i],  avg_u_plus_nonRL[i],  avg_u_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_avg_v  = visualizer.build_vel_avg_frame( frames_avg_v,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_v_plus_RL[i],  avg_v_plus_nonRL[i],  avg_v_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='v', ylim=ylim_avg_v,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_avg_w  = visualizer.build_vel_avg_frame( frames_avg_w,  y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, avg_w_plus_RL[i],  avg_w_plus_nonRL[i],  avg_w_plus_ref,  averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='w', ylim=ylim_avg_w,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_u_plus_RL[i], rmsf_u_plus_nonRL[i], rmsf_u_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_v_plus_RL[i], rmsf_v_plus_nonRL[i], rmsf_v_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i], y_plus_nonRL[i], y_plus_ref, rmsf_w_plus_RL[i], rmsf_w_plus_nonRL[i], rmsf_w_plus_ref, averaging_time_RL[i], averaging_time_nonRL[i], train_step_list[i], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
+    i_nonRL = idx_nonRL[i]
+    i_RL    = idx_RL[i]
+    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_nonRL],  avg_u_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_avg_v  = visualizer.build_vel_avg_frame( frames_avg_v,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_v_plus_RL[i_RL],  avg_v_plus_nonRL[i_nonRL],  avg_v_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_avg_v,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_avg_w  = visualizer.build_vel_avg_frame( frames_avg_w,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_w_plus_RL[i_RL],  avg_w_plus_nonRL[i_nonRL],  avg_w_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_avg_w,  x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_nonRL], rmsf_u_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_nonRL], rmsf_v_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
+    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_nonRL], rmsf_w_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
 
 print("Building gifs from frames...")
 frames_dict = {'avg_u':frames_avg_u, 'avg_v':frames_avg_v, 'avg_w':frames_avg_w, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
 visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")
-
-
 
 ############################# RL & non-RL Errors w.r.t. Reference #############################
 
@@ -601,19 +604,20 @@ y_plus = np.concatenate([[0.0],y_plus_ref,[delta]])
 
 print("\nCalculating L1, L2, Linf errors...")
 # Absolute error 
-abs_error_avg_u_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_u_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
-abs_error_avg_v_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_v_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
-abs_error_avg_w_plus_RL  = np.zeros( [N, y_plus_ref.size] ); abs_error_avg_w_plus_nonRL  = np.zeros( [N, y_plus_ref.size] )
-abs_error_rmsf_u_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_u_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
-abs_error_rmsf_v_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_v_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
-abs_error_rmsf_w_plus_RL = np.zeros( [N, y_plus_ref.size] ); abs_error_rmsf_w_plus_nonRL = np.zeros( [N, y_plus_ref.size] )
-for i in range(N):
+abs_error_avg_u_plus_RL  = np.zeros( [N_RL, y_plus_ref.size] ); abs_error_avg_u_plus_nonRL  = np.zeros( [N_nonRL, y_plus_ref.size] )
+abs_error_avg_v_plus_RL  = np.zeros( [N_RL, y_plus_ref.size] ); abs_error_avg_v_plus_nonRL  = np.zeros( [N_nonRL, y_plus_ref.size] )
+abs_error_avg_w_plus_RL  = np.zeros( [N_RL, y_plus_ref.size] ); abs_error_avg_w_plus_nonRL  = np.zeros( [N_nonRL, y_plus_ref.size] )
+abs_error_rmsf_u_plus_RL = np.zeros( [N_RL, y_plus_ref.size] ); abs_error_rmsf_u_plus_nonRL = np.zeros( [N_nonRL, y_plus_ref.size] )
+abs_error_rmsf_v_plus_RL = np.zeros( [N_RL, y_plus_ref.size] ); abs_error_rmsf_v_plus_nonRL = np.zeros( [N_nonRL, y_plus_ref.size] )
+abs_error_rmsf_w_plus_RL = np.zeros( [N_RL, y_plus_ref.size] ); abs_error_rmsf_w_plus_nonRL = np.zeros( [N_nonRL, y_plus_ref.size] )
+for i in range(N_RL):
     abs_error_avg_u_plus_RL[i,:]     = np.abs( avg_u_plus_RL[i,:]    - avg_u_plus_ref )
     abs_error_avg_v_plus_RL[i,:]     = np.abs( avg_v_plus_RL[i,:]    - avg_v_plus_ref )
     abs_error_avg_w_plus_RL[i,:]     = np.abs( avg_w_plus_RL[i,:]    - avg_w_plus_ref )
     abs_error_rmsf_u_plus_RL[i,:]    = np.abs( rmsf_u_plus_RL[i,:]   - rmsf_u_plus_ref )
     abs_error_rmsf_v_plus_RL[i,:]    = np.abs( rmsf_v_plus_RL[i,:]   - rmsf_v_plus_ref )
     abs_error_rmsf_w_plus_RL[i,:]    = np.abs( rmsf_w_plus_RL[i,:]   - rmsf_w_plus_ref )
+for i in range(N_nonRL):
     abs_error_avg_u_plus_nonRL[i,:]  = np.abs( avg_u_plus_nonRL[i,:]  - avg_u_plus_ref )
     abs_error_avg_v_plus_nonRL[i,:]  = np.abs( avg_v_plus_nonRL[i,:]  - avg_v_plus_ref )
     abs_error_avg_w_plus_nonRL[i,:]  = np.abs( avg_w_plus_nonRL[i,:]  - avg_w_plus_ref )
@@ -622,23 +626,24 @@ for i in range(N):
     abs_error_rmsf_w_plus_nonRL[i,:] = np.abs( rmsf_w_plus_nonRL[i,:] - rmsf_w_plus_ref )
 
 # L1 Error
-L1_error_avg_u_plus_RL  = np.zeros(N); L1_error_avg_u_plus_nonRL  = np.zeros(N)
-L1_error_avg_v_plus_RL  = np.zeros(N); L1_error_avg_v_plus_nonRL  = np.zeros(N)
-L1_error_avg_w_plus_RL  = np.zeros(N); L1_error_avg_w_plus_nonRL  = np.zeros(N)
-L1_error_rmsf_u_plus_RL = np.zeros(N); L1_error_rmsf_u_plus_nonRL = np.zeros(N)
-L1_error_rmsf_v_plus_RL = np.zeros(N); L1_error_rmsf_v_plus_nonRL = np.zeros(N)
-L1_error_rmsf_w_plus_RL = np.zeros(N); L1_error_rmsf_w_plus_nonRL = np.zeros(N)
+L1_error_avg_u_plus_RL  = np.zeros(N_RL); L1_error_avg_u_plus_nonRL  = np.zeros(N_nonRL)
+L1_error_avg_v_plus_RL  = np.zeros(N_RL); L1_error_avg_v_plus_nonRL  = np.zeros(N_nonRL)
+L1_error_avg_w_plus_RL  = np.zeros(N_RL); L1_error_avg_w_plus_nonRL  = np.zeros(N_nonRL)
+L1_error_rmsf_u_plus_RL = np.zeros(N_RL); L1_error_rmsf_u_plus_nonRL = np.zeros(N_nonRL)
+L1_error_rmsf_v_plus_RL = np.zeros(N_RL); L1_error_rmsf_v_plus_nonRL = np.zeros(N_nonRL)
+L1_error_rmsf_w_plus_RL = np.zeros(N_RL); L1_error_rmsf_w_plus_nonRL = np.zeros(N_nonRL)
 ylength = 0.0
 for j in range(ny):
     dy = np.abs(0.5 * (y_plus[j+2]-y_plus[j]))
     ylength += dy
-    for i in range(N):
+    for i in range(N_RL):
         L1_error_avg_u_plus_RL[i]     += abs_error_avg_u_plus_RL[i,j]     * dy
         L1_error_avg_v_plus_RL[i]     += abs_error_avg_v_plus_RL[i,j]     * dy
         L1_error_avg_w_plus_RL[i]     += abs_error_avg_w_plus_RL[i,j]     * dy
         L1_error_rmsf_u_plus_RL[i]    += abs_error_rmsf_u_plus_RL[i,j]    * dy
         L1_error_rmsf_v_plus_RL[i]    += abs_error_rmsf_v_plus_RL[i,j]    * dy
         L1_error_rmsf_w_plus_RL[i]    += abs_error_rmsf_w_plus_RL[i,j]    * dy
+    for i in range(N_nonRL):
         L1_error_avg_u_plus_nonRL[i]  += abs_error_avg_u_plus_nonRL[i,j]  * dy
         L1_error_avg_v_plus_nonRL[i]  += abs_error_avg_v_plus_nonRL[i,j]  * dy
         L1_error_avg_w_plus_nonRL[i]  += abs_error_avg_w_plus_nonRL[i,j]  * dy
@@ -659,23 +664,24 @@ L1_error_rmsf_v_plus_nonRL /= ylength
 L1_error_rmsf_w_plus_nonRL /= ylength         
 
 # L2 Error (RMS Error)
-L2_error_avg_u_plus_RL  = np.zeros(N); L2_error_avg_u_plus_nonRL  = np.zeros(N)
-L2_error_avg_v_plus_RL  = np.zeros(N); L2_error_avg_v_plus_nonRL  = np.zeros(N)
-L2_error_avg_w_plus_RL  = np.zeros(N); L2_error_avg_w_plus_nonRL  = np.zeros(N)
-L2_error_rmsf_u_plus_RL = np.zeros(N); L2_error_rmsf_u_plus_nonRL = np.zeros(N)
-L2_error_rmsf_v_plus_RL = np.zeros(N); L2_error_rmsf_v_plus_nonRL = np.zeros(N)
-L2_error_rmsf_w_plus_RL = np.zeros(N); L2_error_rmsf_w_plus_nonRL = np.zeros(N)
+L2_error_avg_u_plus_RL  = np.zeros(N_RL); L2_error_avg_u_plus_nonRL  = np.zeros(N_nonRL)
+L2_error_avg_v_plus_RL  = np.zeros(N_RL); L2_error_avg_v_plus_nonRL  = np.zeros(N_nonRL)
+L2_error_avg_w_plus_RL  = np.zeros(N_RL); L2_error_avg_w_plus_nonRL  = np.zeros(N_nonRL)
+L2_error_rmsf_u_plus_RL = np.zeros(N_RL); L2_error_rmsf_u_plus_nonRL = np.zeros(N_nonRL)
+L2_error_rmsf_v_plus_RL = np.zeros(N_RL); L2_error_rmsf_v_plus_nonRL = np.zeros(N_nonRL)
+L2_error_rmsf_w_plus_RL = np.zeros(N_RL); L2_error_rmsf_w_plus_nonRL = np.zeros(N_nonRL)
 ylength = 0.0
 for j in range(ny):
     dy = np.abs(0.5 * (y_plus[j+2]-y_plus[j]))
     ylength += dy
-    for i in range(N):
+    for i in range(N_RL):
         L2_error_avg_u_plus_RL[i]     += ( ( avg_u_plus_RL[i,j]     - avg_u_plus_ref[j] )**2 )  * dy
         L2_error_avg_v_plus_RL[i]     += ( ( avg_v_plus_RL[i,j]     - avg_v_plus_ref[j] )**2 )  * dy
         L2_error_avg_w_plus_RL[i]     += ( ( avg_w_plus_RL[i,j]     - avg_w_plus_ref[j] )**2 )  * dy
         L2_error_rmsf_u_plus_RL[i]    += ( ( rmsf_u_plus_RL[i,j]    - rmsf_u_plus_ref[j] )**2 ) * dy 
         L2_error_rmsf_v_plus_RL[i]    += ( ( rmsf_v_plus_RL[i,j]    - rmsf_v_plus_ref[j] )**2 ) * dy 
         L2_error_rmsf_w_plus_RL[i]    += ( ( rmsf_w_plus_RL[i,j]    - rmsf_w_plus_ref[j] )**2 ) * dy 
+    for i in range(N_nonRL):
         L2_error_avg_u_plus_nonRL[i]  += ( ( avg_u_plus_nonRL[i,j]  - avg_u_plus_ref[j])**2 )   * dy
         L2_error_avg_v_plus_nonRL[i]  += ( ( avg_v_plus_nonRL[i,j]  - avg_v_plus_ref[j])**2 )   * dy
         L2_error_avg_w_plus_nonRL[i]  += ( ( avg_w_plus_nonRL[i,j]  - avg_w_plus_ref[j])**2 )   * dy
@@ -696,19 +702,20 @@ L2_error_rmsf_v_plus_nonRL = np.sqrt( L2_error_rmsf_v_plus_nonRL / ylength )
 L2_error_rmsf_w_plus_nonRL = np.sqrt( L2_error_rmsf_w_plus_nonRL / ylength )          
 
 # Linf Error
-Linf_error_avg_u_plus_RL  = np.zeros(N); Linf_error_avg_u_plus_nonRL  = np.zeros(N)
-Linf_error_avg_v_plus_RL  = np.zeros(N); Linf_error_avg_v_plus_nonRL  = np.zeros(N)
-Linf_error_avg_w_plus_RL  = np.zeros(N); Linf_error_avg_w_plus_nonRL  = np.zeros(N)
-Linf_error_rmsf_u_plus_RL = np.zeros(N); Linf_error_rmsf_u_plus_nonRL = np.zeros(N)
-Linf_error_rmsf_v_plus_RL = np.zeros(N); Linf_error_rmsf_v_plus_nonRL = np.zeros(N)
-Linf_error_rmsf_w_plus_RL = np.zeros(N); Linf_error_rmsf_w_plus_nonRL = np.zeros(N)
-for i in range(N):
+Linf_error_avg_u_plus_RL  = np.zeros(N_RL); Linf_error_avg_u_plus_nonRL  = np.zeros(N_nonRL)
+Linf_error_avg_v_plus_RL  = np.zeros(N_RL); Linf_error_avg_v_plus_nonRL  = np.zeros(N_nonRL)
+Linf_error_avg_w_plus_RL  = np.zeros(N_RL); Linf_error_avg_w_plus_nonRL  = np.zeros(N_nonRL)
+Linf_error_rmsf_u_plus_RL = np.zeros(N_RL); Linf_error_rmsf_u_plus_nonRL = np.zeros(N_nonRL)
+Linf_error_rmsf_v_plus_RL = np.zeros(N_RL); Linf_error_rmsf_v_plus_nonRL = np.zeros(N_nonRL)
+Linf_error_rmsf_w_plus_RL = np.zeros(N_RL); Linf_error_rmsf_w_plus_nonRL = np.zeros(N_nonRL)
+for i in range(N_RL):
     Linf_error_avg_u_plus_RL[i]     = np.max(abs_error_avg_u_plus_RL[i,:])
     Linf_error_avg_v_plus_RL[i]     = np.max(abs_error_avg_v_plus_RL[i,:])
     Linf_error_avg_w_plus_RL[i]     = np.max(abs_error_avg_w_plus_RL[i,:])
     Linf_error_rmsf_u_plus_RL[i]    = np.max(abs_error_rmsf_u_plus_RL[i,:])
     Linf_error_rmsf_v_plus_RL[i]    = np.max(abs_error_rmsf_v_plus_RL[i,:])
     Linf_error_rmsf_w_plus_RL[i]    = np.max(abs_error_rmsf_w_plus_RL[i,:])
+for i in range(N_nonRL):
     Linf_error_avg_u_plus_nonRL[i]  = np.max(abs_error_avg_u_plus_nonRL[i,:])
     Linf_error_avg_v_plus_nonRL[i]  = np.max(abs_error_avg_v_plus_nonRL[i,:])
     Linf_error_avg_w_plus_nonRL[i]  = np.max(abs_error_avg_w_plus_nonRL[i,:])
@@ -720,9 +727,15 @@ print("Errors calculated successfully!")
 # --- Errors logging ---
 
 # Store error logs in file
-error_log_filename = f"{postDir}/errors_{iteration}_ensemble{ensemble}.txt"
+error_log_filename = f"{postDir}/errors_ensemble{ensemble}.txt"
 print(f"\nWriting errors in file '{error_log_filename}'")
 with open(error_log_filename, "w") as file:
+    # averaging times at which errors are calculated
+    file.write("\n\n------------------------------------------------")
+    file.write("\nAveraging times:")
+    file.write(f"\n\nAveraging time RL: {averaging_time_RL}")
+    file.write(f"\nAveraging time accumulated RL: {averaging_time_accum_RL}")
+    file.write(f"\nAveraging time non-RL: {averaging_time_nonRL}")
     # avg_u errors:
     file.write("\n\n------------------------------------------------")
     file.write("\nConvergence errors of avg_u:")
@@ -787,124 +800,34 @@ with open(error_log_filename, "r") as file:
 # --- Errors Plots ---
 print("\nBuilding error plots...")
 
+def build_error_plot(avg_time_nonRL, avg_time_RL, err_avg_nonRL, err_avg_RL, err_rmsf_nonRL, err_rmsf_RL, vel_component='u', error_num='2'):
+    plt.clf()
+    plt.semilogy( avg_time_nonRL, err_avg_nonRL,  linestyle = '-', marker = 's', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), zorder = 0, label = rf'$\overline{{{vel_component}}}^+$ non-RL' )
+    plt.semilogy( avg_time_RL,    err_avg_RL,     linestyle = '-', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), zorder = 1, label = rf'$\overline{{{vel_component}}}^+$ RL' )
+    plt.semilogy( avg_time_nonRL, err_rmsf_nonRL, linestyle = ':', marker = 'o', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), zorder = 0, label = rf'${vel_component}_\textrm{{rms}}^+$ non-RL' )
+    plt.semilogy( avg_time_RL,    err_rmsf_RL,    linestyle = ':', marker = 'v', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), zorder = 1, label = rf'${vel_component}_\textrm{{rms}}^+$ RL' )
+    plt.xlabel(r'Accumulated averaging time $t_{avg}^+$' )
+    plt.ylabel(rf'$L_{error_num}$ Error' )
+    plt.grid(which='both',axis='y')
+    plt.legend(loc='upper right', frameon=True, framealpha=1.0, fancybox=True) # loc='center left', bbox_to_anchor=(1, 0.5)
+    plt.tick_params( axis = 'both', pad = 7.5 )
+    plt.tight_layout()
+    filename = f'{postDir}/L{error_num}_error_{vel_component}_{iteration}_ensemble{ensemble}.jpg'
+    plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
+    plt.close()
+    print(f"Build plot: '{filename}'")
+
 # L1-Error plot
-plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_avg_v_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_avg_v_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_avg_w_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_avg_w_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L1_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ RL' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( 'L1 Error' )
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/L1_error_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"Build plot: '{filename}'")
-
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, L1_error_avg_u_plus_nonRL,   L1_error_avg_u_plus_RL,   L1_error_rmsf_u_plus_nonRL,   L1_error_rmsf_u_plus_RL,   vel_component='u', error_num='1')
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, L1_error_avg_v_plus_nonRL,   L1_error_avg_v_plus_RL,   L1_error_rmsf_v_plus_nonRL,   L1_error_rmsf_v_plus_RL,   vel_component='v', error_num='1')
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, L1_error_avg_w_plus_nonRL,   L1_error_avg_w_plus_RL,   L1_error_rmsf_w_plus_nonRL,   L1_error_rmsf_w_plus_RL,   vel_component='w', error_num='1')
 # L2-Error plot
-plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_avg_v_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_avg_v_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_avg_w_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_avg_w_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, L2_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ RL' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( 'L2 Error' )
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/L2_error_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"Build plot: '{filename}'")
-
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, L2_error_avg_u_plus_nonRL,   L2_error_avg_u_plus_RL,   L2_error_rmsf_u_plus_nonRL,   L2_error_rmsf_u_plus_RL,   vel_component='u', error_num='2')
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, L2_error_avg_v_plus_nonRL,   L2_error_avg_v_plus_RL,   L2_error_rmsf_v_plus_nonRL,   L2_error_rmsf_v_plus_RL,   vel_component='v', error_num='2')
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, L2_error_avg_w_plus_nonRL,   L2_error_avg_w_plus_RL,   L2_error_rmsf_w_plus_nonRL,   L2_error_rmsf_w_plus_RL,   vel_component='w', error_num='2')
 # Linf-Error plot
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_u_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_v_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_v_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_w_plus_nonRL,  linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_avg_w_plus_RL,     linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$ RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_nonRL, linestyle = '-',                             linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ non-RL' )
-plt.semilogy( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL,    linestyle=':', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$ RL' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( 'Linf Error' )
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/Linf_error_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"Build plot: '{filename}'")
-
-# L1-Error plot, RATIO RL / non-RL
-plt.plot( averaging_time_nonRL, L1_error_avg_u_plus_RL  / L1_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_avg_v_plus_RL  / L1_error_avg_v_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_avg_w_plus_RL  / L1_error_avg_w_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_u_plus_RL / L1_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_v_plus_RL / L1_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L1_error_rmsf_w_plus_RL / L1_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$' )
-plt.xlabel( r'Accumulated averaging time $t_{\textrm{avg}}^{+}$' )
-plt.ylabel( 'L1 Error Ratio (RL / non-RL)' )
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/L1_error_ratio_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"Build plot: '{filename}'")
-
-# L2-Error plot, RATIO RL / non-RL
-plt.plot( averaging_time_nonRL, L2_error_avg_u_plus_RL  / L2_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_avg_v_plus_RL  / L2_error_avg_v_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_avg_w_plus_RL  / L2_error_avg_w_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_u_plus_RL / L2_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_v_plus_RL / L2_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, L2_error_rmsf_w_plus_RL / L2_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( 'L2 Error Ratio (RL / non-RL)' )
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/L2_error_ratio_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"Build plot: '{filename}'")
-
-# Linf-Error plot, RATIO RL / non-RL
-plt.plot( averaging_time_nonRL, Linf_error_avg_u_plus_RL  / Linf_error_avg_u_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_avg_v_plus_RL  / Linf_error_avg_v_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{v}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_avg_w_plus_RL  / Linf_error_avg_w_plus_nonRL,  linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(2), label = r'$\overline{w}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_u_plus_RL / Linf_error_rmsf_u_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(3), label = r'$u_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_v_plus_RL / Linf_error_rmsf_v_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(4), label = r'$v_{\textrm{rms}}^{+}$' )
-plt.plot( averaging_time_nonRL, Linf_error_rmsf_w_plus_RL / Linf_error_rmsf_w_plus_nonRL, linestyle = '-', marker = '^', linewidth = 1, color = plt.cm.tab10(5), label = r'$w_{\textrm{rms}}^{+}$' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( 'Linf Error Ratio (RL / non-RL)' )
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/Linf_error_ratio_{iteration}_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"Build plot: '{filename}'")
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, Linf_error_avg_u_plus_nonRL, Linf_error_avg_u_plus_RL, Linf_error_rmsf_u_plus_nonRL, Linf_error_rmsf_u_plus_RL, vel_component='u', error_num='inf')
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, Linf_error_avg_v_plus_nonRL, Linf_error_avg_v_plus_RL, Linf_error_rmsf_v_plus_nonRL, Linf_error_rmsf_v_plus_RL, vel_component='v', error_num='inf')
+build_error_plot(averaging_time_nonRL, averaging_time_accum_RL, Linf_error_avg_w_plus_nonRL, Linf_error_avg_w_plus_RL, Linf_error_rmsf_w_plus_nonRL, Linf_error_rmsf_w_plus_RL, vel_component='w', error_num='inf')
 
 print("Error plots built successfully!")

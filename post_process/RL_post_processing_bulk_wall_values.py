@@ -19,7 +19,7 @@ from matplotlib import rc, rcParams
 # --- Get CASE parameters ---
 
 try :
-    iteration       = sys.argv[1]
+    iteration       = int(sys.argv[1])
     ensemble        = sys.argv[2]
     train_name      = sys.argv[3]
     Re_tau          = float(sys.argv[4])     # Friction Reynolds number [-]
@@ -68,6 +68,7 @@ max_length_legend_RL = 10
 # RL parameters
 cfd_n_envs = 1
 rl_n_envs  = 8
+delta_iteration_nonRL            = 10000
 simulation_time_per_train_step   = t_episode_train                    # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
@@ -84,53 +85,7 @@ print("\nRL parameters: \n- Simulation time per train step:", simulation_time_pe
       "\n- Iteration end train step:", iteration_end_train_step,
 ) 
 
-
 # ----------- Build data h5 filenames ------------
-
-# --- RL filenames ---
-# Get 'file_details' & filename_RL
-pattern = f"{case_dir}/rhea_exp/output_data/RL_3d_turbulent_channel_flow_{iteration}_ensemble{ensemble}_*.h5"
-# Use glob to find all matching files
-matching_files = sorted(glob.glob(pattern))
-# List to store the extracted parts corresponding to "*"
-filename_RL_list  = []
-file_details_list = []
-step_num_list     = []
-# Check if files were found
-if matching_files:
-    print("\RL files:")
-    for file in matching_files:
-        # Store file
-        filename_RL_list.append(file)
-        # Extract the filename (without the directory)
-        base_filename = os.path.basename(file)
-        # Extract the part corresponding to "*"
-        # Split by "_" and get the last part before ".h5"
-        file_details = base_filename.split('_')[-1].replace('.h5', '')
-        # Add the extracted part to the list
-        file_details_list.append(file_details)
-        # Step number
-        step_num = int(file_details[4:])
-        step_num_list.append(step_num)
-        # Print the file and the extracted part
-        print(f"Filename: {base_filename}, File details: {file_details}, Step number: {step_num}")
-else:
-    print(f"No files found matching the pattern: {pattern}")
-global_step_num_list = step_num_list
-N = len(filename_RL_list)
-
-# --- non-RL filenames ---
-train_step_list = [int(gs/num_global_steps_per_train_step) for gs in global_step_num_list]
-if run_mode == "train":
-    iteration_nonRL_list = [ (s+1)*num_iterations_per_train_step + iteration_restart_data_file for s in train_step_list]
-else:   # run_mode == "eval"
-    iteration_nonRL_list = [ iteration_end_train_step ]
-filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
-
-assert N == len(train_step_list)
-print("\nnon-RL files:")
-for i in range(N):
-    print("Filename:", filename_nonRL_list[i], ", Iteration:", iteration_nonRL_list[i])
 
 # --- non-RL converged reference filename ---
 filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
@@ -138,33 +93,68 @@ filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 # --- non-RL restart data file
 filename_rst = f"{compareDatasetDir}/3d_turbulent_channel_flow_{iteration_restart_data_file}.h5"
 
-# Append restart data file to RL & non-RL files list
-# > RL lists:
-filename_RL_list.insert(0,filename_rst)
-file_details_list.insert(0,'restart')
-step_num_list.insert(0,'000000') 
-global_step_num_list.insert(0,'000000') 
-N = len(filename_RL_list)   # update N
-# > non-RL lists:
-filename_nonRL_list.insert(0,filename_rst)
-train_step_list.insert(0,0)
-iteration_nonRL_list.insert(0,iteration_restart_data_file)
-assert N == len(filename_nonRL_list)
+# --- RL filenames ---
 
-# --- Discard non-RL (and corresponding RL) snapshots if not available
-filename_nonRL_is_available = [iter < iteration_max_nonRL for iter in iteration_nonRL_list]
-n_nonRL_is_available = sum(filename_nonRL_is_available)
-print("\nAvailable non-RL files:", n_nonRL_is_available, "Non-available non-RL files:", N - n_nonRL_is_available)
-filename_RL_list_available = []
-filename_nonRL_list_available = []
-for i in range(N):
-    if filename_nonRL_is_available[i]:
-        filename_RL_list_available.append(filename_RL_list[i])
-        filename_nonRL_list_available.append(filename_nonRL_list[i])
-filename_RL_list    = filename_RL_list_available
-filename_nonRL_list = filename_nonRL_list_available
-N = len(filename_RL_list)   # update N
-print(f"Datasets RL and non-RL have now {N} files each")
+# Take the h5 file of each global step at iteration number 'iteration',
+# or smaller if early episode termination was activated for that step.
+# Note: the iteration at early episode termination must be smaller than maximum episode length 'iteration' 
+
+# Get filepath and file details of the last saved iteration of each global step
+pattern = f"{case_dir}/rhea_exp/output_data/RL_3d_turbulent_channel_flow_*_ensemble{ensemble}_step*.h5"
+matching_files = sorted(glob.glob(pattern))
+best_files = {}     # dict: {global_step: (iter_num, filepath)}
+if matching_files:
+    print("\RL files:")
+    for filepath in matching_files:
+        filename       = os.path.basename(filepath)
+        parts_filename = filename.split('_')
+        # Extract iteration and global step
+        try:
+            iter_num    = int(parts_filename[5])
+            global_step = int(parts_filename[-1].replace('.h5','')[4:])
+        except (IndexError, ValueError):
+            print(f"Skipping invalid file: {filename}, in filepath: {filepath}")
+            continue
+        # Keep only the file with the highes iteration for each global step, but >= iteration
+        if ( global_step not in best_files or iter_num > best_files[global_step][0] ) and (iter_num <= iteration):
+            best_files[global_step] = (iter_num, filepath)
+    
+    # Sort by global step
+    sorted_best_files = sorted(best_files.items())      # list of tuples: [(global_step, (iteration, filepath))]
+    filename_RL_list     = [file for _, (_, file) in sorted_best_files]
+    iteration_RL_list    = [iter for _, (iter, _) in sorted_best_files]
+    global_step_RL_list  = [step for step, (_, _) in sorted_best_files]
+
+    # Append restart data file to RL files list
+    filename_RL_list.insert(0,filename_rst)
+    iteration_RL_list.insert(0,iteration_restart_data_file) 
+    global_step_RL_list.insert(0,'000000') 
+    N_RL = len(filename_RL_list)
+
+    # Print selected files
+    for i in range(N_RL):
+        print(f"\nFilename: {filename_RL_list[i]}, \nIteration: {iteration_RL_list[i]}, \nGlobal step: {global_step_RL_list[i]}")
+else:
+    print(f"No files found matching the pattern: {pattern}")
+
+iter_simulated   = [iter - iteration_restart_data_file for iter in iteration_RL_list]
+iter_accumulated = np.sum(iter_simulated)
+iter_max_nonRL   = iteration_restart_data_file + iter_accumulated
+print(f"\nA total of {iter_accumulated} iterations have been simulated through the RL episodes, \nwhich accounting for restart file {iteration_restart_data_file} iterations \nis equivalent to final non-RL {iter_max_nonRL} iterations.")
+iteration_max_nonRL = np.min([iter_max_nonRL, iteration_max_nonRL])
+print(f"Last non-RL iteration: {iteration_max_nonRL}")
+
+# --- non-RL filenames ---
+
+if run_mode == "train":
+    iteration_nonRL_list = np.arange(iteration_restart_data_file, iteration_max_nonRL, delta_iteration_nonRL)
+else:   # run_mode == "eval"
+    iteration_nonRL_list = [ iteration_end_train_step ]
+filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
+N_nonRL = len(filename_nonRL_list)
+print("\nnon-RL files:")
+for i in range(N_nonRL):
+    print("\nFilename:", filename_nonRL_list[i], ", \nIteration:", iteration_nonRL_list[i])
 
 #--------------------------------------------------------------------------------------------
 
@@ -188,7 +178,7 @@ if not os.path.isfile(filename_ref):
 print("\nImporting data from files...")
 
 print("\nImporting data from RL files:")
-for i in range(N):
+for i in range(N_RL):
     filename_RL = filename_RL_list[i]
     with h5py.File( filename_RL, 'r' ) as data_file:
         #list( data_file.keys() )
@@ -197,35 +187,38 @@ for i in range(N):
         avg_u_data_RL_aux  = data_file['avg_u'][:,:,:]
     # Initialize allocation arrays
     if i == 0:
-        num_points_x      = avg_u_data_RL_aux[0,0,:].size
-        num_points_y      = avg_u_data_RL_aux[0,:,0].size
-        num_points_z      = avg_u_data_RL_aux[:,0,0].size
-        averaging_time_RL = np.zeros(N)
-        u_data_RL         = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_RL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        num_points_x       = avg_u_data_RL_aux[0,0,:].size
+        num_points_y       = avg_u_data_RL_aux[0,:,0].size
+        num_points_z       = avg_u_data_RL_aux[:,0,0].size
+        averaging_time_RL  = np.zeros(N_RL)
+        u_data_RL          = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_RL      = np.zeros([N_RL, num_points_z, num_points_y, num_points_x])         
     # Fill allocation arrays
-    averaging_time_RL[i]    = averaging_time_RL_aux
-    u_data_RL[i,:,:,:]      = u_data_RL_aux
-    avg_u_data_RL[i,:,:,:]  = avg_u_data_RL_aux
+    averaging_time_RL[i]   = averaging_time_RL_aux
+    u_data_RL[i,:,:,:]     = u_data_RL_aux
+    avg_u_data_RL[i,:,:,:] = avg_u_data_RL_aux
     # Logging
     print(f"RL non-converged data imported from file '{filename_RL}' - averaging time: {averaging_time_RL_aux:.6f}")
+averaging_time_simulated_RL    = averaging_time_RL - averaging_time_RL[0]  # averaging_time_RL[0] is the restart file averaging time, t_avg_0
+averaging_time_simulated_RL[0] = averaging_time_RL[0]
+averaging_time_accum_RL        = np.cumsum(averaging_time_simulated_RL)
 
 print("\nImporting data from non-RL files:")
-for i in range(N):
+for i in range(N_nonRL):
     filename_nonRL = filename_nonRL_list[i]
     with h5py.File( filename_nonRL, 'r' ) as data_file:
         #list( data_file.keys() )
         averaging_time_nonRL_aux = data_file.attrs["AveragingTime"][0]
-        u_data_nonRL_aux      = data_file['u'][:,:,:]
-        avg_u_data_nonRL_aux  = data_file['avg_u'][:,:,:]
+        u_data_nonRL_aux         = data_file['u'][:,:,:]
+        avg_u_data_nonRL_aux     = data_file['avg_u'][:,:,:]
     # Initialize allocation arrays
     if i == 0:
         num_points_x      = avg_u_data_nonRL_aux[0,0,:].size
         num_points_y      = avg_u_data_nonRL_aux[0,:,0].size
         num_points_z      = avg_u_data_nonRL_aux[:,0,0].size
-        averaging_time_nonRL = np.zeros(N)
-        u_data_nonRL         = np.zeros([N, num_points_z, num_points_y, num_points_x])         
-        avg_u_data_nonRL     = np.zeros([N, num_points_z, num_points_y, num_points_x])         
+        averaging_time_nonRL = np.zeros(N_nonRL)
+        u_data_nonRL         = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])         
+        avg_u_data_nonRL     = np.zeros([N_nonRL, num_points_z, num_points_y, num_points_x])         
     # Fill allocation arrays
     averaging_time_nonRL[i]    = averaging_time_nonRL_aux
     u_data_nonRL[i,:,:,:]      = u_data_nonRL_aux
@@ -254,8 +247,8 @@ z_data = z_data_ref
 
 # --- Calculate U_bulk ---
 
-sum_avg_u_volume_RL    = np.zeros(N);       sum_u_volume_RL    = np.zeros(N)
-sum_avg_u_volume_nonRL = np.zeros(N);       sum_u_volume_nonRL = np.zeros(N)
+sum_avg_u_volume_RL    = np.zeros(N_RL);    sum_u_volume_RL    = np.zeros(N_RL)
+sum_avg_u_volume_nonRL = np.zeros(N_nonRL); sum_u_volume_nonRL = np.zeros(N_nonRL)
 sum_avg_u_volume_ref   = 0.0;               sum_u_volume_ref   = 0.0
 sum_volume = 0.0
 for i in range( 1, num_points_x-1 ):
@@ -268,11 +261,12 @@ for i in range( 1, num_points_x-1 ):
             delta_volume = delta_x*delta_y*delta_z
             sum_volume  += delta_volume
             # Integrate quantities
-            for n in range(N):
-                # > RL
+            # > RL
+            for n in range(N_RL):
                 sum_u_volume_RL[n]        += u_data_RL[n,k,j,i] * delta_volume
                 sum_avg_u_volume_RL[n]    += avg_u_data_RL[n,k,j,i] * delta_volume
-                # > non-RL, non-converged
+            # > non-RL, non-converged
+            for n in range(N_nonRL):
                 sum_u_volume_nonRL[n]     += u_data_nonRL[n,k,j,i] * delta_volume
                 sum_avg_u_volume_nonRL[n] += avg_u_data_nonRL[n,k,j,i] * delta_volume
             # > non-RL, reference
@@ -290,9 +284,9 @@ print( "\nnon-RL Numerical avg_u_bulk:",    avg_u_b_nonRL );    print( "\nnon-RL
 # --- Calculate \tau_wall ---
 
 ### Average variables in space
-sum_avg_u_inner_RL    = np.zeros(N);   sum_avg_u_boundary_RL    = np.zeros(N)
-sum_avg_u_inner_nonRL = np.zeros(N);   sum_avg_u_boundary_nonRL = np.zeros(N)
-sum_avg_u_inner_ref   = 0.0;           sum_avg_u_boundary_ref   = 0.0
+sum_avg_u_inner_RL    = np.zeros(N_RL);    sum_avg_u_boundary_RL    = np.zeros(N_RL)
+sum_avg_u_inner_nonRL = np.zeros(N_nonRL); sum_avg_u_boundary_nonRL = np.zeros(N_nonRL)
+sum_avg_u_inner_ref   = 0.0;               sum_avg_u_boundary_ref   = 0.0
 sum_surface = 0.0
 for i in range( 1, num_points_x-1 ):
     for k in range( 1, num_points_z-1 ):
@@ -302,11 +296,12 @@ for i in range( 1, num_points_x-1 ):
         delta_z = 0.5*( z_data[k+1,j,i] - z_data[k-1,j,i] )
         delta_surface = delta_x*delta_z
         sum_surface += delta_surface
-        for n in range(N):
-            # > RL
+        # > RL
+        for n in range(N_RL):
             sum_avg_u_inner_RL[n]    += avg_u_data_RL[n,k,j+1,i] * delta_surface
             sum_avg_u_boundary_RL[n] += avg_u_data_RL[n,k,j,i] * delta_surface
-            # > non-RL, non-converged
+        # > non-RL, non-converged
+        for n in range(N_nonRL):
             sum_avg_u_inner_nonRL[n]    += avg_u_data_nonRL[n,k,j+1,i] * delta_surface
             sum_avg_u_boundary_nonRL[n] += avg_u_data_nonRL[n,k,j,i] * delta_surface
         # > non-RL, reference
@@ -318,11 +313,12 @@ for i in range( 1, num_points_x-1 ):
         delta_z = 0.5*( z_data[k+1,j,i] - z_data[k-1,j,i] )
         delta_surface = delta_x*delta_z
         sum_surface += delta_surface
-        for n in range(N):
-            # > RL
+        # > RL
+        for n in range(N_RL):
             sum_avg_u_inner_RL[n]    += avg_u_data_RL[n,k,j-1,i] * delta_surface
             sum_avg_u_boundary_RL[n] += avg_u_data_RL[n,k,j,i] * delta_surface
-            # > non-RL, non-converged
+        # > non-RL, non-converged
+        for n in range(N_nonRL):
             sum_avg_u_inner_nonRL[n]    += avg_u_data_nonRL[n,k,j-1,i] * delta_surface
             sum_avg_u_boundary_nonRL[n] += avg_u_data_nonRL[n,k,j,i] * delta_surface
         # > non-RL, reference
@@ -354,9 +350,9 @@ print("non-RL Numerical u_tau:", u_tau_num_nonRL)
 # -------------- Build plots --------------
 
 # --- (inst) u_bulk plot ---
-plt.plot( averaging_time_nonRL, u_b_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL, u_b_nonRL,             linestyle = '--',                            linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
-plt.plot( averaging_time_nonRL, u_b_RL,                linestyle=':', marker = '^', markersize = 2, linewidth = 2, color = plt.cm.tab10(1), label = r'RL' )
+plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
+plt.plot( averaging_time_nonRL,    u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
+plt.plot( averaging_time_accum_RL, u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical $u^{+}_b$' )
 #plt.ylim(14,14.8)
@@ -371,9 +367,9 @@ plt.clf()
 print(f"\nBuild plot: '{filename}'")
 
 # --- avg_u_bulk plot ---
-plt.plot( averaging_time_nonRL, avg_u_b_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL, avg_u_b_nonRL,             linestyle = '--',                            linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
-plt.plot( averaging_time_nonRL, avg_u_b_RL,                linestyle=':', marker = '^', markersize = 2, linewidth = 2, color = plt.cm.tab10(1), label = r'RL' )
+plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
+plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
+plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical $\overline{u}^{+}_b$' )
 plt.ylim(14,14.8)
@@ -387,12 +383,12 @@ plt.clf()
 print(f"\nBuild plot: '{filename}'")
 
 # --- avg_u_bulk & (inst) u_bulk plot ---
-plt.plot( averaging_time_nonRL, avg_u_b_ref * np.ones(N),  linestyle = '-',                                zorder = 1, linewidth = 1, color = "k",             label = r'$\overline{u}^{+}_b$ Reference' )
-plt.plot( averaging_time_nonRL, avg_u_b_nonRL,             linestyle = '-',                                zorder = 1, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}_b$ non-RL' )
-plt.plot( averaging_time_nonRL, avg_u_b_RL,                linestyle = '-', marker = 'v', markersize = 2,  zorder = 1, linewidth = 1, color = plt.cm.tab10(1), label = r'$\overline{u}^{+}_b$ RL' )
-plt.plot( averaging_time_nonRL, u_b_ref * np.ones(N),      linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
-plt.plot( averaging_time_nonRL, u_b_nonRL,                 linestyle = '--',                               zorder = 0, linewidth = 1, color = plt.cm.tab10(0), label = r'${u}^{+}_b$ non-RL' )
-plt.plot( averaging_time_nonRL, u_b_RL,                    linestyle = '--', marker = '^', markersize = 2, zorder = 0, linewidth = 1, color = plt.cm.tab10(1), label = r'${u}^{+}_b$ RL' )
+plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                zorder = 1, linewidth = 1, color = "k",             label = r'$\overline{u}^{+}_b$ Reference' )
+plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '-',  marker = 's', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}_b$ non-RL' )
+plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = '-',  marker = 'v', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(3), label = r'$\overline{u}^{+}_b$ RL' )
+plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL),     linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
+plt.plot( averaging_time_nonRL,    u_b_nonRL,                      linestyle = '--', marker = 'o', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(0), label = r'${u}^{+}_b$ non-RL' )
+plt.plot( averaging_time_accum_RL, u_b_RL,                         linestyle = '--', marker = '^', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(3), label = r'${u}^{+}_b$ RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical avg. $\overline{u}^{+}_b$ and inst. $\overline{u}^{+}_b$' )
 plt.ylim(12,17)
@@ -406,9 +402,9 @@ plt.clf()
 print(f"\nBuild plot: '{filename}'")
 
 # --- tau_w plot ---
-plt.plot( averaging_time_nonRL, tau_w_num_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL, tau_w_num_nonRL,             linestyle = '--',                            linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
-plt.plot( averaging_time_nonRL, tau_w_num_RL,                linestyle=':', marker = '^', markersize = 2, linewidth = 2, color = plt.cm.tab10(1), label = r'RL' )
+plt.plot( averaging_time_nonRL,    tau_w_num_ref * np.ones(N_nonRL),  linestyle = '-',                            linewidth = 2, color = "k",             label = r'Reference' )
+plt.plot( averaging_time_nonRL,    tau_w_num_nonRL,             linestyle = '--',   marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
+plt.plot( averaging_time_accum_RL, tau_w_num_RL,                linestyle=':',      marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical $\tau_w$' )
 plt.grid(which='both',axis='y')
@@ -420,9 +416,9 @@ plt.clf()
 print(f"\nBuild plot: '{filename}'")
 
 # --- u_tau plot ---
-plt.plot( averaging_time_nonRL, u_tau_num_ref * np.ones(N),  linestyle = '-',                             linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL, u_tau_num_nonRL,             linestyle = '--',                            linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
-plt.plot( averaging_time_nonRL, u_tau_num_RL,                linestyle=':', marker = '^', markersize = 2, linewidth = 2, color = plt.cm.tab10(1), label = r'RL' )
+plt.plot( averaging_time_nonRL,    u_tau_num_ref * np.ones(N_nonRL),  linestyle = '-',                           linewidth = 2, color = "k",             label = r'Reference' )
+plt.plot( averaging_time_nonRL,    u_tau_num_nonRL,             linestyle = '--',  marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'non-RL' )
+plt.plot( averaging_time_accum_RL, u_tau_num_RL,                linestyle=':',     marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL' )
 plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
 plt.ylabel( r'Numerical $u_\tau$' )
 plt.grid(which='both',axis='y')

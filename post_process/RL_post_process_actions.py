@@ -113,58 +113,46 @@ for file in time_filepath_list:
 # --- Get action & time data from txt files ---
 print("\nImporting action & time data from txt files...")
 n_RL = len(action_filepath_list)
+action_dict   = dict.fromkeys(np.arange(n_RL))
+avg_time_dict = dict.fromkeys(np.arange(n_RL))
+action_min    = 1e8;    action_max   = -1e8
+avg_time_min  = 1e8;    avg_time_max = -1e8
 for i_RL in range(n_RL):
     
     # Read data
-    action_file        = action_filepath_list[i_RL]
-    time_file          = time_filepath_list[i_RL]
-    action_data_aux    = np.loadtxt(action_file)
-    time_data_aux      = np.loadtxt(time_file)
-    num_time_steps_aux = action_data_aux.shape[0]
-
-    # Allocate action data array
-    if i_RL == 0:
-        num_time_steps = num_time_steps_aux
-        action_data   = np.zeros((n_RL, num_time_steps, action_dim, rl_n_envs))
-    else:
-        if num_time_steps != num_time_steps_aux:
-            print(f"Warning: global step {global_step_list[i_RL]} has num. global steps {num_time_steps_aux} != {num_time_steps}")
-            print(f"Warning: not considered steps >= global step {global_step_list[i_RL]}")
-            break
+    action_file    = action_filepath_list[i_RL]
+    time_file      = time_filepath_list[i_RL]
+    action_data    = np.loadtxt(action_file)    # shape [num_time_steps, action_dim + rl_n_envs]
+    time_data      = np.loadtxt(time_file)      # shape [num_time_steps]
+    avg_time_data  = time_data - t_avg_0
+    num_time_steps = avg_time_data.size
 
     # Allocate data
-    action_data[i_RL,:,:,:] = action_data_aux.reshape(num_time_steps, action_dim, rl_n_envs)
-    if i_RL == 0:
-        time_data     = time_data_aux               # shape [num_time_steps]
-        avg_time_data = time_data_aux - t_avg_0     # shape [num_time_steps]
-    else:
-        assert np.allclose(time_data, time_data_aux, atol=1e-6)
+    action_dict[i_RL]   = action_data.reshape(num_time_steps, action_dim, rl_n_envs)
+    avg_time_dict[i_RL] = avg_time_data
+
+    # Update min & max values, if necessary
+    action_min   = np.min([action_min, np.min(action_data)])
+    action_max   = np.max([action_max, np.max(action_data)])
+    avg_time_min = np.min([avg_time_min, np.min(avg_time_data)])
+    avg_time_max = np.max([avg_time_max, np.max(avg_time_data)])
 
     # Logging    
     print(f"\nAction data imported from file '{action_file}'")
     print(f"Time data imported from file '{time_file}'")
 
-# Check if the for loop break due to incomplete global step
-if i_RL != (n_RL-1):
-    action_data = action_data[:i_RL,:,:,:]
-    n_RL = i_RL
 print("\nData imported successfully!")
 
 #-----------------------------------------------------------------------------------------
 #                              Actions figures and gif frames 
 #-----------------------------------------------------------------------------------------
 
-actions_min = int(np.min(action_data))-1
-actions_max = int(np.max(action_data))+1
-ylim = [actions_min, actions_max]
-print(f"\nAction limits: {ylim}")
-
-# ---------------------- Plot actions at each RL global step (specific ensemble) ---------------------- 
-
-#print("\nBuilding actions figures...")
-#for i_RL in range(n_RL):
-#    visualizer.build_actions_fig(avg_time_data, action_data[i_RL], global_step_list[i_RL], ylim)
-#print("Actions figures done successfully!")
+action_min = int(action_min)-1
+action_max = int(action_max)+1
+action_lim   = [action_min,   action_max]
+avg_time_lim = [avg_time_min, avg_time_max]
+print(f"\nAction limits: {action_lim}")
+print(f"\nAveraging time limits: {avg_time_lim}")
 
 # ----------------- Plot Animation Frames of each action dimension for increasing RL global step (specific ensemble) -----------------
 
@@ -183,7 +171,7 @@ for i_RL in range(n_RL):
     if i_RL % (n_RL//10 or 1) == 0:
         print(f"{i_RL/n_RL*100:.0f}%")
     # Build frames
-    frames_dict_scatter, frames_dict_pdf = visualizer.build_actions_frames(frames_dict_scatter, frames_dict_pdf, avg_time_data, action_data[i_RL], global_step_list[i_RL], ylim)
+    frames_dict_scatter, frames_dict_pdf = visualizer.build_actions_frames(frames_dict_scatter, frames_dict_pdf, avg_time_dict[i_RL], action_dict[i_RL], avg_time_lim, action_lim, global_step_list[i_RL])
 
 print("Building gifs from frames...")
 visualizer.build_action_gifs_from_frames(frames_dict_scatter, frames_dict_pdf, action_dim)
