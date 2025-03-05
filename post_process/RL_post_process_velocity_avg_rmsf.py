@@ -29,7 +29,7 @@ try :
     run_mode        = sys.argv[8]
     print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
 except :
-    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <run_mode>")
+    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <t_episode_train> <case_dir> <run_mode>")
 
 if run_mode == "train":
     print("Run mode is set to training")
@@ -39,6 +39,7 @@ else:
     raise ValueError(f"Unrecognized input argument run_mode = `{run_mode}`")
     
 # --- Case parameters ---
+
 rho_0   = 1.0				# Reference density [kg/m3]
 u_tau   = 1.0				# Friction velocity [m/s]
 delta   = 1.0				# Channel half-height [m]
@@ -94,6 +95,8 @@ elif np.isclose(Re_tau, 180, atol=1e-8):
 else:
     raise ValueError(f"'actuators_boundaries' not implemented for Re_tau = {Re_tau}")
 y_plus_actuators_boundaries = y_actuators_boundaries * Re_tau_theoretical   
+
+#--------------------------------------------------------------------------------------------
 
 # ----------- Build data h5 filenames ------------
 
@@ -278,8 +281,8 @@ with h5py.File( filename_ref, 'r' ) as data_file:
     rmsf_v_data_ref = data_file['rmsf_v'][1:-1,1:-1,1:-1]
     rmsf_w_data_ref = data_file['rmsf_w'][1:-1,1:-1,1:-1]
 assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging times from non-converged RL & non-RL"
-print(f"\nNon-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
-print("Data imported successfully!")
+print(f"Non-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
+print("\nData imported successfully!")
 
 ### RL and non-RL data is taken at different cummulative averaging times, manage corresponding indices for non-available time instants
 averaging_time_all = np.unique(np.round(np.concatenate((averaging_time_nonRL, averaging_time_accum_RL)), decimals=3))
