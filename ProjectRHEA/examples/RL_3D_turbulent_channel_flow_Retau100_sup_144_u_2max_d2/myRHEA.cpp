@@ -1336,13 +1336,14 @@ void myRHEA::temporalHookFunction() {
 
     /// Save data only for ensemble #0 due to memory limitations
     if (tag == "0") {
-        if ( print_timers ) {
-            /// Print timers information
+        /// Print timers information
+        if ( ( print_timers ) && (current_time_iter%print_frequency_iter == 0) ) {
             char filename_timers[1024];
             sprintf( filename_timers, "%s/rhea_exp/timers_info/timers_information_file_%d_ensemble%s_step%s.txt", 
                      rl_case_path, current_time_iter, tag.c_str(), global_step.c_str() );
             timers->printTimers( filename_timers );
         }
+        /// Output current state in RL dedicated directory
         if ( current_time_iter%print_frequency_iter == 0 ) {
             this->outputCurrentStateDataRL();
         }
