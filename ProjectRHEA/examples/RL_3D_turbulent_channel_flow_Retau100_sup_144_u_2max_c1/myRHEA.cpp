@@ -908,7 +908,6 @@ void myRHEA::calculateSourceTerms() {
                     /// action_local  = manager->getActionLocal();  /// action_local not used
                     /// Update & Write step size (from 1) to 0 if the next time that we require actuation value is the last one
                     if (current_time + 2.0 * actuation_period > final_time) {
-                        if (tag == "0") this->outputCurrentStateDataRL(); /// Save state before episode termination
                         if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Set RL Step '0' to terminate episode at time: " << current_time << ", iteration: " << current_time_iter << endl;
                         manager->writeStepType(0, step_type_key);
                         last_communication = true;
@@ -2416,7 +2415,7 @@ void myRHEA::calculateReward() {
     double c4 = 0.0;
     double c5 = 0.0;
     double c6 = 0.0;
-    double c7 = 0.1;    // action penalization coefficient
+    double c7 = 0.0;    // action penalization coefficient
 
 #if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
     double l2_err_avg_u = 0.0,  l2_err_avg_v = 0.0,  l2_err_avg_w = 0.0;
