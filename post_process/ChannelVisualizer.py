@@ -756,7 +756,7 @@ class ChannelVisualizer():
         plt.text( 0.4850, 0.9000, r'$\textbf{x}_{3_{c}}$' )
         cbar = plt.colorbar()
         cbar.set_label( r'$y/\delta$' )
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.legend(loc='upper right')
         plt.tight_layout()
         ###plt.clim( 0.0, 20.0 )
@@ -784,7 +784,7 @@ class ChannelVisualizer():
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"Reynolds Stress Trace $R_{kk}$")
         plt.grid(axis="y")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
@@ -815,7 +815,7 @@ class ChannelVisualizer():
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"barycentric coordinates $x_i$")
         plt.grid(axis="y")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
@@ -851,7 +851,7 @@ class ChannelVisualizer():
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"anisotropy tensor eigenvalues $\lambda_i$")
         plt.grid(axis="y")
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         #fig = plt.gcf()
@@ -1729,7 +1729,7 @@ class ChannelVisualizer():
         plt.xscale('log')
         plt.grid(True)
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+        plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.tight_layout()
         return fig
 
@@ -1768,9 +1768,9 @@ class ChannelVisualizer():
         plt.grid(True)
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         if avg_time_RL is None:
-            plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$")
+            plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$")
         else:
-            plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.0f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.0f}$, train step = {global_step}")
+            plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
         plt.tight_layout()
         return fig
 
