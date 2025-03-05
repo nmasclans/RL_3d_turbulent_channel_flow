@@ -35,17 +35,16 @@ verbose = False
 # --- Get CASE parameters ---
 
 try :
-    iteration       = int(sys.argv[1])
-    ensemble        = sys.argv[2]
-    train_name      = sys.argv[3]
-    Re_tau          = float(sys.argv[4])     # Friction Reynolds number [-]
-    dt_phys         = float(sys.argv[5])
-    t_episode_train = float(sys.argv[6])
-    case_dir        = sys.argv[7]
-    run_mode        = sys.argv[8]
-    print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
+    ensemble        = sys.argv[1]
+    train_name      = sys.argv[2]
+    Re_tau          = float(sys.argv[3])     # Friction Reynolds number [-]
+    dt_phys         = float(sys.argv[4])
+    t_episode_train = float(sys.argv[5])
+    case_dir        = sys.argv[6]
+    run_mode        = sys.argv[7]
+    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
 except :
-    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <t_episode_train> <case_dir> <run_mode>")
+    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <t_episode_train> <case_dir> <run_mode>")
 
 if run_mode == "train":
     print("Run mode is set to training")
@@ -151,8 +150,8 @@ if matching_files:
         except (IndexError, ValueError):
             print(f"Skipping invalid file: {filename}, in filepath: {filepath}")
             continue
-        # Keep only the file with the highes iteration for each global step, but >= iteration
-        if ( global_step not in best_files or iter_num > best_files[global_step][0] ) and (iter_num <= iteration):
+        # Keep only the file with the highes iteration for each global step
+        if ( global_step not in best_files or iter_num > best_files[global_step][0] ):
             best_files[global_step] = (iter_num, filepath)
     
     # Sort by global step
@@ -313,9 +312,9 @@ print(f"Non-RL reference data imported from file '{filename_ref}' - averaging ti
 print("\nData imported successfully!")
 
 ### RL and non-RL data is taken at different cummulative averaging times, manage corresponding indices for non-available time instants
-averaging_time_all = np.unique(np.round(np.concatenate((averaging_time_nonRL, averaging_time_accum_RL)), decimals=3))
-idx_nonRL = np.searchsorted(averaging_time_nonRL, averaging_time_all, side='right')-1
-idx_RL    = np.searchsorted(averaging_time_accum_RL, averaging_time_all, side='right')-1
+averaging_time_all = np.unique(np.round(np.concatenate((averaging_time_nonRL, averaging_time_accum_RL)), decimals=1))
+idx_nonRL = np.array([np.argmin(np.abs(averaging_time_nonRL - t))    for t in averaging_time_all])
+idx_RL    = np.array([np.argmin(np.abs(averaging_time_accum_RL - t)) for t in averaging_time_all])
 N_all     = len(averaging_time_all)
 
 # -------------- Averaging fields using XZ symmetries --------------

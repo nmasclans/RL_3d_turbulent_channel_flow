@@ -19,17 +19,16 @@ from matplotlib import rc, rcParams
 # --- Get CASE parameters ---
 
 try :
-    iteration       = int(sys.argv[1])
-    ensemble        = sys.argv[2]
-    train_name      = sys.argv[3]
-    Re_tau          = float(sys.argv[4])     # Friction Reynolds number [-]
-    dt_phys         = float(sys.argv[5])
-    t_episode_train = float(sys.argv[6])
-    case_dir        = sys.argv[7]
-    run_mode        = sys.argv[8]
-    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
+    ensemble        = sys.argv[1]
+    train_name      = sys.argv[2]
+    Re_tau          = float(sys.argv[3])     # Friction Reynolds number [-]
+    dt_phys         = float(sys.argv[4])
+    t_episode_train = float(sys.argv[5])
+    case_dir        = sys.argv[6]
+    run_mode        = sys.argv[7]
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
 except :
-    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <run_mode>")
+    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <run_mode>")
 
 if run_mode == "train":
     print("Run mode is set to training")
@@ -104,7 +103,7 @@ pattern = f"{case_dir}/rhea_exp/output_data/RL_3d_turbulent_channel_flow_*_ensem
 matching_files = sorted(glob.glob(pattern))
 best_files = {}     # dict: {global_step: (iter_num, filepath)}
 if matching_files:
-    print("\RL files:")
+    print("\nRL files:")
     for filepath in matching_files:
         filename       = os.path.basename(filepath)
         parts_filename = filename.split('_')
@@ -115,8 +114,8 @@ if matching_files:
         except (IndexError, ValueError):
             print(f"Skipping invalid file: {filename}, in filepath: {filepath}")
             continue
-        # Keep only the file with the highes iteration for each global step, but >= iteration
-        if ( global_step not in best_files or iter_num > best_files[global_step][0] ) and (iter_num <= iteration):
+        # Keep only the file with the highes iteration for each global step
+        if ( global_step not in best_files or iter_num > best_files[global_step][0] ):
             best_files[global_step] = (iter_num, filepath)
     
     # Sort by global step
@@ -361,7 +360,7 @@ plt.ylabel( r'Numerical $u^{+}_b$' )
 plt.grid(which='both',axis='y')
 plt.tick_params( axis = 'both', pad = 7.5 )
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-filename = f'{postDir}/numerical_u_bulk_{iteration}_ensemble{ensemble}.jpg'
+filename = f'{postDir}/numerical_u_bulk_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
 print(f"\nBuild plot: '{filename}'")
@@ -377,7 +376,7 @@ plt.yticks(np.arange(14,14.8,0.1))
 plt.grid(which='major',axis='y')
 plt.tick_params( axis = 'both', pad = 7.5 )
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-filename = f'{postDir}/numerical_avg_u_bulk_{iteration}_ensemble{ensemble}.jpg'
+filename = f'{postDir}/numerical_avg_u_bulk_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
 print(f"\nBuild plot: '{filename}'")
@@ -396,7 +395,7 @@ plt.yticks(np.arange(12,17,1.0))
 plt.grid(which='major',axis='y')
 plt.tick_params( axis = 'both', pad = 7.5 )
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-filename = f'{postDir}/numerical_inst_avg_u_bulk_{iteration}_ensemble{ensemble}.jpg'
+filename = f'{postDir}/numerical_inst_avg_u_bulk_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
 print(f"\nBuild plot: '{filename}'")
@@ -410,7 +409,7 @@ plt.ylabel( r'Numerical $\tau_w$' )
 plt.grid(which='both',axis='y')
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/numerical_tau_w_{iteration}_ensemble{ensemble}.jpg'
+filename = f'{postDir}/numerical_tau_w_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
 print(f"\nBuild plot: '{filename}'")
@@ -424,7 +423,7 @@ plt.ylabel( r'Numerical $u_\tau$' )
 plt.grid(which='both',axis='y')
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/numerical_u_tau_{iteration}_ensemble{ensemble}.jpg'
+filename = f'{postDir}/numerical_u_tau_ensemble{ensemble}.jpg'
 plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
 plt.clf()
 print(f"\nBuild plot: '{filename}'")
