@@ -2044,11 +2044,11 @@ void myRHEA::preproceWitnessPoints() {
     
     // Each mpi process updates attribute 'state_local_size2'
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, y / delta )
-    this->state_local_size2 = 2 * state_local_size2_counter;
+    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, ||rmsf_u||_2, y / delta )
+    this->state_local_size2 = 3 * state_local_size2_counter;
 #else
-    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2 )
-    this->state_local_size2 = 1 * state_local_size2_counter;
+    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2, ||rmsf_u||_2 )
+    this->state_local_size2 = 2 * state_local_size2_counter;
 #endif
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
@@ -2362,15 +2362,17 @@ void myRHEA::updateState() {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
                     state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)],  2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(rmsf_u_field[I1D(i,j_index,k)], 2.0);
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-                    state_local[state_local_size2_counter+1] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
+                    state_local[state_local_size2_counter+2] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
                     xz_slice_points_counter += 1;
                 }
             }
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter ) / u_tau;
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / u_tau;
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / delta;
+            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter ) / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 
 #else ///  _WITNESS_XZ_SLICES_ 0
@@ -2379,17 +2381,18 @@ void myRHEA::updateState() {
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
-            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)] / u_tau;
+            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)]  / u_tau;
+            state_local[state_local_size2_counter+1] = rmsf_u_field[I1D(i_index,j_index,k_index)] / u_tau;
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+1] = y_field[I1D(i_index,j_index,k_index)] / delta;
+            state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local_size2_counter += 2;
+            state_local_size2_counter += 3;
 #else
-            state_local_size2_counter += 1;
+            state_local_size2_counter += 2;
 #endif
         }
     }
@@ -2412,7 +2415,7 @@ void myRHEA::calculateReward() {
     double c1 = 10.0;
     double c2 = 0.0;
     double c3 = 0.0;
-    double c4 = 0.0;
+    double c4 = 1.0;
     double c5 = 0.0;
     double c6 = 0.0;
     double c7 = 0.0;    // action penalization coefficient
