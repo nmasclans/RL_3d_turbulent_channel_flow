@@ -582,7 +582,7 @@ for i in range(N_all):
     frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_nonRL], rmsf_v_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
     frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_nonRL], rmsf_w_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
 
-print("Building gifs from frames...")
+print("\nBuilding gifs from frames...")
 frames_dict = {'avg_u':frames_avg_u, 'avg_v':frames_avg_v, 'avg_w':frames_avg_w, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
 visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")

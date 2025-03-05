@@ -173,7 +173,7 @@ for i_RL in range(n_RL):
     # Build frames
     frames_dict_scatter, frames_dict_pdf = visualizer.build_actions_frames(frames_dict_scatter, frames_dict_pdf, avg_time_dict[i_RL], action_dict[i_RL], avg_time_lim, action_lim, global_step_list[i_RL])
 
-print("Building gifs from frames...")
+print("\nBuilding gifs from frames...")
 visualizer.build_action_gifs_from_frames(frames_dict_scatter, frames_dict_pdf, action_dim)
 print("Gifs plotted successfully!")
 

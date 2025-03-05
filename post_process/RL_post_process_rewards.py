@@ -202,7 +202,7 @@ for i_RL in range(n_RL):
     frames_plot_local_reward, frames_pdf_local_reward = visualizer.build_rewards_frames(frames_plot_local_reward, frames_pdf_local_reward, avg_time_dict[i_RL], local_reward_dict[i_RL], avg_time_lim, local_reward_lim, global_step_list[i_RL], "Local Reward")
     frames_plot_reward,       frames_pdf_reward       = visualizer.build_rewards_frames(frames_plot_reward,       frames_pdf_reward,       avg_time_dict[i_RL], reward_dict[i_RL],       avg_time_lim, reward_lim,       global_step_list[i_RL], "Reward")
 
-print("Building gifs from frames...")
+print("\nBuilding gifs from frames...")
 visualizer.build_rewards_gifs_from_frames(frames_plot_local_reward, frames_pdf_local_reward, "reward_local")
 visualizer.build_rewards_gifs_from_frames(frames_plot_reward,       frames_pdf_reward,       "reward")
 print("Gifs plotted successfully!")
