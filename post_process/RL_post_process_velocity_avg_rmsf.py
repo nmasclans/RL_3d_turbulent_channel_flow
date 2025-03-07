@@ -811,7 +811,7 @@ def build_error_plot(avg_time_nonRL, avg_time_RL, err_avg_nonRL, err_avg_RL, err
     plt.xlabel(r'Accumulated averaging time $t_{avg}^+$' )
     plt.ylabel(rf'$L_{error_num}$ Error' )
     plt.grid(which='both',axis='y')
-    plt.legend(loc='upper right', frameon=True, framealpha=1.0, fancybox=True) # loc='center left', bbox_to_anchor=(1, 0.5)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
     plt.tick_params( axis = 'both', pad = 7.5 )
     plt.tight_layout()
     filename = f'{postDir}/L{error_num}_error_{vel_component}_ensemble{ensemble}.jpg'
