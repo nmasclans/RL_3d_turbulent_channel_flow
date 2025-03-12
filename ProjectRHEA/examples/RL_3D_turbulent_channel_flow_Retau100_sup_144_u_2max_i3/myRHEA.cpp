@@ -66,7 +66,8 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const double u_bulk_reference = 14.665;
 #endif
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
-const double avg_u_bulk_max = 14.665 + 0.005;
+const double avg_u_bulk_max = 14.665 + 0.7;
+const double avg_u_bulk_min = 14.665 - 0.7;
 #endif
 
 
@@ -1581,8 +1582,13 @@ void myRHEA::manageStreamwiseBulkVelocity() {
         rl_early_episode_termination = true;
         final_time = current_time + 2.0 * actuation_period + delta_t;
         if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk " << avg_u_bulk_max << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
+    } else if ( avg_u_bulk_numeric <= avg_u_bulk_min && !rl_early_episode_termination) {
+        /// Only executed once, if early termination is necessary 
+        rl_early_episode_termination = true;
+        final_time = current_time + 2.0 * actuation_period + delta_t;
+        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as minimum avg_u_bulk " << avg_u_bulk_min << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
     } else {
-        if( my_rank == 0 ) cout << endl << "Numerical avg_u_bulk: " << avg_u_bulk_numeric << ", maximum avg_u_bulk: " << avg_u_bulk_max << ", time: " << current_time << ", final time: " << final_time << endl;
+        if( my_rank == 0 ) cout << endl << "Numerical avg_u_bulk: " << avg_u_bulk_numeric << ", time: " << current_time << ", final time: " << final_time << endl;
     }
 #endif /// of _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
 
