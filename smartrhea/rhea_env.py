@@ -357,14 +357,12 @@ class RheaEnv(py_environment.PyEnvironment):
 
     def _create_mpmd_ensemble(self, restart_file, global_step):
         # TODO: add method description
-        """
-        # TODO: custom this implementation if several random restart files are used
-        if restart_file == 3:   # random choice of restart file
-            restart_step = [random.choice(["1", "2"]) for _ in range(self.cfd_n_envs)]
+        if restart_file == "random_choice":   # random choice of restart file
+            random_num = random.choice(["3210000", "3320000", "3420000", "3520000", "3620000", "3720000", "3820000"])
+            restart_step = [f"{self.rhea_case_path}/restart_data_file_{random_num}.h5" for _ in range(self.cfd_n_envs)]
         else:
-            restart_step = [str(restart_file) for _ in range(self.cfd_n_envs)]
-        """
-        restart_step = [ f"{self.rhea_case_path}/{restart_file}" for _ in range(self.cfd_n_envs)]
+            restart_step = [ f"{self.rhea_case_path}/{restart_file}" for _ in range(self.cfd_n_envs)]
+        logger.info(f"Restart files used: {restart_step}")
 
         # set RHEA exe arguments
         rhea_args = {"configuration_file": self.configuration_file, 

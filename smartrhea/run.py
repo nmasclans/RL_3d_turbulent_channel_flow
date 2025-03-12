@@ -496,7 +496,7 @@ with tf.compat.v2.summary.record_if(  # pylint: disable=not-context-manager
             start_time = time.time()
             env.start(
                 new_ensamble=True,
-                restart_file=params["restart_file"], # TODO: impl. sth if we want to use several restart files, i.e. if global_step_val > 0 else 1,
+                restart_file=params["restart_file"],
                 global_step=global_step_val,
             )
             logger.debug(f"{bcolors.OKBLUE}Collect environment started, with global_step: {global_step_val}{bcolors.ENDC}")
