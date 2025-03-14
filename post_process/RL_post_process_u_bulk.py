@@ -107,7 +107,7 @@ print("\nImporting numerical avg_u_bulk data from .out files...")
 n_RL                = len(filepath_list)
 avg_u_bulk_num_dict = dict.fromkeys(np.arange(n_RL))
 avg_time_dict       = dict.fromkeys(np.arange(n_RL))
-data_pattern        = re.compile(r'Numerical avg_u_bulk: ([\d\.]+), .* time: ([\d\.]+),')
+data_pattern        = re.compile(r"Numerical avg_u_bulk:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*time:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)")
 avg_u_bulk_num_min, avg_u_bulk_num_max  = (1e8,-1e8)
 avg_time_min, avg_time_max              = (1e8,-1e8)
 for i_RL in range(n_RL):
@@ -125,7 +125,7 @@ for i_RL in range(n_RL):
         if match:
             avg_u_bulk_num_aux.append( float(match.group(1)) )
             avg_time_aux.append( float(match.group(2)) - t_avg_0 )
-    
+
     avg_u_bulk_num_min = np.min([avg_u_bulk_num_min, np.min(avg_u_bulk_num_aux), avg_u_bulk_ref])
     avg_u_bulk_num_max = np.max([avg_u_bulk_num_max, np.max(avg_u_bulk_num_aux), avg_u_bulk_ref])
     avg_time_min       = np.min([avg_time_min,       np.min(avg_time_aux)])

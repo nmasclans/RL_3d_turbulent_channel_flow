@@ -66,8 +66,8 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const double u_bulk_reference = 14.665;
 #endif
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
-const double avg_u_bulk_max = 14.665 + 0.7;
-const double avg_u_bulk_min = 14.665 - 0.7;
+const double avg_u_bulk_max = 14.665 + 0.6;
+const double avg_u_bulk_min = 14.665 - 0.6;
 #endif
 
 
