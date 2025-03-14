@@ -358,7 +358,7 @@ class RheaEnv(py_environment.PyEnvironment):
     def _create_mpmd_ensemble(self, restart_file, global_step):
         # TODO: add method description
         if restart_file == "random_choice":   # random choice of restart file
-            random_num = random.choice(["3210000", "3320000", "3420000", "3520000", "3620000", "3720000", "3820000"])
+            random_num = random.choice(["3210000", "3320000", "3520000", "3620000", "3720000", "3820000"])
             restart_step = [f"{self.rhea_case_path}/restart_data_file_{random_num}.h5" for _ in range(self.cfd_n_envs)]
         else:
             restart_step = [ f"{self.rhea_case_path}/{restart_file}" for _ in range(self.cfd_n_envs)]
