@@ -635,12 +635,15 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
              << ", rmsf_w: " << rmsf_w_reference_profile[global_j] 
              << endl;
     }
+    /// Reward calculation auxiliary variables
+    l2_err_avg_u_previous = 0.0;
+    l2_rl_f_previous      = 0.0;
 #endif
 
     /// Initialize additional attribute members
 #if _RL_CONTROL_IS_SUPERVISED_
-    first_actuation_time_done   = true;
-    first_actuation_period_done = true;
+    first_actuation_time_done   = false;
+    first_actuation_period_done = false;
 #else
     first_actuation_time_done   = false;
     first_actuation_period_done = false;
@@ -818,12 +821,13 @@ void myRHEA::calculateSourceTerms() {
         /// If needed, get and post-process new action
         if (current_time > begin_actuation_time) {
 
-            if ( !first_actuation_time_done ) {     /// executed just once
-                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (unsupervised)
+            if ( !first_actuation_time_done ) {     /// executed just once     
+                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised)
+                                                    /// initializing 'l2_err_avg_u_previous' and 'l2_rl_f_previous' (if supervised)        
                 updateState();
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
-                    cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous'" << endl;
+                    cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised) or 'l2_err_avg_u_previous', 'l2_rl_f_previous' (if supervised)" << endl;
                 }
             } 
 
@@ -850,7 +854,7 @@ void myRHEA::calculateSourceTerms() {
 
                     /// At the begining of the first actuation step, reward and state are updated to collect previous fields values, but no action is applied,
                     /// This is considered a previous step necessary before activating perturbations
-                    calculateReward();      /// update avg_u,v,w_previous_field, rmsf_u,v,w_previous_field for next reward calculation
+                    calculateReward();
                     updateState();
                     first_actuation_period_done = true;
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -1576,16 +1580,19 @@ void myRHEA::manageStreamwiseBulkVelocity() {
 
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
     int my_rank;
+    double final_time_aux;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     if ( avg_u_bulk_numeric >= avg_u_bulk_max && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time = current_time + 2.0 * actuation_period + delta_t;
+        final_time_aux = current_time + 2.0 * actuation_period + delta_t;
+        if (final_time_aux < final_time) final_time = final_time_aux; 
         if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk " << avg_u_bulk_max << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
     } else if ( avg_u_bulk_numeric <= avg_u_bulk_min && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time = current_time + 2.0 * actuation_period + delta_t;
+        final_time_aux = current_time + 2.0 * actuation_period + delta_t;
+        if (final_time_aux < final_time) final_time = final_time_aux; 
         if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as minimum avg_u_bulk " << avg_u_bulk_min << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
     } else {
         if( my_rank == 0 ) cout << endl << "Numerical avg_u_bulk: " << avg_u_bulk_numeric << ", time: " << current_time << ", final time: " << final_time << endl;
@@ -2408,27 +2415,27 @@ void myRHEA::updateState() {
 /// If _RL_CONTROL_IS_SUPERVISED_ 1:
 /// -> updates attributes: reward_local
 /// else _RL_CONTROL_IS_SUPERVISED_ 0:
-/// -> updates attributes: reward_local, avg_u_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field
+/// -> updates attributes: reward_local, 
+//                         avg_u_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field (if unsupervised),
+//                         l2_err_avg_u_previous, l2_rl_f_previous (if supervised)
 void myRHEA::calculateReward() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Reward weight coefficients
-    double b_param = 1.0;
+    double b_param = 0.0;
     double d_param = 0.0;
-    double c1 = 10.0;
+    double c1 = 10.0;   // used in supervised! avg_u penalization coefficient
     double c2 = 0.0;
     double c3 = 0.0;
     double c4 = 0.0;
     double c5 = 0.0;
     double c6 = 0.0;
-    double c7 = 0.0;    // action penalization coefficient
+    double c7 = 0.0;    // used in supervised! action penalization coefficient
 
 #if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
-    double l2_err_avg_u = 0.0,  l2_err_avg_v = 0.0,  l2_err_avg_w = 0.0;
-    double l2_err_rmsf_u = 0.0, l2_err_rmsf_v = 0.0, l2_err_rmsf_w = 0.0;
-    double l2_avg_u_reference  = 0.0;   // avg_v_reference, avg_w_reference = 0.0 everywhere in the profile
-    double l2_rmsf_u_reference = 0.0, l2_rmsf_v_reference = 0.0, l2_rmsf_w_reference = 0.0;
+    double l2_err_avg_u = 0.0;
+    double l2_avg_u_reference  = 0.0;
     double l2_rl_f_rhou = 0.0, l2_rl_f_rhov = 0.0, l2_rl_f_rhow = 0.0, l2_rl_f = 0.0;
     double length_y = 0.0, delta_y  = 0.0;
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -2436,15 +2443,7 @@ void myRHEA::calculateReward() {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 delta_y             = 0.5 * ( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] );
                 l2_err_avg_u        += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
-                l2_err_avg_v        += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0,                                2.0) * delta_y;
-                l2_err_avg_w        += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0,                                2.0) * delta_y;
-                l2_err_rmsf_u       += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
-                l2_err_rmsf_v       += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_y;
-                l2_err_rmsf_w       += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_y;
                 l2_avg_u_reference  += std::pow(avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
-                l2_rmsf_u_reference += std::pow(rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
-                l2_rmsf_v_reference += std::pow(rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_y;
-                l2_rmsf_w_reference += std::pow(rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_y;
                 l2_rl_f_rhou        += std::pow(rl_f_rhou_field[I1D(i,j,k)],        2.0) * delta_y;
                 l2_rl_f_rhov        += std::pow(rl_f_rhov_field[I1D(i,j,k)],        2.0) * delta_y;
                 l2_rl_f_rhow        += std::pow(rl_f_rhow_field[I1D(i,j,k)],        2.0) * delta_y;
@@ -2453,36 +2452,23 @@ void myRHEA::calculateReward() {
         }
     }
     l2_err_avg_u        = std::sqrt( l2_err_avg_u  / length_y );
-    l2_err_avg_v        = std::sqrt( l2_err_avg_v  / length_y );
-    l2_err_avg_w        = std::sqrt( l2_err_avg_w  / length_y );
-    l2_err_rmsf_u       = std::sqrt( l2_err_rmsf_u / length_y );
-    l2_err_rmsf_v       = std::sqrt( l2_err_rmsf_v / length_y );
-    l2_err_rmsf_w       = std::sqrt( l2_err_rmsf_w / length_y );
     l2_avg_u_reference  = std::sqrt( l2_avg_u_reference  / length_y );
-    l2_rmsf_u_reference = std::sqrt( l2_rmsf_u_reference / length_y );
-    l2_rmsf_v_reference = std::sqrt( l2_rmsf_v_reference / length_y );
-    l2_rmsf_w_reference = std::sqrt( l2_rmsf_w_reference / length_y );
     l2_rl_f_rhou        = std::sqrt( l2_rl_f_rhou / length_y );
     l2_rl_f_rhov        = std::sqrt( l2_rl_f_rhov / length_y );
     l2_rl_f_rhow        = std::sqrt( l2_rl_f_rhow / length_y );
     l2_rl_f             = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local = ( b_param - (   ( c1 * l2_err_avg_u  / l2_avg_u_reference ) \
-                                 + ( c2 * l2_err_avg_v ) \
-                                 + ( c3 * l2_err_avg_w ) \
-                                 + ( c4 * l2_err_rmsf_u / l2_rmsf_u_reference ) \
-                                 + ( c5 * l2_err_rmsf_v / l2_rmsf_v_reference ) \
-                                 + ( c6 * l2_err_rmsf_w / l2_rmsf_w_reference ) \
-                                 + ( c7 * l2_rl_f ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
+    reward_local        =   c1 * ( ( l2_err_avg_u_previous - l2_err_avg_u ) / l2_avg_u_reference ) \
+                          + c7 * ( l2_rl_f_previous - l2_rl_f );
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
-         << c1 * l2_err_avg_u  / l2_avg_u_reference << " " 
-	     << c2 * l2_err_avg_v << " "
-	     << c3 * l2_err_avg_w << " "
-	     << c4 * l2_err_rmsf_u / l2_rmsf_u_reference << " "
-	     << c5 * l2_err_rmsf_v / l2_rmsf_v_reference << " "
-	     << c6 * l2_err_rmsf_w / l2_rmsf_w_reference << " "
-         << c7 * l2_rl_f << endl
-	     << "reward scaler dt_RL: " <<  std::pow(current_time - begin_actuation_time, d_param) << endl;
+         <<   c1 * l2_err_avg_u_previous / l2_avg_u_reference << " " 
+	     << - c1 * l2_err_avg_u          / l2_avg_u_reference << " "
+	     <<   c7 *  l2_rl_f_previous << " "
+	     << - c7 *  l2_rl_f << endl;
+    
+    /// Store current l2 norms for next reward calculation
+    l2_err_avg_u_previous = l2_err_avg_u;
+    l2_rl_f_previous      = l2_rl_f;
 
 #else                           /// Unsupervised Reward
     /// Initialize variables
