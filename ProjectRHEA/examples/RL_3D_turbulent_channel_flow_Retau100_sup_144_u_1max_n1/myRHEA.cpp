@@ -2425,7 +2425,7 @@ void myRHEA::calculateReward() {
     // Reward weight coefficients
     double b_param = 0.0;
     double d_param = 0.0;
-    double c1 = 10.0;   // used in supervised! avg_u penalization coefficient
+    double c1 = 10.0 / actuation_period;   // used in supervised! avg_u penalization coefficient
     double c2 = 0.0;
     double c3 = 0.0;
     double c4 = 0.0;
@@ -2594,7 +2594,7 @@ int main(int argc, char** argv) {
         configuration_file  = argv[1];
         tag                 = argv[2];
         restart_data_file   = argv[3];
-        t_action            = argv[4];  // 0.0001 
+        t_action            = argv[4];  // 0.01 
         t_episode           = argv[5];  // 1.0
         t_begin_control     = argv[6];  // 0.0
         db_clustered        = argv[7];  // False
