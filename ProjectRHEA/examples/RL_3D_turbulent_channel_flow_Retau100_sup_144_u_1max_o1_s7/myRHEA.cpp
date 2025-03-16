@@ -185,6 +185,12 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhov_field_curr_step.setTopology(topo, "rl_f_rhov_field_curr_step");
     rl_f_rhow_field_curr_step.setTopology(topo, "rl_f_rhow_field_curr_step");
 #endif  /// of _TEMPORAL_SMOOTHING_RL_ACTION_
+    Rkk_field.setTopology(topo,   "Rkk_field");
+    phi1_field.setTopology(topo,  "phi1_field");
+    phi2_field.setTopology(topo,  "phi2_field");
+    phi3_field.setTopology(topo,  "phi3_field");
+    xmap1_field.setTopology(topo, "xmap1_field");
+    xmap2_field.setTopology(topo, "xmap2_field");
     DeltaRxx_field.setTopology(topo, "DeltaRxx");
     DeltaRxy_field.setTopology(topo, "DeltaRxy");
     DeltaRxz_field.setTopology(topo, "DeltaRxz");
@@ -821,10 +827,11 @@ void myRHEA::calculateSourceTerms() {
         /// If needed, get and post-process new action
         if (current_time > begin_actuation_time) {
 
-            if ( !first_actuation_time_done ) {     /// executed just once     
+            if ( !first_actuation_time_done ) {     /// executed just once
+                updateRijEigenDecomp();             /// update 'Rkk_field', 'phi1_field', 'phi2_field', 'phi3_field', 'xmap1_field', 'xmap2_field' 
+                updateState();
                 calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised)
                                                     /// initializing 'l2_err_avg_u_previous' and 'l2_rl_f_previous' (if supervised)        
-                updateState();
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
                     cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised) or 'l2_err_avg_u_previous', 'l2_rl_f_previous' (if supervised)" << endl;
@@ -833,6 +840,9 @@ void myRHEA::calculateSourceTerms() {
 
             /// Check if new action is needed -> update F_pert(x,t_p) using updated RL actions a_k^p
             if (current_time - previous_actuation_time >= actuation_period) {
+
+                /// Perform Rij eigendecomposition, update 'Rkk_field', 'phi1_field', 'phi2_field', 'phi3_field', 'xmap1_field', 'xmap2_field'
+                updateRijEigenDecomp(); 
 
                 /// Store previous actuation time
                 previous_actuation_time = current_time;
@@ -851,11 +861,11 @@ void myRHEA::calculateSourceTerms() {
 #endif  /// of _TEMPORAL_SMOOTHING_RL_ACTION_
 
                 if ( !first_actuation_period_done ) {
-
+                    
                     /// At the begining of the first actuation step, reward and state are updated to collect previous fields values, but no action is applied,
                     /// This is considered a previous step necessary before activating perturbations
-                    calculateReward();
                     updateState();
+                    calculateReward();
                     first_actuation_period_done = true;
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
@@ -926,14 +936,11 @@ void myRHEA::calculateSourceTerms() {
                     timers->start( "rl_update_DeltaRij" );
 
                     /// Initialize variables
-                    double Rkk, phi1, phi2, phi3, xmap1, xmap2; 
                     double DeltaRkk = 0.0, DeltaPhi1 = 0.0, DeltaPhi2 = 0.0, DeltaPhi3 = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
-                    double Rkk_inv, Akk;
                     bool   isNegligibleAction, isNegligibleRkk;
                     size_t actuation_idx;
-                    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
-                    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+                    vector<vector<double>> DijPert(3, vector<double>(3, 0.0));
+                    vector<vector<double>> QijPert(3, vector<double>(3, 0.0));
                     vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
                     
                     /// Calculate DeltaRij = Rij_perturbated - Rij_original
@@ -988,8 +995,7 @@ void myRHEA::calculateSourceTerms() {
                                     
                                     /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
                                     isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaPhi1) < EPS && abs(DeltaPhi2) < EPS && abs(DeltaPhi3) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
-                                    Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                                    isNegligibleRkk    = (abs(Rkk) < EPS);
+                                    isNegligibleRkk    = (abs(Rkk_field[I1D(i,j,k)]) < EPS);
                                     if (isNegligibleAction || isNegligibleRkk) {
                                         DeltaRxx_field[I1D(i,j,k)] = 0.0;
                                         DeltaRyy_field[I1D(i,j,k)] = 0.0;
@@ -999,53 +1005,23 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaRyz_field[I1D(i,j,k)] = 0.0;
                                     } else {
 
-                                        /// Rkk is Rij trace (dof #1)
-                                        Rkk_inv = 1.0 / Rkk;
-
-                                        /// Build anisotropy tensor (symmetric, trace-free)
-                                        Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                                        Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                                        Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                                        Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                                        Aij[1][0]  = Aij[0][1];
-                                        Aij[2][0]  = Aij[0][2];
-                                        Aij[2][1]  = Aij[1][2];
-
-                                        /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                                        Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                                        Aij[0][0] -= Akk / 3.0;
-                                        Aij[1][1] -= Akk / 3.0;
-                                        Aij[2][2] -= Akk / 3.0;
-
-                                        /// Aij eigen-decomposition
-                                        symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Qij
-                                        sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
-
-                                        /// Eigen-vectors Euler ZXZ rotation angles (dof #2-4)
-                                        eigVect2eulerAngles(Qij, phi1, phi2, phi3);      // update phi1, phi2, phi3
-
-                                        /// Eigen-values Barycentric coordinates (dof #5-6)
-                                        eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);      // update xmap1, xmap2
-
                                         /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
                                         /// Delta_* are standarized values between 'action_bounds' RL parameter
-                                        Rkk    = Rkk   + DeltaRkk   * 1.0;
-                                        phi1   = phi1  + DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
-                                        phi2   = phi2  + DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
-                                        phi3   = phi3  + DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
-                                        xmap1  = xmap1 + DeltaXmap1 * 1.0;          // xmap1 range: [0,1]
-                                        xmap2  = xmap2 + DeltaXmap2 * 1.0;          // xmap2 range: [0,1]
+                                        Rkk_field[I1D(i,j,k)]    += DeltaRkk   * 1.0;
+                                        phi1_field[I1D(i,j,k)]   += DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
+                                        phi2_field[I1D(i,j,k)]   += DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
+                                        phi3_field[I1D(i,j,k)]   += DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
+                                        xmap1_field[I1D(i,j,k)]  += DeltaXmap1 * 1.0;          // xmap1 range: [0,1]
+                                        xmap2_field[I1D(i,j,k)]  += DeltaXmap2 * 1.0;          // xmap2 range: [0,1]
 
-                                        /// Enforce realizability to perturbed Rij d.o.f
-                                        enforceRealizability(Rkk, phi1, phi2, phi3, xmap1, xmap2);    // update Rkk, phi1, phi2, phi3, xmap1, xmap2, if necessary
+                                        /// Enforce realizability to perturbed Rij d.o.f (update {Rkk,phi1,phi2,phi3,xmap1,xmap2}_field, if necessary)
+                                        enforceRealizability(Rkk_field[I1D(i,j,k)], phi1_field[I1D(i,j,k)], phi2_field[I1D(i,j,k)], phi3_field[I1D(i,j,k)], xmap1_field[I1D(i,j,k)], xmap2_field[I1D(i,j,k)]);
 
                                         /// Calculate perturbed & realizable Rij
-                                        eulerAngles2eigVect(phi1, phi2, phi3, Qij);                   // update Qij
-                                        barycentricCoord2eigValMatrix(xmap1, xmap2, Dij);                   // update Dij
-                                        sortEigenDecomposition(Qij, Dij);                                   // update Qij & Dij, if necessary
-                                        Rijdof2matrix(Rkk, Dij, Qij, RijPert);                              // update RijPert
+                                        eulerAngles2eigVect(phi1_field[I1D(i,j,k)], phi2_field[I1D(i,j,k)], phi3_field[I1D(i,j,k)], QijPert);   // update QijPert
+                                        barycentricCoord2eigValMatrix(xmap1_field[I1D(i,j,k)], xmap2_field[I1D(i,j,k)], DijPert);               // update DijPert
+                                        sortEigenDecomposition(QijPert, DijPert);                                                               // update QijPert & DijPert, if necessary
+                                        Rijdof2matrix(Rkk_field[I1D(i,j,k)], DijPert, QijPert, RijPert);                                        // update RijPert
 
                                         /// Calculate perturbed & realizable DeltaRij
                                         DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
@@ -1601,6 +1577,63 @@ void myRHEA::manageStreamwiseBulkVelocity() {
 
 };
 
+
+///////////////////////////////////////////////////////////////////////////////
+/** Perform eigendecomposition to Reynolds stress tensor
+ * 
+ * From attributes 'favre_uffuff_field', 'favre_uffvff_field', 'favre_uffwff_field', 'favre_vffvff_field', 'favre_vffwff_field', 'favre_wffwff_field',
+ * update attributes 'Rkk_field', 'phi1_field', 'phi2_field', 'phi3_field', 'xmap1_field', 'xmap2_field'
+ */
+void myRHEA::updateRijEigenDecomp() {
+
+    /// Auxiliary variables
+    double Rkk_inv, Akk;
+    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
+
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                
+                /// Rij trace (dof #1) - update Rkk_field
+                Rkk_field[I1D(i,j,k)] = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                
+                /// Anisotropy tensor (symmetric, trace-free)
+                Rkk_inv = 1.0 / Rkk_field[I1D(i,j,k)];
+                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                Aij[1][0]  = Aij[0][1];
+                Aij[2][0]  = Aij[0][2];
+                Aij[2][1]  = Aij[1][2];
+
+                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                Aij[0][0] -= Akk / 3.0;
+                Aij[1][1] -= Akk / 3.0;
+                Aij[2][2] -= Akk / 3.0;
+
+                /// Aij eigen-decomposition
+                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Dij
+                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
+
+                /// Eigen-vectors Euler ZXZ rotation angles (dof #2-4) - update phi1_field, phi2_field, phi3_field
+                eigVect2eulerAngles(Qij, phi1_field[I1D(i,j,k)], phi2_field[I1D(i,j,k)], phi3_field[I1D(i,j,k)]);   
+
+                /// Eigen-values Barycentric coordinates (dof #5-6) - update xmap1_field, ,xmap2_field
+                eigValMatrix2barycentricCoord(Dij, xmap1_field[I1D(i,j,k)], xmap2_field[I1D(i,j,k)]);
+
+            }
+        }
+    }
+
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
  * 
@@ -2058,11 +2091,11 @@ void myRHEA::preproceWitnessPoints() {
     
     // Each mpi process updates attribute 'state_local_size2'
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-    /// each observation point / slide includes 3-D state data: ( ||avg_u||_2, y / delta )
-    this->state_local_size2 = 2 * state_local_size2_counter;
+    /// each observation point / slide includes 3-D state data: ( Rkk, theta_1, theta_2, theta_3, xmap_1, xmap_2, y / delta )
+    this->state_local_size2 = 7 * state_local_size2_counter;
 #else
-    /// each observation point / slide includes 2-D state data: ( ||avg_u||_2 )
-    this->state_local_size2 = 1 * state_local_size2_counter;
+    /// each observation point / slide includes 2-D state data: ( Rkk, theta_1, theta_2, theta_3, xmap_1, xmap_2 )
+    this->state_local_size2 = 6 * state_local_size2_counter;
 #endif
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
@@ -2375,16 +2408,26 @@ void myRHEA::updateState() {
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
-                    state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)],  2.0);
+                    state_local[state_local_size2_counter]   += std::pow(Rkk_field[I1D(i,j_index,k)],    2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(phi1_field[I1D(i,j_index,k)],   2.0);
+                    state_local[state_local_size2_counter+2] += std::pow(phi2_field[I1D(i,j_index,k)],   2.0);
+                    state_local[state_local_size2_counter+3] += std::pow(phi3_field[I1D(i,j_index,k)],   2.0);
+                    state_local[state_local_size2_counter+4] += std::pow(xmap1_field[I1D(i,j_index,k)],  2.0);
+                    state_local[state_local_size2_counter+5] += std::pow(xmap2_field[I1D(i,j_index,k)],  2.0);
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-                    state_local[state_local_size2_counter+1] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
+                    state_local[state_local_size2_counter+6] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
                     xz_slice_points_counter += 1;
                 }
             }
-            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter ) / u_tau;
+            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+3] = std::sqrt( state_local[state_local_size2_counter+3] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+4] = std::sqrt( state_local[state_local_size2_counter+4] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+5] = std::sqrt( state_local[state_local_size2_counter+5] / xz_slice_points_counter );
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / delta;
+            state_local[state_local_size2_counter+6] = std::sqrt( state_local[state_local_size2_counter+6] / xz_slice_points_counter ) / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 
 #else ///  _WITNESS_XZ_SLICES_ 0
@@ -2393,17 +2436,22 @@ void myRHEA::updateState() {
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
-            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)] / u_tau;
+            state_local[state_local_size2_counter]   = Rkk_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+1] = phi1_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+2] = phi2_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+3] = phi3_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+4] = xmap1_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+5] = xmap2_field[I1D(i_index,j_index,k_index)];
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+1] = y_field[I1D(i_index,j_index,k_index)] / delta;
+            state_local[state_local_size2_counter+6] = y_field[I1D(i_index,j_index,k_index)] / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local_size2_counter += 2;
+            state_local_size2_counter += 7;
 #else
-            state_local_size2_counter += 1;
+            state_local_size2_counter += 6;
 #endif
         }
     }

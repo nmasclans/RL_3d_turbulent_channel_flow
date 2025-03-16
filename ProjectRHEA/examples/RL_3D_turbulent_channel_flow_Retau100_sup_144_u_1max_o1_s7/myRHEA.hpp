@@ -70,6 +70,12 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhov_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhow_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray Rkk_field;
+        DistributedArray phi1_field;
+        DistributedArray phi2_field;
+        DistributedArray phi3_field;
+        DistributedArray xmap1_field;
+        DistributedArray xmap2_field;
         DistributedArray DeltaRxx_field;               /// 3-D field of DeltaRxx
         DistributedArray DeltaRxy_field;               /// 3-D field of DeltaRxy
         DistributedArray DeltaRxz_field;               /// 3-D field of DeltaRxz
@@ -140,6 +146,7 @@ class myRHEA : public FlowSolverRHEA {
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void updateState();
         void calculateReward();
+        void updateRijEigenDecomp();
 
     private:
 
