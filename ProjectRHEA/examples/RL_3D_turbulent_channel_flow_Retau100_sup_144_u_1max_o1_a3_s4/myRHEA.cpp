@@ -78,7 +78,7 @@ const double avg_u_bulk_min = 14.665 - 0.1;
 #endif
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
-int action_dim = 6;
+int action_dim = 3;
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
 /* Baricentric map coordinates, source: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
@@ -968,12 +968,12 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaXmap1 = action_global[actuation_idx * action_dim + 0];
                                         DeltaXmap2 = action_global[actuation_idx * action_dim + 1];
                                     } else if (action_dim == 3) {
-                                        DeltaRkk   = 0.0;
-                                        DeltaPhi1  = action_global[actuation_idx * action_dim + 0];
-                                        DeltaPhi2  = action_global[actuation_idx * action_dim + 1];
-                                        DeltaPhi3  = action_global[actuation_idx * action_dim + 2];
-                                        DeltaXmap1 = 0.0;
-                                        DeltaXmap2 = 0.0;
+                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                        DeltaPhi1  = 0.0;
+                                        DeltaPhi2  = 0.0;
+                                        DeltaPhi3  = 0.0;
+                                        DeltaXmap1 = action_global[actuation_idx * action_dim + 1];
+                                        DeltaXmap2 = action_global[actuation_idx * action_dim + 2];
                                     } else if (action_dim == 5) {
                                         DeltaRkk   = 0.0;
                                         DeltaPhi1  = action_global[actuation_idx * action_dim + 0];
