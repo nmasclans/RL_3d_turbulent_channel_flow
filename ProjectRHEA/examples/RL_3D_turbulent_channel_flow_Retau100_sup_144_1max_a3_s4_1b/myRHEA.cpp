@@ -2496,12 +2496,12 @@ void myRHEA::calculateReward() {
     l2_rl_f_rhov        = std::sqrt( l2_rl_f_rhov / length_y );
     l2_rl_f_rhow        = std::sqrt( l2_rl_f_rhow / length_y );
     l2_rl_f             = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local        =   c1 * ( ( l2_err_avg_u_previous - l2_err_avg_u ) / l2_avg_u_reference ) \
+    reward_local        =   c1 * ( ( l2_err_avg_u_previous - l2_err_avg_u ) / l2_err_avg_u ) \
                           + c7 * ( l2_rl_f_previous - l2_rl_f );
     /// Debugging
     cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
-         <<   c1 * l2_err_avg_u_previous / l2_avg_u_reference << " " 
-	     << - c1 * l2_err_avg_u          / l2_avg_u_reference << " "
+         <<   c1 * l2_err_avg_u_previous / l2_err_avg_u << " " 
+	     << - c1 * l2_err_avg_u          / l2_err_avg_u << " "
 	     <<   c7 *  l2_rl_f_previous << " "
 	     << - c7 *  l2_rl_f << endl;
     
