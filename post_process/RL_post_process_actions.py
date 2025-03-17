@@ -45,7 +45,6 @@ restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
 restart_data_file_averaging_time = 2.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0    = restart_data_file_time - restart_data_file_averaging_time 
 rl_n_envs  = 8   # num. actuators (control cubes) per cfd simulation 
-action_dim = 6
 
 # --- Post-processing parameters ---
 verbose = False
@@ -122,13 +121,13 @@ for i_RL in range(n_RL):
     # Read data
     action_file    = action_filepath_list[i_RL]
     time_file      = time_filepath_list[i_RL]
-    action_data    = np.loadtxt(action_file)    # shape [num_time_steps, action_dim + rl_n_envs]
+    action_data    = np.loadtxt(action_file)    # shape [num_time_steps, action_dim + rl_n_envs], action_dim set as free parameter
     time_data      = np.loadtxt(time_file)      # shape [num_time_steps]
     avg_time_data  = time_data - t_avg_0
     num_time_steps = avg_time_data.size
 
     # Allocate data
-    action_dict[i_RL]   = action_data.reshape(num_time_steps, action_dim, rl_n_envs)
+    action_dict[i_RL]   = action_data.reshape(num_time_steps, -1, rl_n_envs)
     avg_time_dict[i_RL] = avg_time_data
 
     # Update min & max values, if necessary
@@ -137,10 +136,18 @@ for i_RL in range(n_RL):
     avg_time_min = np.min([avg_time_min, np.min(avg_time_data)])
     avg_time_max = np.max([avg_time_max, np.max(avg_time_data)])
 
+    # Action dimension 
+    action_dim_aux      = action_dict[i_RL].shape[1]
+    if i_RL == 0:
+        action_dim = action_dim_aux
+    else:
+        assert action_dim == action_dim_aux, f"Different action dimension found in '{action_file}', with {action_dim} != {action_dim_aux}"
+    
     # Logging    
     print(f"\nAction data imported from file '{action_file}'")
     print(f"Time data imported from file '{time_file}'")
 
+print(f"\nAction dimension: {action_dim}")
 print("\nData imported successfully!")
 
 #-----------------------------------------------------------------------------------------
