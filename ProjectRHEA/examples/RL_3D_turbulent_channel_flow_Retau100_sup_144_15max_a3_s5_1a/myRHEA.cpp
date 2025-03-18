@@ -1561,13 +1561,13 @@ void myRHEA::manageStreamwiseBulkVelocity() {
     if ( avg_u_bulk_numeric >= avg_u_bulk_max && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time_aux = current_time + 2.0 * actuation_period + delta_t;
+        final_time_aux = current_time + 3.0 * actuation_period;
         if (final_time_aux < final_time) final_time = final_time_aux; 
         if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk " << avg_u_bulk_max << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
     } else if ( avg_u_bulk_numeric <= avg_u_bulk_min && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time_aux = current_time + 2.0 * actuation_period + delta_t;
+        final_time_aux = current_time + 3.0 * actuation_period;
         if (final_time_aux < final_time) final_time = final_time_aux; 
         if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as minimum avg_u_bulk " << avg_u_bulk_min << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
     } else {
@@ -2092,10 +2092,10 @@ void myRHEA::preproceWitnessPoints() {
     // Each mpi process updates attribute 'state_local_size2'
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
     /// each observation point / slide includes 3-D state data: ( Rkk, theta_1, theta_2, theta_3, xmap_1, xmap_2, y / delta )
-    this->state_local_size2 = 4 * state_local_size2_counter;
+    this->state_local_size2 = 5 * state_local_size2_counter;
 #else
     /// each observation point / slide includes 2-D state data: ( Rkk, theta_1, theta_2, theta_3, xmap_1, xmap_2 )
-    this->state_local_size2 = 3 * state_local_size2_counter;
+    this->state_local_size2 = 4 * state_local_size2_counter;
 #endif
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
@@ -2411,8 +2411,9 @@ void myRHEA::updateState() {
                     state_local[state_local_size2_counter]   += std::pow(Rkk_field[I1D(i,j_index,k)],    2.0);
                     state_local[state_local_size2_counter+1] += std::pow(xmap1_field[I1D(i,j_index,k)],  2.0);
                     state_local[state_local_size2_counter+2] += std::pow(xmap2_field[I1D(i,j_index,k)],  2.0);
+                    state_local[state_local_size2_counter+3] += std::pow(avg_u_field[I1D(i,j_index,k)],  2.0);
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-                    state_local[state_local_size2_counter+3] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
+                    state_local[state_local_size2_counter+4] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
                     xz_slice_points_counter += 1;
                 }
@@ -2420,8 +2421,9 @@ void myRHEA::updateState() {
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
             state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
             state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter );
-            #if _INCLUDE_YCOORD_INTO_RL_STATE_
             state_local[state_local_size2_counter+3] = std::sqrt( state_local[state_local_size2_counter+3] / xz_slice_points_counter );
+            #if _INCLUDE_YCOORD_INTO_RL_STATE_
+            state_local[state_local_size2_counter+4] = std::sqrt( state_local[state_local_size2_counter+4] / xz_slice_points_counter );
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 
 #else ///  _WITNESS_XZ_SLICES_ 0
@@ -2433,16 +2435,17 @@ void myRHEA::updateState() {
             state_local[state_local_size2_counter]   = Rkk_field[I1D(i_index,j_index,k_index)];
             state_local[state_local_size2_counter+1] = xmap1_field[I1D(i_index,j_index,k_index)];
             state_local[state_local_size2_counter+2] = xmap2_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+3] = avg_u_field[I1D(i_index,j_index,k_index)];
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+3] = y_field[I1D(i_index,j_index,k_index)] / delta;
+            state_local[state_local_size2_counter+4] = y_field[I1D(i_index,j_index,k_index)] / delta;
 #endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
 #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local_size2_counter += 4;
+            state_local_size2_counter += 5;
 #else
-            state_local_size2_counter += 3;
+            state_local_size2_counter += 4;
 #endif
         }
     }
