@@ -168,7 +168,7 @@ print("\nData imported successfully!")
 local_reward_min  = int(local_reward_min)-1
 local_reward_max  = int(local_reward_max)+1
 reward_min        = int(reward_min)-1
-reward_max        = int(np.max(reward_data))+1
+reward_max        = int(reward_max)+1
 local_reward_lim  = [local_reward_min, local_reward_max]
 reward_lim        = [reward_min, reward_max]
 avg_time_lim      = [avg_time_min, avg_time_max]
