@@ -83,7 +83,7 @@ params = {
     "shared_vars_l2_reg": 1e-5,
     # Regularization for any shared parameters between the policy and value networks
     # Recommended: 1e-4 - 1e-3, or set the same as the policy/value L2 regularization values
-    "value_pred_loss_coef": 1e-4,
+    "value_pred_loss_coef": 1e-5,
     # This coefficient balances the weight of the value prediction loss in the overall loss function
     # Recommended: 0.5
     # If the value function is underperforming, you can increase it to give more weight to value function learning 
