@@ -23,8 +23,7 @@ using namespace std;
 #define _INCLUDE_YCOORD_INTO_RL_STATE_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 
-/// Pi number
-//const double pi = 2.0*asin( 1.0 );
+const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
 /// PROBLEM PARAMETERS ///
 //const double R_specific = 287.058;				/// Specific gas constant
