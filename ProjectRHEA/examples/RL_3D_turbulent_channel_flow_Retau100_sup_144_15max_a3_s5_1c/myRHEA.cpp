@@ -1524,6 +1524,9 @@ void myRHEA::outputTemporalPointProbesData() {
                     output_header_string  = "# t [s], x [m], y [m], z[m], rho [kg/m3], u [m/s], v [m/s], w [m/s]";
                     output_header_string += ", avg_u [m/s], avg_v [m/s], avg_w [m/s]";
                     output_header_string += ", rmsf_u [m/s], rmsf_v [m/s], rmsf_w [m/s]";
+                    output_header_string += ", rhou_inv_flux [kg/m2s2], rhov_inv_flux [kg/m2s2], rhow_inv_flux [kg/m2s2]";
+                    output_header_string += ", rhou_vis_flux [kg/m2s2], rhov_vis_flux [kg/m2s2], rhow_vis_flux [kg/m2s2]";
+                    output_header_string += ", f_rhou_field [kg/m2s2], f_rhov_field [kg/m2s2], f_rhow_field [kg/m2s2]";
                     output_header_string += ", rl_f_rhou [kg/m2s2], rl_f_rhov [kg/m2s2], rl_f_rhow [kg/m2s2]";
                     /// Generate data string
                     ostringstream sstr; sstr.precision( fstream_precision ); sstr << fixed;
@@ -1541,6 +1544,15 @@ void myRHEA::outputTemporalPointProbesData() {
                     sstr << "," << rmsf_u_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rmsf_v_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rmsf_w_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rhou_inv_flux[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rhov_inv_flux[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rhow_inv_flux[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rhou_vis_flux[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rhov_vis_flux[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rhow_vis_flux[I1D(i_index,j_index,k_index)];                    
+                    sstr << "," << f_rhou_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << f_rhov_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << f_rhow_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhou_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhov_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhow_field[I1D(i_index,j_index,k_index)];
