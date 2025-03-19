@@ -1504,12 +1504,56 @@ void myRHEA::timeAdvanceConservedVariables() {
 
 
 void myRHEA::outputTemporalPointProbesData() {
-
     if (tag == "0") {
-        FlowSolverRHEA::outputTemporalPointProbesData();
+        /// Initialize MPI stuff
+        int my_rank, world_size;
+        MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+        /// Iterate through temporal point probes
+        for(int tpp = 0; tpp < number_temporal_point_probes; ++tpp) {
+            /// Write temporal point probe data to file (if criterion satisfied)
+            if( current_time_iter%tpp_output_frequency_iters[tpp] == 0 ) {
+                /// Owner rank writes to file
+                if( temporal_point_probes[tpp].getGlobalOwnerRank() == my_rank ) {
+                    int i_index, j_index, k_index;
+                    /// Get local indices i, j, k
+                    i_index = temporal_point_probes[tpp].getLocalIndexI(); 
+                    j_index = temporal_point_probes[tpp].getLocalIndexJ(); 
+                    k_index = temporal_point_probes[tpp].getLocalIndexK();
+                    /// Generate header string
+                    string output_header_string; 
+                    output_header_string  = "# t [s], x [m], y [m], z[m], rho [kg/m3], u [m/s], v [m/s], w [m/s]";
+                    output_header_string += ", avg_u [m/s], avg_v [m/s], avg_w [m/s]";
+                    output_header_string += ", rmsf_u [m/s], rmsf_v [m/s], rmsf_w [m/s]";
+                    output_header_string += ", rl_f_rhou [kg/m2s2], rl_f_rhov [kg/m2s2], rl_f_rhow [kg/m2s2]";
+                    /// Generate data string
+                    ostringstream sstr; sstr.precision( fstream_precision ); sstr << fixed;
+                    sstr << current_time;
+                    sstr << "," << x_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << y_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << z_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rho_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << u_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << v_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << w_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << avg_u_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << avg_v_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << avg_w_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rmsf_u_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rmsf_v_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rmsf_w_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhou_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhov_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhow_field[I1D(i_index,j_index,k_index)];
+                    string output_data_string = sstr.str();
+                    /// Write (header string) data string to file
+                    temporal_point_probes[tpp].writeDataStringToOutputFile(output_header_string, output_data_string);
+                }
+            }
+        }	    
     }
-
 };
+
 
 void myRHEA::manageStreamwiseBulkVelocity() {
 
