@@ -1781,3 +1781,38 @@ class ChannelVisualizer():
         frames.append(img)
         plt.close()
         return frames
+
+# ------------------------------------ RHS terms of drhou/dt, drhov/dt, drhow/dt -------------------------------------------
+
+    def build_rhovel_fig_from_dicts(self, y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim, vel_name):
+        #import pdb; pdb.set_trace()
+        y_coord_name_list = list(y_plus_dict.keys()) 
+        n_y_coord         = len(y_coord_name_list)
+        colors_list       = ['black','tab:blue','tab:green','tab:orange']
+        assert n_y_coord == 4
+        colors_dict       = dict(map(lambda k,v : (k,v), y_coord_name_list, colors_list))
+        # Plot Euu vs kplus
+        fig, ax = plt.subplots(figsize=(12, 6))
+        for y_coord in y_coord_name_list:
+            plt.plot(time, rhovel_dict[y_coord],      color=colors_dict[y_coord], linestyle='solid',          lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} value")
+            plt.plot(time, rhovel_inv_dict[y_coord],  color=colors_dict[y_coord], linestyle='dotted',         lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} inv.")
+            plt.plot(time, rhovel_vis_dict[y_coord],  color=colors_dict[y_coord], linestyle='dashed',         lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} vis.")
+            plt.plot(time, f_rhovel_dict[y_coord],    color=colors_dict[y_coord], linestyle='dashdot',        lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} forcing")
+            plt.plot(time, rl_f_rhovel_dict[y_coord], color=colors_dict[y_coord], linestyle='densely dashed', lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} RL")
+        plt.xlabel(r"time [s]")
+        plt.ylabel(rf"RHS terms of N-S eq. $\rho{{vel_name}}")
+        if ylim is not None:
+            plt.ylim(ylim)
+        plt.grid(True)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.title(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
+        plt.tight_layout()
+        return fig
+
+    def build_rhovel_frame_from_dicts(self, frames_rhovel, y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim=None, vel_name='u'):
+        fig = self.build_rhovel_fig_from_dicts(y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim, vel_name)
+        fig.canvas.draw()
+        img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        frames_rhovel.append(img)
+        plt.close()
+        return frames_rhovel
