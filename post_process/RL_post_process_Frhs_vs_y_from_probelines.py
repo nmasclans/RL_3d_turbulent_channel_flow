@@ -31,8 +31,22 @@ if not os.path.exists(postDir):
 # RL probelines data directory
 probelines_dir_RL = os.path.join(case_dir, "rhea_exp", "temporal_time_probes")
 
-# tavg0, time at which statistic averaging is activated (idem for non-RL and RL)
-tavg0_RL    = 318.99999999
+# Flow parameters 
+if np.isclose(Re_tau, 100, atol=1e-8):  # Re_tau = 100
+    Re_tau = 100.0
+elif np.isclose(Re_tau, 180, atol=1e-8):
+    Re_tau = 180.0
+else:
+    raise ValueError(f"Not implemented Re_tau = {Re_tau}")
+u_tau = 1.0
+rho0  = 1.0  
+delta = 1.0
+mu0   = rho0 * u_tau / Re_tau  # = 1.0 / Re_tau
+nu0   = mu0 / rho0             # = 1.0 / Re_tau
+print(f"\nFlow parameters: \n- Re_tau: {Re_tau}\n- u_tau: {u_tau}\n- rho0: {rho0}\n- mu0: {mu0}\n- nu0: {nu0}")
+
+# Simulation parameters
+tavg0_RL = 318.99999999
 
 # Probes y-coordinates at RL agent location - center y-coordinate of control cubes
 # > probes distributed along z-axis:
@@ -77,22 +91,22 @@ fontsize         = 18
 
 # Probelines csv parameters
 time_key      = "# t [s]"
-y_key         = " y[m]"
-u_key         = "u [m/s]"
-v_key         = "v [m/s]"
-w_key         = "w [m/s]"
-rhou_inv_key  = "rhou_inv_flux [kg/m2s2]"
-rhov_inv_key  = "rhov_inv_flux [kg/m2s2]"
-rhow_inv_key  = "rhow_inv_flux [kg/m2s2]"
-rhou_vis_key  = "rhou_vis_flux [kg/m2s2]"
-rhov_vis_key  = "rhov_vis_flux [kg/m2s2]"
-rhow_vis_key  = "rhow_vis_flux [kg/m2s2]"
-f_rhou_key    = "f_rhou_field [kg/m2s2]"
-f_rhov_key    = "f_rhov_field [kg/m2s2]"
-f_rhow_key    = "f_rhow_field [kg/m2s2]"
-rl_f_rhou_key = "rl_f_rhou [kg/m2s2]"
-rl_f_rhov_key = "rl_f_rhov [kg/m2s2]"
-rl_f_rhow_key = "rl_f_rhow [kg/m2s2]"
+y_key         = " y [m]"
+u_key         = " u [m/s]"
+v_key         = " v [m/s]"
+w_key         = " w [m/s]"
+rhou_inv_key  = " rhou_inv_flux [kg/m2s2]"
+rhov_inv_key  = " rhov_inv_flux [kg/m2s2]"
+rhow_inv_key  = " rhow_inv_flux [kg/m2s2]"
+rhou_vis_key  = " rhou_vis_flux [kg/m2s2]"
+rhov_vis_key  = " rhov_vis_flux [kg/m2s2]"
+rhow_vis_key  = " rhow_vis_flux [kg/m2s2]"
+f_rhou_key    = " f_rhou_field [kg/m2s2]"
+f_rhov_key    = " f_rhov_field [kg/m2s2]"
+f_rhow_key    = " f_rhow_field [kg/m2s2]"
+rl_f_rhou_key = " rl_f_rhou [kg/m2s2]"
+rl_f_rhov_key = " rl_f_rhov [kg/m2s2]"
+rl_f_rhow_key = " rl_f_rhow [kg/m2s2]"
 vars_keys     = [time_key, y_key, u_key, v_key, w_key,
                  rhou_inv_key, rhov_inv_key, rhow_inv_key, 
                  rhou_vis_key, rhov_vis_key, rhow_vis_key, 
@@ -151,11 +165,10 @@ for episode in episodes_name_RL:
 print("\nAll files exist :)")
 
 #--------------------------------------------------------------------------------------------
+
 # --- Get probelines data ---
 print("\nImporting probelines data...")
 
-# --- RL data ---
-print("\nImporting probelines RL data...")
 tavg_atEpStart_dict_RL = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
 time_atEpStart_dict_RL = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
 time_dict_RL           = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
@@ -176,7 +189,9 @@ f_rhow_dict_RL         = {episode: {probe: None for probe in probes_name} for ep
 rl_f_rhou_dict_RL      = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
 rl_f_rhov_dict_RL      = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
 rl_f_rhow_dict_RL      = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+episode_counter = 0
 for episode in episodes_name_RL:
+    print(f"{episode_counter/n_episodes_RL*100:.0f}%"); episode_counter += 1
     for probe in probes_name:
         # Get data from csv file
         file = filename_dict_RL[episode][probe]
@@ -232,7 +247,8 @@ time_atEpStart_RL = check_uniform_nested_dict(time_atEpStart_dict_RL)
 del tavg_atEpStart_dict_RL, time_atEpStart_dict_RL
 
 #--------------------------------------------------------------------------------------------
-# Ensemble-Average probelines variables with the same y-coord, assuming all probelines are generated at same time instants
+
+# ----- Ensemble-Average probelines variables with the same y-coord, assuming all probelines are generated at same time instants
 print("\nAveraging probelines spectral data...")
 
 # Get time and y+ for first averaging probe, which will be used ensure all probelines from the ensemble (same y-coord) have the same time and y+ values
@@ -240,8 +256,8 @@ ensemble_y_plus_dict_RL      = {episode: {y_coord: None for y_coord in y_coord_n
 ensemble_time_dict_RL        = {episode: None for episode in episodes_name_RL}
 ensemble_global_step_dict_RL = {episode: None for episode in episodes_name_RL}
 for episode in episodes_name_RL:
-    ensemble_time_dict_RL[episode]        = time_dict_RL[episode][y_coord_name_list[0]]
-    ensemble_global_step_dict_RL[episode] = global_step_dict_RL[episode][y_coord_name_list[0]]
+    ensemble_time_dict_RL[episode]        = time_dict_RL[episode][probes_name[0]]
+    ensemble_global_step_dict_RL[episode] = global_step_dict_RL[episode][probes_name[0]]
     for y_coord in y_coord_name_list:
         avg_probes = y_coord_name_vs_probes_name_dict[y_coord]
         probe = avg_probes[0]
@@ -264,28 +280,45 @@ ensemble_rl_f_rhou_dict_RL = {episode: {y_coord: None for y_coord in y_coord_nam
 ensemble_rl_f_rhov_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
 ensemble_rl_f_rhow_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
 for episode in episodes_name_RL:
-    assert np.isequal(ensemble_time_dict_RL[episode],        time_dict_RL[episode][probe])
-    assert np.isequal(ensemble_global_step_dict_RL[episode], global_step_dict_RL[episode][probe])
+    assert np.allclose(ensemble_time_dict_RL[episode],        time_dict_RL[episode][probe])
+    assert np.allclose(ensemble_global_step_dict_RL[episode], global_step_dict_RL[episode][probe])
     for y_coord in y_coord_name_list:
         avg_probes = y_coord_name_vs_probes_name_dict[y_coord]
         for probe in avg_probes:
             # Check all ensemble probelines use the same temporal vector
-            assert np.isequal(ensemble_y_plus_dict_RL[episode][y_coord], y_plus_dict_RL[episode][probe]).all()
-            ensemble_u_dict_RL[episode][y_coord]         += u_dict_RL[episode][probe]
-            ensemble_v_dict_RL[episode][y_coord]         += v_dict_RL[episode][probe]
-            ensemble_w_dict_RL[episode][y_coord]         += w_dict_RL[episode][probe]
-            ensemble_rhou_inv_dict_RL[episode][y_coord]  += rhou_inv_dict_RL[episode][probe]
-            ensemble_rhov_inv_dict_RL[episode][y_coord]  += rhov_inv_dict_RL[episode][probe]
-            ensemble_rhow_inv_dict_RL[episode][y_coord]  += rhow_inv_dict_RL[episode][probe]
-            ensemble_rhou_vis_dict_RL[episode][y_coord]  += rhou_vis_dict_RL[episode][probe]
-            ensemble_rhov_vis_dict_RL[episode][y_coord]  += rhov_vis_dict_RL[episode][probe]
-            ensemble_rhow_vis_dict_RL[episode][y_coord]  += rhow_vis_dict_RL[episode][probe]
-            ensemble_f_rhou_dict_RL[episode][y_coord]    += f_rhou_dict_RL[episode][probe]
-            ensemble_f_rhov_dict_RL[episode][y_coord]    += f_rhov_dict_RL[episode][probe]
-            ensemble_f_rhow_dict_RL[episode][y_coord]    += f_rhow_dict_RL[episode][probe]
-            ensemble_rl_f_rhou_dict_RL[episode][y_coord] += rl_f_rhou_dict_RL[episode][probe]
-            ensemble_rl_f_rhov_dict_RL[episode][y_coord] += rl_f_rhov_dict_RL[episode][probe]
-            ensemble_rl_f_rhow_dict_RL[episode][y_coord] += rl_f_rhow_dict_RL[episode][probe]
+            assert np.allclose(ensemble_y_plus_dict_RL[episode][y_coord], y_plus_dict_RL[episode][probe])
+            if probe == avg_probes[0]:
+                ensemble_u_dict_RL[episode][y_coord]         = u_dict_RL[episode][probe]
+                ensemble_v_dict_RL[episode][y_coord]         = v_dict_RL[episode][probe]
+                ensemble_w_dict_RL[episode][y_coord]         = w_dict_RL[episode][probe]
+                ensemble_rhou_inv_dict_RL[episode][y_coord]  = rhou_inv_dict_RL[episode][probe]
+                ensemble_rhov_inv_dict_RL[episode][y_coord]  = rhov_inv_dict_RL[episode][probe]
+                ensemble_rhow_inv_dict_RL[episode][y_coord]  = rhow_inv_dict_RL[episode][probe]
+                ensemble_rhou_vis_dict_RL[episode][y_coord]  = rhou_vis_dict_RL[episode][probe]
+                ensemble_rhov_vis_dict_RL[episode][y_coord]  = rhov_vis_dict_RL[episode][probe]
+                ensemble_rhow_vis_dict_RL[episode][y_coord]  = rhow_vis_dict_RL[episode][probe]
+                ensemble_f_rhou_dict_RL[episode][y_coord]    = f_rhou_dict_RL[episode][probe]
+                ensemble_f_rhov_dict_RL[episode][y_coord]    = f_rhov_dict_RL[episode][probe]
+                ensemble_f_rhow_dict_RL[episode][y_coord]    = f_rhow_dict_RL[episode][probe]
+                ensemble_rl_f_rhou_dict_RL[episode][y_coord] = rl_f_rhou_dict_RL[episode][probe]
+                ensemble_rl_f_rhov_dict_RL[episode][y_coord] = rl_f_rhov_dict_RL[episode][probe]
+                ensemble_rl_f_rhow_dict_RL[episode][y_coord] = rl_f_rhow_dict_RL[episode][probe]
+            else:
+                ensemble_u_dict_RL[episode][y_coord]         += u_dict_RL[episode][probe]
+                ensemble_v_dict_RL[episode][y_coord]         += v_dict_RL[episode][probe]
+                ensemble_w_dict_RL[episode][y_coord]         += w_dict_RL[episode][probe]
+                ensemble_rhou_inv_dict_RL[episode][y_coord]  += rhou_inv_dict_RL[episode][probe]
+                ensemble_rhov_inv_dict_RL[episode][y_coord]  += rhov_inv_dict_RL[episode][probe]
+                ensemble_rhow_inv_dict_RL[episode][y_coord]  += rhow_inv_dict_RL[episode][probe]
+                ensemble_rhou_vis_dict_RL[episode][y_coord]  += rhou_vis_dict_RL[episode][probe]
+                ensemble_rhov_vis_dict_RL[episode][y_coord]  += rhov_vis_dict_RL[episode][probe]
+                ensemble_rhow_vis_dict_RL[episode][y_coord]  += rhow_vis_dict_RL[episode][probe]
+                ensemble_f_rhou_dict_RL[episode][y_coord]    += f_rhou_dict_RL[episode][probe]
+                ensemble_f_rhov_dict_RL[episode][y_coord]    += f_rhov_dict_RL[episode][probe]
+                ensemble_f_rhow_dict_RL[episode][y_coord]    += f_rhow_dict_RL[episode][probe]
+                ensemble_rl_f_rhou_dict_RL[episode][y_coord] += rl_f_rhou_dict_RL[episode][probe]
+                ensemble_rl_f_rhov_dict_RL[episode][y_coord] += rl_f_rhov_dict_RL[episode][probe]
+                ensemble_rl_f_rhow_dict_RL[episode][y_coord] += rl_f_rhow_dict_RL[episode][probe]
         ensemble_u_dict_RL[episode][y_coord]         /= len(avg_probes)
         ensemble_v_dict_RL[episode][y_coord]         /= len(avg_probes)
         ensemble_w_dict_RL[episode][y_coord]         /= len(avg_probes)
@@ -306,7 +339,6 @@ for episode in episodes_name_RL:
 # Plot RHS terms of drhou/dt, drhov/dt, drhow/dt N-S equations
 # Assuming ct. rho = 1 everywhere in the domain
 print("\nBuild frames...")
-
 frames_rhou = []; frames_rhov = []; frames_rhow = []
 for episode in episodes_name_RL:
     frames_rhou = visualizer.build_rhovel_frame_from_dicts(
@@ -324,7 +356,8 @@ for episode in episodes_name_RL:
         ensemble_w_dict_RL[episode], ensemble_rhow_inv_dict_RL[episode], ensemble_rhow_vis_dict_RL[episode], ensemble_f_rhow_dict_RL[episode], ensemble_rl_f_rhow_dict_RL[episode],
         tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode], ylim=None, vel_name='w',
     )
+
 print("\nSave gifs from frames...")
-frames_dict = {'rhou_rhs_vs_time': frames_u, 'rhov_rhs_vs_time': frames_v, 'rhow_rhs_vs_time': frames_w }
+frames_dict = {'rhs_rhou': frames_rhou, 'rhs_rhov': frames_rhov, 'rhs_rhow': frames_rhow }
 visualizer.build_main_gifs_from_frames(frames_dict)
 print("Gifs plotted successfully!")

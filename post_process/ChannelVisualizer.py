@@ -1788,25 +1788,26 @@ class ChannelVisualizer():
         #import pdb; pdb.set_trace()
         y_coord_name_list = list(y_plus_dict.keys()) 
         n_y_coord         = len(y_coord_name_list)
-        colors_list       = ['black','tab:blue','tab:green','tab:orange']
+        colors_list       = ['black','tab:blue','tab:green','tab:orange', 'tab:purple']
         assert n_y_coord == 4
-        colors_dict       = dict(map(lambda k,v : (k,v), y_coord_name_list, colors_list))
-        # Plot Euu vs kplus
-        fig, ax = plt.subplots(figsize=(12, 6))
-        for y_coord in y_coord_name_list:
-            plt.plot(time, rhovel_dict[y_coord],      color=colors_dict[y_coord], linestyle='solid',          lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} value")
-            plt.plot(time, rhovel_inv_dict[y_coord],  color=colors_dict[y_coord], linestyle='dotted',         lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} inv.")
-            plt.plot(time, rhovel_vis_dict[y_coord],  color=colors_dict[y_coord], linestyle='dashed',         lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} vis.")
-            plt.plot(time, f_rhovel_dict[y_coord],    color=colors_dict[y_coord], linestyle='dashdot',        lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} forcing")
-            plt.plot(time, rl_f_rhovel_dict[y_coord], color=colors_dict[y_coord], linestyle='densely dashed', lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, $\rho{vel_name} RL")
-        plt.xlabel(r"time [s]")
-        plt.ylabel(rf"RHS terms of N-S eq. $\rho{{vel_name}}")
-        if ylim is not None:
-            plt.ylim(ylim)
-        plt.grid(True)
+        fig, ax = plt.subplots(n_y_coord, figsize=(8,12), sharex=True)
+        for i in range(n_y_coord):
+            y_coord = y_coord_name_list[i]
+            ax[i].plot(time, rhovel_dict[y_coord],      color=colors_list[0], lw=2, label=rf"$\rho {vel_name}$ value")
+            ax[i].plot(time, rhovel_inv_dict[y_coord],  color=colors_list[1], lw=2, label=rf"$\rho {vel_name}$ inv.")
+            ax[i].plot(time, rhovel_vis_dict[y_coord],  color=colors_list[2], lw=2, label=rf"$\rho {vel_name}$ vis.")
+            ax[i].plot(time, f_rhovel_dict[y_coord],    color=colors_list[3], lw=2, label=rf"$\rho {vel_name}$ forcing")
+            ax[i].plot(time, rl_f_rhovel_dict[y_coord], color=colors_list[4], lw=2, label=rf"$\rho {vel_name}$ RL")
+            ax[i].set_title(rf"$y^+={y_plus_dict[y_coord]:.2f}$", pad=10)
+            if ylim is not None:
+                ax[i].set_ylim(ylim)
+            ax[i].grid()
+            if i < n_y_coord - 1:
+                ax[i].tick_params(labelbottom=False)
+        ax[-1].set_xlabel(r"time [s]", labelpad=10)
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.title(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
-        plt.tight_layout()
+        plt.suptitle(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = ${global_step}$", y=0.98)
+        plt.subplots_adjust(hspace=0.5, top=0.93, bottom=0.15)
         return fig
 
     def build_rhovel_frame_from_dicts(self, frames_rhovel, y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim=None, vel_name='u'):
