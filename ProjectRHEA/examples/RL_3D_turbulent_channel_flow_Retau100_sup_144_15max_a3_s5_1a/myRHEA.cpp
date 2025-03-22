@@ -22,6 +22,7 @@ using namespace std;
 #define _WITNESS_XZ_SLICES_ 1
 #define _INCLUDE_YCOORD_INTO_RL_STATE_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
+#define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
@@ -1399,7 +1400,8 @@ void myRHEA::timeAdvanceConservedVariables() {
         }
     }
 #endif  /// of _TEMPORAL_SMOOTHING_RL_ACTION_
-    
+
+#if _ZERO_NET_FLUX_PERTURBATION_LOAD_
     /// ------------------------------------------------------------------- 
     ///                 PERTURBATION LOAD INTEGRATION 
     /// -------------------------------------------------------------------
@@ -1433,17 +1435,18 @@ void myRHEA::timeAdvanceConservedVariables() {
     MPI_Allreduce(&local_rl_f_rhou_volume, &global_rl_f_rhou_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     MPI_Allreduce(&local_rl_f_rhov_volume, &global_rl_f_rhov_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     MPI_Allreduce(&local_rl_f_rhow_volume, &global_rl_f_rhow_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    
+#endif 
 
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
+#if _ZERO_NET_FLUX_PERTURBATION_LOAD_
                 /// Enforce net flux zero of the RL perturbation load
                 rl_f_rhou_field[I1D(i,j,k)] -= global_rl_f_rhou_volume / global_volume; 
                 rl_f_rhov_field[I1D(i,j,k)] -= global_rl_f_rhov_volume / global_volume;
                 rl_f_rhow_field[I1D(i,j,k)] -= global_rl_f_rhow_volume / global_volume;
-
+#endif
                 /// Work of momentum sources
                 f_rhouvw = (f_rhou_field[I1D(i,j,k)] + rl_f_rhou_field[I1D(i,j,k)]) * u_field[I1D(i,j,k)]
                          + (f_rhov_field[I1D(i,j,k)] + rl_f_rhov_field[I1D(i,j,k)]) * v_field[I1D(i,j,k)]
