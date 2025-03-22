@@ -1790,10 +1790,10 @@ class ChannelVisualizer():
         n_y_coord         = len(y_coord_name_list)
         colors_list       = ['black','tab:blue','tab:green','tab:orange', 'tab:purple']
         assert n_y_coord == 4
-        fig, ax = plt.subplots(n_y_coord, figsize=(8,12), sharex=True)
+        fig, ax = plt.subplots(n_y_coord, figsize=(12,10), sharex=True)
         for i in range(n_y_coord):
             y_coord = y_coord_name_list[i]
-            ax[i].plot(time, rhovel_dict[y_coord],      color=colors_list[0], lw=2, label=rf"$\rho {vel_name}$ value")
+            ax[i].plot(time, rhovel_dict[y_coord],      color=colors_list[i], lw=2, label=rf"$\rho {vel_name}$ value")
             ax[i].plot(time, rhovel_inv_dict[y_coord],  color=colors_list[1], lw=2, label=rf"$\rho {vel_name}$ inv.")
             ax[i].plot(time, rhovel_vis_dict[y_coord],  color=colors_list[2], lw=2, label=rf"$\rho {vel_name}$ vis.")
             ax[i].plot(time, f_rhovel_dict[y_coord],    color=colors_list[3], lw=2, label=rf"$\rho {vel_name}$ forcing")
@@ -1805,9 +1805,11 @@ class ChannelVisualizer():
             if i < n_y_coord - 1:
                 ax[i].tick_params(labelbottom=False)
         ax[-1].set_xlabel(r"time [s]", labelpad=10)
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.suptitle(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = ${global_step}$", y=0.98)
-        plt.subplots_adjust(hspace=0.5, top=0.93, bottom=0.15)
+        handles, labels = ax[-1].get_legend_handles_labels()
+        fig.subplots_adjust(right=0.75)
+        fig.legend(handles, labels, loc='center left', bbox_to_anchor=(1.02,0.5), fontsize=12)
+        plt.suptitle(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = ${global_step}$", y=0.97)
+        plt.subplots_adjust(hspace=0.8, top=0.88, bottom=0.1)
         return fig
 
     def build_rhovel_frame_from_dicts(self, frames_rhovel, y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim=None, vel_name='u'):
