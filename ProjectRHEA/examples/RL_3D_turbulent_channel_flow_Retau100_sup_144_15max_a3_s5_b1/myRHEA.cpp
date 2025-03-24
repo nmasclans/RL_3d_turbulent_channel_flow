@@ -954,7 +954,7 @@ void myRHEA::calculateSourceTerms() {
                                     /// Get perturbation values from RL agent
                                     actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
                                     if (action_dim == 1) {
-                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                        DeltaRkk   = 5.0 * action_global[actuation_idx * action_dim + 0];
                                         DeltaPhi1  = 0.0;
                                         DeltaPhi2  = 0.0;
                                         DeltaPhi3  = 0.0;
@@ -968,7 +968,7 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaXmap1 = action_global[actuation_idx * action_dim + 0];
                                         DeltaXmap2 = action_global[actuation_idx * action_dim + 1];
                                     } else if (action_dim == 3) {
-                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                        DeltaRkk   = 5.0 * action_global[actuation_idx * action_dim + 0];
                                         DeltaPhi1  = 0.0;
                                         DeltaPhi2  = 0.0;
                                         DeltaPhi3  = 0.0;
@@ -982,7 +982,7 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaXmap1 = action_global[actuation_idx * action_dim + 3];
                                         DeltaXmap2 = action_global[actuation_idx * action_dim + 4];
                                     } else if (action_dim == 6) {
-                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                        DeltaRkk   = 5.0 * action_global[actuation_idx * action_dim + 0];
                                         DeltaPhi1  = action_global[actuation_idx * action_dim + 1];
                                         DeltaPhi2  = action_global[actuation_idx * action_dim + 2];
                                         DeltaPhi3  = action_global[actuation_idx * action_dim + 3];
