@@ -954,7 +954,7 @@ void myRHEA::calculateSourceTerms() {
                                     /// Get perturbation values from RL agent
                                     actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
                                     if (action_dim == 1) {
-                                        DeltaRkk   = 5.0 * action_global[actuation_idx * action_dim + 0];
+                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
                                         DeltaPhi1  = 0.0;
                                         DeltaPhi2  = 0.0;
                                         DeltaPhi3  = 0.0;
@@ -968,7 +968,7 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaXmap1 = action_global[actuation_idx * action_dim + 0];
                                         DeltaXmap2 = action_global[actuation_idx * action_dim + 1];
                                     } else if (action_dim == 3) {
-                                        DeltaRkk   = 5.0 * action_global[actuation_idx * action_dim + 0];
+                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
                                         DeltaPhi1  = 0.0;
                                         DeltaPhi2  = 0.0;
                                         DeltaPhi3  = 0.0;
@@ -982,7 +982,7 @@ void myRHEA::calculateSourceTerms() {
                                         DeltaXmap1 = action_global[actuation_idx * action_dim + 3];
                                         DeltaXmap2 = action_global[actuation_idx * action_dim + 4];
                                     } else if (action_dim == 6) {
-                                        DeltaRkk   = 5.0 * action_global[actuation_idx * action_dim + 0];
+                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
                                         DeltaPhi1  = action_global[actuation_idx * action_dim + 1];
                                         DeltaPhi2  = action_global[actuation_idx * action_dim + 2];
                                         DeltaPhi3  = action_global[actuation_idx * action_dim + 3];
@@ -1006,8 +1006,8 @@ void myRHEA::calculateSourceTerms() {
                                     } else {
 
                                         /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
-                                        /// Delta_* are standarized values between 'action_bounds' RL parameter
-                                        Rkk_field[I1D(i,j,k)]    += DeltaRkk   * 1.0;
+                                        /// Delta_* are standarized values between 'action_bounds' RL parameter > normalize actions to desired action bounds
+                                        Rkk_field[I1D(i,j,k)]    += DeltaRkk   * 5.0;
                                         phi1_field[I1D(i,j,k)]   += DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
                                         phi2_field[I1D(i,j,k)]   += DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
                                         phi3_field[I1D(i,j,k)]   += DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
