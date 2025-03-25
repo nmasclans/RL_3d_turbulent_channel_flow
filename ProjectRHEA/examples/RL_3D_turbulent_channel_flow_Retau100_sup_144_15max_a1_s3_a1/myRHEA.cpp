@@ -920,7 +920,7 @@ void myRHEA::calculateSourceTerms() {
                     action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = action_dim * n_rl_envs (currently only 1 action variable per rl env.)
                     /// action_local  = manager->getActionLocal();  /// action_local not used
                     /// Update & Write step size (from 1) to 0 if the next time that we require actuation value is the last one
-                    if (current_time + 2.0 * actuation_period > final_time) {
+                    if ( current_time + 2.0 * ( actuation_period + delta_t ) >= final_time ) {
                         if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Set RL Step '0' to terminate episode at time: " << current_time << ", iteration: " << current_time_iter << endl;
                         manager->writeStepType(0, step_type_key);
                         last_communication = true;
@@ -1620,15 +1620,15 @@ void myRHEA::manageStreamwiseBulkVelocity() {
     if ( avg_u_bulk_numeric >= avg_u_bulk_max && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time_aux = current_time + 3.0 * actuation_period;
+        final_time_aux = current_time + 3.0 * ( actuation_period + delta_t );
         if (final_time_aux < final_time) final_time = final_time_aux; 
-        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk " << avg_u_bulk_max << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
+        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as maximum avg_u_bulk " << avg_u_bulk_max << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << " at time " << current_time << ". Final time set to " << final_time << endl;
     } else if ( avg_u_bulk_numeric <= avg_u_bulk_min && !rl_early_episode_termination) {
         /// Only executed once, if early termination is necessary 
         rl_early_episode_termination = true;
-        final_time_aux = current_time + 3.0 * actuation_period;
+        final_time_aux = current_time + 3.0 * ( actuation_period + delta_t );
         if (final_time_aux < final_time) final_time = final_time_aux; 
-        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as minimum avg_u_bulk " << avg_u_bulk_min << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << ". Final time set to " << final_time << endl;
+        if( my_rank == 0 ) cout << endl << "RL EARLY EPISODE TERMINATION as minimum avg_u_bulk " << avg_u_bulk_min << " is reached with numerical avg_u_bulk " << avg_u_bulk_numeric << " at time " << current_time << ". Final time set to " << final_time << endl;
     } else {
         if( my_rank == 0 ) cout << endl << "Numerical avg_u_bulk: " << avg_u_bulk_numeric << ", time: " << current_time << ", final time: " << final_time << endl;
     }
