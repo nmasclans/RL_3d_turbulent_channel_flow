@@ -945,7 +945,7 @@ class ChannelVisualizer():
                     label=rf"RL env {i_env}: $\mu$={mean:.2f}, $\sigma$={std_dev:.2f}"
                 )
             plt.xlim(actions_lim)
-            plt.ylim([0,1])
+            #plt.ylim([0,1])
             plt.xlabel("Action " + action_dict[i_act], fontsize=16)
             plt.ylabel("PDF", fontsize=16)
             plt.title(f"RL step = {global_step}", fontsize=16)
