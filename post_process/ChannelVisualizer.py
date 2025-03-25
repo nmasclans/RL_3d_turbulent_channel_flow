@@ -1788,7 +1788,7 @@ class ChannelVisualizer():
         #import pdb; pdb.set_trace()
         y_coord_name_list = list(y_plus_dict.keys()) 
         n_y_coord         = len(y_coord_name_list)
-        colors_list       = ['black','tab:blue','tab:green','tab:orange', 'tab:purple']
+        colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
         assert n_y_coord == 4
         fig, ax = plt.subplots(2,2,figsize=(12,6))
         for i in range(n_y_coord):
