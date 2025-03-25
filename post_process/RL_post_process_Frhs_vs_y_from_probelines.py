@@ -339,8 +339,11 @@ for episode in episodes_name_RL:
 # Plot RHS terms of drhou/dt, drhov/dt, drhow/dt N-S equations
 # Assuming ct. rho = 1 everywhere in the domain
 print("\nBuild frames...")
-frames_rhou = []; frames_rhov = []; frames_rhow = []
+frames_rhou      = []; frames_rhov     = []; frames_rhow       = []
+frames_rhou_zoom = []; frames_rhov_zoom = []; frames_rhow_zoom = []
+
 for episode in episodes_name_RL:
+    # Absoule value of rho*v_i and d/rho*v_i)/dx_i terms of N-S equation
     frames_rhou = visualizer.build_rhovel_frame_from_dicts(
         frames_rhou, ensemble_y_plus_dict_RL[episode], ensemble_time_dict_RL[episode],
         ensemble_u_dict_RL[episode], ensemble_rhou_inv_dict_RL[episode], ensemble_rhou_vis_dict_RL[episode], ensemble_f_rhou_dict_RL[episode], ensemble_rl_f_rhou_dict_RL[episode],
@@ -356,8 +359,26 @@ for episode in episodes_name_RL:
         ensemble_w_dict_RL[episode], ensemble_rhow_inv_dict_RL[episode], ensemble_rhow_vis_dict_RL[episode], ensemble_f_rhow_dict_RL[episode], ensemble_rl_f_rhow_dict_RL[episode],
         tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode], ylim=None, vel_name='w',
     )
+    # Idem., but zoom to RL term range
+    frames_rhou_zoom = visualizer.build_rhovel_frame_from_dicts(
+        frames_rhou_zoom, ensemble_y_plus_dict_RL[episode], ensemble_time_dict_RL[episode],
+        ensemble_u_dict_RL[episode], ensemble_rhou_inv_dict_RL[episode], ensemble_rhou_vis_dict_RL[episode], ensemble_f_rhou_dict_RL[episode], ensemble_rl_f_rhou_dict_RL[episode],
+        tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode], ylim=[-5, 5], vel_name='u',
+    )
+    frames_rhov_zoom = visualizer.build_rhovel_frame_from_dicts(
+        frames_rhov_zoom, ensemble_y_plus_dict_RL[episode], ensemble_time_dict_RL[episode],
+        ensemble_v_dict_RL[episode], ensemble_rhov_inv_dict_RL[episode], ensemble_rhov_vis_dict_RL[episode], ensemble_f_rhov_dict_RL[episode], ensemble_rl_f_rhov_dict_RL[episode],
+        tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode], ylim=[-5, 5], vel_name='v',
+    )
+    frames_rhow_zoom = visualizer.build_rhovel_frame_from_dicts(
+        frames_rhow_zoom, ensemble_y_plus_dict_RL[episode], ensemble_time_dict_RL[episode],
+        ensemble_w_dict_RL[episode], ensemble_rhow_inv_dict_RL[episode], ensemble_rhow_vis_dict_RL[episode], ensemble_f_rhow_dict_RL[episode], ensemble_rl_f_rhow_dict_RL[episode],
+        tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode], ylim=[-5, 5], vel_name='w',
+    )
 
 print("\nSave gifs from frames...")
-frames_dict = {'rhs_rhou': frames_rhou, 'rhs_rhov': frames_rhov, 'rhs_rhow': frames_rhow }
+frames_dict      = { 'rhs_rhou':      frames_rhou,      'rhs_rhov':      frames_rhov,      'rhs_rhow': frames_rhow }
+frames_zoom_dict = { 'rhs_rhou_zoom': frames_rhou_zoom, 'rhs_rhov_zoom': frames_rhov_zoom, 'rhs_rhow_zoom': frames_rhow_zoom }
 visualizer.build_main_gifs_from_frames(frames_dict)
+visualizer.build_main_gifs_from_frames(frames_zoom_dict)
 print("Gifs plotted successfully!")
