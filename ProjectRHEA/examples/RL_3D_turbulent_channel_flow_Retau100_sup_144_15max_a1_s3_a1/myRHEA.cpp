@@ -20,7 +20,6 @@ using namespace std;
 #define _SPATIAL_SMOOTHING_RL_ACTION_ 1
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
 #define _WITNESS_XZ_SLICES_ 1
-#define _INCLUDE_YCOORD_INTO_RL_STATE_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
 
@@ -78,7 +77,9 @@ const double avg_u_bulk_min = 14.665 - 0.565;
 #endif
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
-int action_dim = 3;
+int action_dim = 1;
+int state_dim  = 3;
+
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
 /* Baricentric map coordinates, source: https://en.wikipedia.org/wiki/Barycentric_coordinate_system
@@ -1007,7 +1008,7 @@ void myRHEA::calculateSourceTerms() {
 
                                         /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
                                         /// Delta_* are standarized values between 'action_bounds' RL parameter > normalize actions to desired action bounds
-                                        Rkk_field[I1D(i,j,k)]    += DeltaRkk   * 5.0;
+                                        Rkk_field[I1D(i,j,k)]    += DeltaRkk   * 20.0;
                                         phi1_field[I1D(i,j,k)]   += DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
                                         phi2_field[I1D(i,j,k)]   += DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
                                         phi3_field[I1D(i,j,k)]   += DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
@@ -2148,13 +2149,7 @@ void myRHEA::preproceWitnessPoints() {
     }
     
     // Each mpi process updates attribute 'state_local_size2'
-#if _INCLUDE_YCOORD_INTO_RL_STATE_
-    /// each observation point / slide includes 3-D state data: ( Rkk, theta_1, theta_2, theta_3, xmap_1, xmap_2, y / delta )
-    this->state_local_size2 = 5 * state_local_size2_counter;
-#else
-    /// each observation point / slide includes 2-D state data: ( Rkk, theta_1, theta_2, theta_3, xmap_1, xmap_2 )
-    this->state_local_size2 = 4 * state_local_size2_counter;
-#endif
+    this->state_local_size2 = state_dim * state_local_size2_counter;
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, can be deleted?
@@ -2466,23 +2461,15 @@ void myRHEA::updateState() {
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
 
-                    state_local[state_local_size2_counter]   += std::pow(Rkk_field[I1D(i,j_index,k)],    2.0);
-                    state_local[state_local_size2_counter+1] += std::pow(xmap1_field[I1D(i,j_index,k)],  2.0);
-                    state_local[state_local_size2_counter+2] += std::pow(xmap2_field[I1D(i,j_index,k)],  2.0);
-                    state_local[state_local_size2_counter+3] += std::pow(avg_u_field[I1D(i,j_index,k)],  2.0);
-#if _INCLUDE_YCOORD_INTO_RL_STATE_
-                    state_local[state_local_size2_counter+4] += std::pow(y_field[I1D(i,j_index,k)],      2.0);
-#endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
+                    state_local[state_local_size2_counter]   += std::pow(Rkk_field[I1D(i,j_index,k)],   2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+2] += std::pow(y_field[I1D(i,j_index,k)],     2.0);
                     xz_slice_points_counter += 1;
                 }
             }
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
             state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
             state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter );
-            state_local[state_local_size2_counter+3] = std::sqrt( state_local[state_local_size2_counter+3] / xz_slice_points_counter );
-            #if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+4] = std::sqrt( state_local[state_local_size2_counter+4] / xz_slice_points_counter );
-#endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
 
 #else ///  _WITNESS_XZ_SLICES_ 0
             /// Get local indices i, j, k
@@ -2491,20 +2478,12 @@ void myRHEA::updateState() {
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
             state_local[state_local_size2_counter]   = Rkk_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+1] = xmap1_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+2] = xmap2_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+3] = avg_u_field[I1D(i_index,j_index,k_index)];
-#if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local[state_local_size2_counter+4] = y_field[I1D(i_index,j_index,k_index)] / delta;
-#endif /// of _INCLUDE_YCOORD_INTO_RL_STATE_
+            state_local[state_local_size2_counter+1] = avg_u_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / delta;
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
-#if _INCLUDE_YCOORD_INTO_RL_STATE_
-            state_local_size2_counter += 5;
-#else
-            state_local_size2_counter += 4;
-#endif
+            state_local_size2_counter += state_dim;
         }
     }
 }   
