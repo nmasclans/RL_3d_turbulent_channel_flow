@@ -1085,8 +1085,8 @@ void myRHEA::calculateSourceTerms() {
 
                                 /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
                                 rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxj_j_field[I1D(i,j,k)] );
-                                rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRyj_j_field[I1D(i,j,k)] );
-                                rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRzj_j_field[I1D(i,j,k)] );
+                                rl_f_rhov_field[I1D(i,j,k)] = 0.0; /// ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRyj_j_field[I1D(i,j,k)] );
+                                rl_f_rhow_field[I1D(i,j,k)] = 0.0; /// ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRzj_j_field[I1D(i,j,k)] );
 #if _SPATIAL_SMOOTHING_RL_ACTION_
                                 /// TODO: not necessary if averaging window size 3
                                 rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
