@@ -82,6 +82,18 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray DeltaRyy_field;               /// 3-D field of DeltaRyy
         DistributedArray DeltaRyz_field;               /// 3-D field of DeltaRyz
         DistributedArray DeltaRzz_field;               /// 3-D field of DeltaRzz
+        DistributedArray d_DeltaRxx_x_field;           /// 3-D field of d_DeltaRxx_x_field
+        DistributedArray d_DeltaRxy_x_field;           /// 3-D field of d_DeltaRxy_x_field
+        DistributedArray d_DeltaRxz_x_field;           /// 3-D field of d_DeltaRxz_x_field
+        DistributedArray d_DeltaRxy_y_field;           /// 3-D field of d_DeltaRxy_y_field
+        DistributedArray d_DeltaRyy_y_field;           /// 3-D field of d_DeltaRyy_y_field
+        DistributedArray d_DeltaRyz_y_field;           /// 3-D field of d_DeltaRyz_y_field
+        DistributedArray d_DeltaRxz_z_field;           /// 3-D field of d_DeltaRxz_z_field
+        DistributedArray d_DeltaRyz_z_field;           /// 3-D field of d_DeltaRyz_z_field
+        DistributedArray d_DeltaRzz_z_field;           /// 3-D field of d_DeltaRzz_z_field
+        DistributedArray d_DeltaRxj_j_field;           /// 3-D field of d_DeltaRxj_j_field
+        DistributedArray d_DeltaRyj_j_field;           /// 3-D field of d_DeltaRyj_j_field
+        DistributedArray d_DeltaRzj_j_field;           /// 3-D field of d_DeltaRzj_j_field
         DistributedArray avg_u_reference_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         DistributedArray rmsf_u_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         DistributedArray rmsf_v_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1

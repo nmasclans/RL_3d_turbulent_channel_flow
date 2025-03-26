@@ -78,7 +78,7 @@ const double avg_u_bulk_min = 14.665 - 0.565;
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 int action_dim = 1;
-int state_dim  = 3;
+int state_dim  = 2;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -198,6 +198,18 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     DeltaRyy_field.setTopology(topo, "DeltaRyy");
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
+    d_DeltaRxx_x_field.setTopology(topo, "d_DeltaRxx_x_field"); 
+    d_DeltaRxy_x_field.setTopology(topo, "d_DeltaRxy_x_field"); 
+    d_DeltaRxz_x_field.setTopology(topo, "d_DeltaRxz_x_field"); 
+    d_DeltaRxy_y_field.setTopology(topo, "d_DeltaRxy_y_field"); 
+    d_DeltaRyy_y_field.setTopology(topo, "d_DeltaRyy_y_field"); 
+    d_DeltaRyz_y_field.setTopology(topo, "d_DeltaRyz_y_field"); 
+    d_DeltaRxz_z_field.setTopology(topo, "d_DeltaRxz_z_field"); 
+    d_DeltaRyz_z_field.setTopology(topo, "d_DeltaRyz_z_field"); 
+    d_DeltaRzz_z_field.setTopology(topo, "d_DeltaRzz_z_field"); 
+    d_DeltaRxj_j_field.setTopology(topo, "d_DeltaRxj_j_field");
+    d_DeltaRyj_j_field.setTopology(topo, "d_DeltaRyj_j_field");
+    d_DeltaRzj_j_field.setTopology(topo, "d_DeltaRzj_j_field");
     action_mask.setTopology(topo, "action_mask");
     timers->createTimer( "rl_smartredis_communications" );
     timers->createTimer( "rl_update_DeltaRij" );
@@ -1045,7 +1057,6 @@ void myRHEA::calculateSourceTerms() {
                     timers->start( "rl_update_control_term" );
 
                     /// Initialize variables
-                    double d_DeltaRxx_x, d_DeltaRxy_x, d_DeltaRxz_x, d_DeltaRxy_y, d_DeltaRyy_y, d_DeltaRyz_y, d_DeltaRxz_z, d_DeltaRyz_z, d_DeltaRzz_z;
                     double delta_x, delta_y, delta_z;
 
                     /// Calculate and incorporate perturbation load F = \partial DeltaRij / \partial xj
@@ -1059,20 +1070,23 @@ void myRHEA::calculateSourceTerms() {
                                 delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                                 
                                 /// Calculate DeltaRij derivatives
-                                d_DeltaRxx_x = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxy_x = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxz_x = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
-                                d_DeltaRxy_y = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRyy_y = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRyz_y = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
-                                d_DeltaRxz_z = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                                d_DeltaRyz_z = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
-                                d_DeltaRzz_z = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                                d_DeltaRxx_x_field[I1D(i,j,k)] = ( DeltaRxx_field[I1D(i+1,j,k)] - DeltaRxx_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                                d_DeltaRxy_x_field[I1D(i,j,k)] = ( DeltaRxy_field[I1D(i+1,j,k)] - DeltaRxy_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                                d_DeltaRxz_x_field[I1D(i,j,k)] = ( DeltaRxz_field[I1D(i+1,j,k)] - DeltaRxz_field[I1D(i-1,j,k)] ) / ( 2.0 * delta_x );
+                                d_DeltaRxy_y_field[I1D(i,j,k)] = ( DeltaRxy_field[I1D(i,j+1,k)] - DeltaRxy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                                d_DeltaRyy_y_field[I1D(i,j,k)] = ( DeltaRyy_field[I1D(i,j+1,k)] - DeltaRyy_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                                d_DeltaRyz_y_field[I1D(i,j,k)] = ( DeltaRyz_field[I1D(i,j+1,k)] - DeltaRyz_field[I1D(i,j-1,k)] ) / ( 2.0 * delta_y );
+                                d_DeltaRxz_z_field[I1D(i,j,k)] = ( DeltaRxz_field[I1D(i,j,k+1)] - DeltaRxz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                                d_DeltaRyz_z_field[I1D(i,j,k)] = ( DeltaRyz_field[I1D(i,j,k+1)] - DeltaRyz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                                d_DeltaRzz_z_field[I1D(i,j,k)] = ( DeltaRzz_field[I1D(i,j,k+1)] - DeltaRzz_field[I1D(i,j,k-1)] ) / ( 2.0 * delta_z );
+                                d_DeltaRxj_j_field[I1D(i,j,k)] = d_DeltaRxx_x_field[I1D(i,j,k)] + d_DeltaRxy_y_field[I1D(i,j,k)] + d_DeltaRxz_z_field[I1D(i,j,k)];
+                                d_DeltaRyj_j_field[I1D(i,j,k)] = d_DeltaRxy_x_field[I1D(i,j,k)] + d_DeltaRyy_y_field[I1D(i,j,k)] + d_DeltaRyz_z_field[I1D(i,j,k)];
+                                d_DeltaRzj_j_field[I1D(i,j,k)] = d_DeltaRxz_x_field[I1D(i,j,k)] + d_DeltaRyz_y_field[I1D(i,j,k)] + d_DeltaRzz_z_field[I1D(i,j,k)];
 
                                 /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
-                                rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxx_x + d_DeltaRxy_y + d_DeltaRxz_z );
-                                rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxy_x + d_DeltaRyy_y + d_DeltaRyz_z );
-                                rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxz_x + d_DeltaRyz_y + d_DeltaRzz_z );
+                                rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxj_j_field[I1D(i,j,k)] );
+                                rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRyj_j_field[I1D(i,j,k)] );
+                                rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRzj_j_field[I1D(i,j,k)] );
 #if _SPATIAL_SMOOTHING_RL_ACTION_
                                 /// TODO: not necessary if averaging window size 3
                                 rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
@@ -1528,10 +1542,16 @@ void myRHEA::outputTemporalPointProbesData() {
                     output_header_string  = "# t [s], x [m], y [m], z[m], rho [kg/m3], u [m/s], v [m/s], w [m/s]";
                     output_header_string += ", avg_u [m/s], avg_v [m/s], avg_w [m/s]";
                     output_header_string += ", rmsf_u [m/s], rmsf_v [m/s], rmsf_w [m/s]";
+	                output_header_string += ", favre_uffuff [m2/s2], favre_uffvff [m2/s2], favre_uffwff [m2/s2], favre_vffvff [m2/s2], favre_vffwff [m2/s2], favre_wffwff [m2/s2]";
                     output_header_string += ", rhou_inv_flux [kg/m2s2], rhov_inv_flux [kg/m2s2], rhow_inv_flux [kg/m2s2]";
                     output_header_string += ", rhou_vis_flux [kg/m2s2], rhov_vis_flux [kg/m2s2], rhow_vis_flux [kg/m2s2]";
-                    output_header_string += ", f_rhou_field [kg/m2s2], f_rhov_field [kg/m2s2], f_rhow_field [kg/m2s2]";
+                    output_header_string += ", f_rhou [kg/m2s2], f_rhov [kg/m2s2], f_rhow [kg/m2s2]";
                     output_header_string += ", rl_f_rhou [kg/m2s2], rl_f_rhov [kg/m2s2], rl_f_rhow [kg/m2s2]";
+                    output_header_string += ", rl_f_rhou_curr_step [kg/m2s2], rl_f_rhov_curr_step [kg/m2s2], rl_f_rhow_curr_step [kg/m2s2]";
+                    output_header_string += ", d_DeltaRxj_j [m/s2], d_DeltaRyj_j [m/s2], d_DeltaRzj_j [m/s2]";
+                    output_header_string += ", d_DeltaRxx_x [m/s2], d_DeltaRxy_x [m/s2], d_DeltaRxz_x [m/s2]";
+                    output_header_string += ", d_DeltaRxy_y [m/s2], d_DeltaRyy_y [m/s2], d_DeltaRyz_y [m/s2]";
+                    output_header_string += ", d_DeltaRxz_z [m/s2], d_DeltaRyz_z [m/s2], d_DeltaRzz_z [m/s2]";
                     /// Generate data string
                     ostringstream sstr; sstr.precision( fstream_precision ); sstr << fixed;
                     sstr << current_time;
@@ -1548,6 +1568,12 @@ void myRHEA::outputTemporalPointProbesData() {
                     sstr << "," << rmsf_u_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rmsf_v_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rmsf_w_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_uffuff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_uffvff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_uffwff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_vffvff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_vffwff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_wffwff_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rhou_inv_flux[I1D(i_index,j_index,k_index)];
                     sstr << "," << rhov_inv_flux[I1D(i_index,j_index,k_index)];
                     sstr << "," << rhow_inv_flux[I1D(i_index,j_index,k_index)];
@@ -1560,6 +1586,21 @@ void myRHEA::outputTemporalPointProbesData() {
                     sstr << "," << rl_f_rhou_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhov_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhow_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhou_field_curr_step[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhov_field_curr_step[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhow_field_curr_step[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRxj_j_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRyj_j_field[I1D(i_index,j_index,k_index)]; 
+                    sstr << "," << d_DeltaRzj_j_field[I1D(i_index,j_index,k_index)]; 
+                    sstr << "," << d_DeltaRxx_x_field[I1D(i_index,j_index,k_index)]; 
+                    sstr << "," << d_DeltaRxy_x_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRxz_x_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRxy_y_field[I1D(i_index,j_index,k_index)]; 
+                    sstr << "," << d_DeltaRyy_y_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRyz_y_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRxz_z_field[I1D(i_index,j_index,k_index)]; 
+                    sstr << "," << d_DeltaRyz_z_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRzz_z_field[I1D(i_index,j_index,k_index)];
                     string output_data_string = sstr.str();
                     /// Write (header string) data string to file
                     temporal_point_probes[tpp].writeDataStringToOutputFile(output_header_string, output_data_string);
@@ -2460,16 +2501,13 @@ void myRHEA::updateState() {
             xz_slice_points_counter = 0;
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-
-                    state_local[state_local_size2_counter]   += std::pow(Rkk_field[I1D(i,j_index,k)],   2.0);
-                    state_local[state_local_size2_counter+1] += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
-                    state_local[state_local_size2_counter+2] += std::pow(y_field[I1D(i,j_index,k)],     2.0);
+                    state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
+                    state_local[state_local_size2_counter+1] += std::pow(y_field[I1D(i,j_index,k)],     2.0);
                     xz_slice_points_counter += 1;
                 }
             }
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
             state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
-            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / xz_slice_points_counter );
 
 #else ///  _WITNESS_XZ_SLICES_ 0
             /// Get local indices i, j, k
@@ -2477,9 +2515,8 @@ void myRHEA::updateState() {
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
-            state_local[state_local_size2_counter]   = Rkk_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+1] = avg_u_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / delta;
+            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
+            state_local[state_local_size2_counter+1] = y_field[I1D(i_index,j_index,k_index)] / delta;
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
