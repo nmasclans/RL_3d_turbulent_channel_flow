@@ -1407,10 +1407,13 @@ void myRHEA::outputTemporalPointProbesData() {
                     output_header_string  = "# t [s], x [m], y [m], z[m], rho [kg/m3], u [m/s], v [m/s], w [m/s]";
                     output_header_string += ", avg_u [m/s], avg_v [m/s], avg_w [m/s]";
                     output_header_string += ", rmsf_u [m/s], rmsf_v [m/s], rmsf_w [m/s]";
+	                output_header_string += ", favre_uffuff [m2/s2], favre_uffvff [m2/s2], favre_uffwff [m2/s2], favre_vffvff [m2/s2], favre_vffwff [m2/s2], favre_wffwff [m2/s2]";
                     output_header_string += ", rhou_inv_flux [kg/m2s2], rhov_inv_flux [kg/m2s2], rhow_inv_flux [kg/m2s2]";
                     output_header_string += ", rhou_vis_flux [kg/m2s2], rhov_vis_flux [kg/m2s2], rhow_vis_flux [kg/m2s2]";
                     output_header_string += ", f_rhou_field [kg/m2s2], f_rhov_field [kg/m2s2], f_rhow_field [kg/m2s2]";
                     output_header_string += ", rl_f_rhou [kg/m2s2], rl_f_rhov [kg/m2s2], rl_f_rhow [kg/m2s2]";
+                    output_header_string += ", rl_f_rhou_curr_step [kg/m2s2], rl_f_rhov_curr_step [kg/m2s2], rl_f_rhow_curr_step [kg/m2s2]";
+                    output_header_string += ", d_DeltaRxj_j_field [m/s2], d_DeltaRyj_j_field [m/s2], d_DeltaRzj_j_field [m/s2]";
                     /// Generate data string
                     ostringstream sstr; sstr.precision( fstream_precision ); sstr << fixed;
                     sstr << current_time;
@@ -1427,6 +1430,12 @@ void myRHEA::outputTemporalPointProbesData() {
                     sstr << "," << rmsf_u_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rmsf_v_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rmsf_w_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_uffuff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_uffvff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_uffwff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_vffvff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_vffwff_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << favre_wffwff_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rhou_inv_flux[I1D(i_index,j_index,k_index)];
                     sstr << "," << rhov_inv_flux[I1D(i_index,j_index,k_index)];
                     sstr << "," << rhow_inv_flux[I1D(i_index,j_index,k_index)];
@@ -1439,6 +1448,12 @@ void myRHEA::outputTemporalPointProbesData() {
                     sstr << "," << rl_f_rhou_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhov_field[I1D(i_index,j_index,k_index)];
                     sstr << "," << rl_f_rhow_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhou_field_curr_step[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhov_field_curr_step[I1D(i_index,j_index,k_index)];
+                    sstr << "," << rl_f_rhow_field_curr_step[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRxj_j_field[I1D(i_index,j_index,k_index)];
+                    sstr << "," << d_DeltaRyj_j_field[I1D(i_index,j_index,k_index)]; 
+                    sstr << "," << d_DeltaRzj_j_field[I1D(i_index,j_index,k_index)]; 
                     string output_data_string = sstr.str();
                     /// Write (header string) data string to file
                     temporal_point_probes[tpp].writeDataStringToOutputFile(output_header_string, output_data_string);
