@@ -1410,10 +1410,10 @@ void myRHEA::outputTemporalPointProbesData() {
 	                output_header_string += ", favre_uffuff [m2/s2], favre_uffvff [m2/s2], favre_uffwff [m2/s2], favre_vffvff [m2/s2], favre_vffwff [m2/s2], favre_wffwff [m2/s2]";
                     output_header_string += ", rhou_inv_flux [kg/m2s2], rhov_inv_flux [kg/m2s2], rhow_inv_flux [kg/m2s2]";
                     output_header_string += ", rhou_vis_flux [kg/m2s2], rhov_vis_flux [kg/m2s2], rhow_vis_flux [kg/m2s2]";
-                    output_header_string += ", f_rhou_field [kg/m2s2], f_rhov_field [kg/m2s2], f_rhow_field [kg/m2s2]";
+                    output_header_string += ", f_rhou [kg/m2s2], f_rhov [kg/m2s2], f_rhow [kg/m2s2]";
                     output_header_string += ", rl_f_rhou [kg/m2s2], rl_f_rhov [kg/m2s2], rl_f_rhow [kg/m2s2]";
                     output_header_string += ", rl_f_rhou_curr_step [kg/m2s2], rl_f_rhov_curr_step [kg/m2s2], rl_f_rhow_curr_step [kg/m2s2]";
-                    output_header_string += ", d_DeltaRxj_j_field [m/s2], d_DeltaRyj_j_field [m/s2], d_DeltaRzj_j_field [m/s2]";
+                    output_header_string += ", d_DeltaRxj_j [m/s2], d_DeltaRyj_j [m/s2], d_DeltaRzj_j [m/s2]";
                     /// Generate data string
                     ostringstream sstr; sstr.precision( fstream_precision ); sstr << fixed;
                     sstr << current_time;
