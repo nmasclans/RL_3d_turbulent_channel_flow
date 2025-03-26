@@ -77,7 +77,7 @@ const double avg_u_bulk_min = 14.665 - 0.565;
 #endif
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
-int action_dim = 1;
+int action_dim = 3;
 int state_dim  = 2;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
