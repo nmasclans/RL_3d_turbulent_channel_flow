@@ -107,11 +107,33 @@ f_rhow_key    = " f_rhow [kg/m2s2]"
 rl_f_rhou_key = " rl_f_rhou [kg/m2s2]"
 rl_f_rhov_key = " rl_f_rhov [kg/m2s2]"
 rl_f_rhow_key = " rl_f_rhow [kg/m2s2]"
-vars_keys     = [time_key, y_key, u_key, v_key, w_key,
-                 rhou_inv_key, rhov_inv_key, rhow_inv_key, 
-                 rhou_vis_key, rhov_vis_key, rhow_vis_key, 
-                 f_rhou_key, f_rhov_key, f_rhow_key, 
-                 rl_f_rhou_key, rl_f_rhov_key, rl_f_rhow_key]
+rl_f_rhou_curr_step_key = " rl_f_rhou_curr_step [kg/m2s2]"
+rl_f_rhov_curr_step_key = " rl_f_rhov_curr_step [kg/m2s2]"
+rl_f_rhow_curr_step_key = " rl_f_rhow_curr_step [kg/m2s2]"
+d_DeltaRxj_j_key = " d_DeltaRxj_j [m/s2]"
+d_DeltaRyj_j_key = " d_DeltaRyj_j [m/s2]"
+d_DeltaRzj_j_key = " d_DeltaRzj_j [m/s2]"
+d_DeltaRxx_x_key = " d_DeltaRxx_x [m/s2]"
+d_DeltaRxy_x_key = " d_DeltaRxy_x [m/s2]"
+d_DeltaRxz_x_key = " d_DeltaRxz_x [m/s2]"
+d_DeltaRxy_y_key = " d_DeltaRxy_y [m/s2]"
+d_DeltaRyy_y_key = " d_DeltaRyy_y [m/s2]"
+d_DeltaRyz_y_key = " d_DeltaRyz_y [m/s2]"
+d_DeltaRxz_z_key = " d_DeltaRxz_z [m/s2]"
+d_DeltaRyz_z_key = " d_DeltaRyz_z [m/s2]"
+d_DeltaRzz_z_key = " d_DeltaRzz_z [m/s2]"
+vars_keys = [
+    time_key, y_key, u_key, v_key, w_key,
+    rhou_inv_key, rhov_inv_key, rhow_inv_key, 
+    rhou_vis_key, rhov_vis_key, rhow_vis_key, 
+    f_rhou_key, f_rhov_key, f_rhow_key, 
+    rl_f_rhou_key, rl_f_rhov_key, rl_f_rhow_key,
+    rl_f_rhou_curr_step_key, rl_f_rhov_curr_step_key, rl_f_rhow_curr_step_key, 
+    d_DeltaRxj_j_key, d_DeltaRyj_j_key, d_DeltaRzj_j_key, 
+    d_DeltaRxx_x_key, d_DeltaRxy_x_key, d_DeltaRxz_x_key, 
+    d_DeltaRxy_y_key, d_DeltaRyy_y_key, d_DeltaRyz_y_key, 
+    d_DeltaRxz_z_key, d_DeltaRyz_z_key, d_DeltaRzz_z_key,
+]
 
 # Initialize visualizer
 visualizer = ChannelVisualizer(postDir)
@@ -189,6 +211,22 @@ f_rhow_dict_RL         = {episode: {probe: None for probe in probes_name} for ep
 rl_f_rhou_dict_RL      = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
 rl_f_rhov_dict_RL      = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
 rl_f_rhow_dict_RL      = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+rl_f_rhou_curr_step_dict_RL = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+rl_f_rhov_curr_step_dict_RL = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+rl_f_rhow_curr_step_dict_RL = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRxj_j_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRyj_j_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRzj_j_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRxx_x_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRxy_x_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRxz_x_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRxy_y_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRyy_y_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRyz_y_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRxz_z_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRyz_z_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+d_DeltaRzz_z_dict_RL   = {episode: {probe: None for probe in probes_name} for episode in episodes_name_RL}
+
 episode_counter = 0
 for episode in episodes_name_RL:
     print(f"{episode_counter/n_episodes_RL*100:.0f}%"); episode_counter += 1
@@ -196,26 +234,41 @@ for episode in episodes_name_RL:
         # Get data from csv file
         file = filename_dict_RL[episode][probe]
         data = pd.read_csv(file, usecols=vars_keys)
-        time_data      = data[time_key].to_numpy()[::10]
-        y_data         = data[y_key].to_numpy()[::10]
-        u_data         = data[u_key].to_numpy()[::10]
-        v_data         = data[v_key].to_numpy()[::10]
-        w_data         = data[w_key].to_numpy()[::10]
-        rhou_inv_data  = data[rhou_inv_key].to_numpy()[::10]
-        rhov_inv_data  = data[rhov_inv_key].to_numpy()[::10]
-        rhow_inv_data  = data[rhow_inv_key].to_numpy()[::10]
-        rhou_vis_data  = data[rhou_vis_key].to_numpy()[::10]
-        rhov_vis_data  = data[rhov_vis_key].to_numpy()[::10]
-        rhow_vis_data  = data[rhow_vis_key].to_numpy()[::10]
-        f_rhou_data    = data[f_rhou_key].to_numpy()[::10]
-        f_rhov_data    = data[f_rhov_key].to_numpy()[::10]
-        f_rhow_data    = data[f_rhow_key].to_numpy()[::10]
-        rl_f_rhou_data = data[rl_f_rhou_key].to_numpy()[::10]
-        rl_f_rhov_data = data[rl_f_rhov_key].to_numpy()[::10]
-        rl_f_rhow_data = data[rl_f_rhow_key].to_numpy()[::10]
+        time_data         = data[time_key].to_numpy()[::10]
+        y_data            = data[y_key].to_numpy()[::10]
+        u_data            = data[u_key].to_numpy()[::10]
+        v_data            = data[v_key].to_numpy()[::10]
+        w_data            = data[w_key].to_numpy()[::10]
+        rhou_inv_data     = data[rhou_inv_key].to_numpy()[::10]
+        rhov_inv_data     = data[rhov_inv_key].to_numpy()[::10]
+        rhow_inv_data     = data[rhow_inv_key].to_numpy()[::10]
+        rhou_vis_data     = data[rhou_vis_key].to_numpy()[::10]
+        rhov_vis_data     = data[rhov_vis_key].to_numpy()[::10]
+        rhow_vis_data     = data[rhow_vis_key].to_numpy()[::10]
+        f_rhou_data       = data[f_rhou_key].to_numpy()[::10]
+        f_rhov_data       = data[f_rhov_key].to_numpy()[::10]
+        f_rhow_data       = data[f_rhow_key].to_numpy()[::10]
+        rl_f_rhou_data    = data[rl_f_rhou_key].to_numpy()[::10]
+        rl_f_rhov_data    = data[rl_f_rhov_key].to_numpy()[::10]
+        rl_f_rhow_data    = data[rl_f_rhow_key].to_numpy()[::10]
+        rl_f_rhou_curr_step_data = data[rl_f_rhou_curr_step_key].to_numpy()[::10]
+        rl_f_rhov_curr_step_data = data[rl_f_rhov_curr_step_key].to_numpy()[::10]
+        rl_f_rhow_curr_step_data = data[rl_f_rhow_curr_step_key].to_numpy()[::10]
+        d_DeltaRxj_j_data = data[d_DeltaRxj_j_key].to_numpy()[::10]
+        d_DeltaRyj_j_data = data[d_DeltaRyj_j_key].to_numpy()[::10]
+        d_DeltaRzj_j_data = data[d_DeltaRzj_j_key].to_numpy()[::10]
+        d_DeltaRxx_x_data = data[d_DeltaRxx_x_key].to_numpy()[::10]
+        d_DeltaRxy_x_data = data[d_DeltaRxy_x_key].to_numpy()[::10]
+        d_DeltaRxz_x_data = data[d_DeltaRxz_x_key].to_numpy()[::10]
+        d_DeltaRxy_y_data = data[d_DeltaRxy_y_key].to_numpy()[::10]
+        d_DeltaRyy_y_data = data[d_DeltaRyy_y_key].to_numpy()[::10]
+        d_DeltaRyz_y_data = data[d_DeltaRyz_y_key].to_numpy()[::10]
+        d_DeltaRxz_z_data = data[d_DeltaRxz_z_key].to_numpy()[::10]
+        d_DeltaRyz_z_data = data[d_DeltaRyz_z_key].to_numpy()[::10]
+        d_DeltaRzz_z_data = data[d_DeltaRzz_z_key].to_numpy()[::10]
         # store data in allocation dicts for single train episode period
         time_relative_data  = time_data - time_data[0]     # only interested in relative values, dt
-        ### is_train_episode    = time_relative_data <= t_episode_train
+        ### is_train_episode = time_relative_data <= t_episode_train
         tavg_atEpStart_dict_RL[episode][probe] = float(time_data[0] - tavg0_RL)
         time_atEpStart_dict_RL[episode][probe] = float(time_data[0])
         time_dict_RL[episode][probe]           = time_relative_data
@@ -226,22 +279,37 @@ for episode in episodes_name_RL:
         if isBottomWall:
             y_plus_dict_RL[episode][probe] = y_value * rho0 * u_tau / mu0
         else:
-            y_plus_dict_RL[episode][probe] = (2 * delta - y_value) * rho0 * u_tau / mu0
-        u_dict_RL[episode][probe]          = u_data
-        v_dict_RL[episode][probe]          = v_data
-        w_dict_RL[episode][probe]          = w_data
-        rhou_inv_dict_RL[episode][probe]   = rhou_inv_data
-        rhov_inv_dict_RL[episode][probe]   = rhov_inv_data
-        rhow_inv_dict_RL[episode][probe]   = rhow_inv_data
-        rhou_vis_dict_RL[episode][probe]   = rhou_vis_data
-        rhov_vis_dict_RL[episode][probe]   = rhov_vis_data
-        rhow_vis_dict_RL[episode][probe]   = rhow_vis_data
-        f_rhou_dict_RL[episode][probe]     = f_rhou_data
-        f_rhov_dict_RL[episode][probe]     = f_rhov_data
-        f_rhow_dict_RL[episode][probe]     = f_rhow_data
-        rl_f_rhou_dict_RL[episode][probe]  = rl_f_rhou_data
-        rl_f_rhov_dict_RL[episode][probe]  = rl_f_rhov_data
-        rl_f_rhow_dict_RL[episode][probe]  = rl_f_rhow_data
+            y_plus_dict_RL[episode][probe]   = (2 * delta - y_value) * rho0 * u_tau / mu0
+        u_dict_RL[episode][probe]            = u_data
+        v_dict_RL[episode][probe]            = v_data
+        w_dict_RL[episode][probe]            = w_data
+        rhou_inv_dict_RL[episode][probe]     = rhou_inv_data
+        rhov_inv_dict_RL[episode][probe]     = rhov_inv_data
+        rhow_inv_dict_RL[episode][probe]     = rhow_inv_data
+        rhou_vis_dict_RL[episode][probe]     = rhou_vis_data
+        rhov_vis_dict_RL[episode][probe]     = rhov_vis_data
+        rhow_vis_dict_RL[episode][probe]     = rhow_vis_data
+        f_rhou_dict_RL[episode][probe]       = f_rhou_data
+        f_rhov_dict_RL[episode][probe]       = f_rhov_data
+        f_rhow_dict_RL[episode][probe]       = f_rhow_data
+        rl_f_rhou_dict_RL[episode][probe]    = rl_f_rhou_data
+        rl_f_rhov_dict_RL[episode][probe]    = rl_f_rhov_data
+        rl_f_rhow_dict_RL[episode][probe]    = rl_f_rhow_data
+        rl_f_rhou_curr_step_dict_RL[episode][probe] = rl_f_rhou_curr_step_data
+        rl_f_rhov_curr_step_dict_RL[episode][probe] = rl_f_rhov_curr_step_data
+        rl_f_rhow_curr_step_dict_RL[episode][probe] = rl_f_rhow_curr_step_data
+        d_DeltaRxj_j_dict_RL[episode][probe] = d_DeltaRxj_j_data
+        d_DeltaRyj_j_dict_RL[episode][probe] = d_DeltaRyj_j_data
+        d_DeltaRzj_j_dict_RL[episode][probe] = d_DeltaRzj_j_data
+        d_DeltaRxx_x_dict_RL[episode][probe] = d_DeltaRxx_x_data
+        d_DeltaRxy_x_dict_RL[episode][probe] = d_DeltaRxy_x_data
+        d_DeltaRxz_x_dict_RL[episode][probe] = d_DeltaRxz_x_data
+        d_DeltaRxy_y_dict_RL[episode][probe] = d_DeltaRxy_y_data
+        d_DeltaRyy_y_dict_RL[episode][probe] = d_DeltaRyy_y_data
+        d_DeltaRyz_y_dict_RL[episode][probe] = d_DeltaRyz_y_data
+        d_DeltaRxz_z_dict_RL[episode][probe] = d_DeltaRxz_z_data
+        d_DeltaRyz_z_dict_RL[episode][probe] = d_DeltaRyz_z_data
+        d_DeltaRzz_z_dict_RL[episode][probe] = d_DeltaRzz_z_data
 tavg_atEpStart_RL = check_uniform_nested_dict(tavg_atEpStart_dict_RL)
 time_atEpStart_RL = check_uniform_nested_dict(time_atEpStart_dict_RL)
 del tavg_atEpStart_dict_RL, time_atEpStart_dict_RL
@@ -264,21 +332,37 @@ for episode in episodes_name_RL:
         ensemble_y_plus_dict_RL[episode][y_coord] = y_plus_dict_RL[episode][probe]
 
 # Ensemble-average variables at same y-coord
-ensemble_u_dict_RL         = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_v_dict_RL         = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_w_dict_RL         = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rhou_inv_dict_RL  = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rhov_inv_dict_RL  = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rhow_inv_dict_RL  = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rhou_vis_dict_RL  = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rhov_vis_dict_RL  = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rhow_vis_dict_RL  = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_f_rhou_dict_RL    = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_f_rhov_dict_RL    = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_f_rhow_dict_RL    = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rl_f_rhou_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rl_f_rhov_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
-ensemble_rl_f_rhow_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_u_dict_RL            = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_v_dict_RL            = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_w_dict_RL            = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rhou_inv_dict_RL     = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rhov_inv_dict_RL     = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rhow_inv_dict_RL     = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rhou_vis_dict_RL     = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rhov_vis_dict_RL     = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rhow_vis_dict_RL     = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_f_rhou_dict_RL       = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_f_rhov_dict_RL       = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_f_rhow_dict_RL       = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rl_f_rhou_dict_RL    = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rl_f_rhov_dict_RL    = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rl_f_rhow_dict_RL    = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rl_f_rhou_curr_step_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rl_f_rhov_curr_step_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_rl_f_rhow_curr_step_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRxj_j_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRyj_j_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRzj_j_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRxx_x_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRxy_x_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRxz_x_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRxy_y_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRyy_y_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRyz_y_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRxz_z_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRyz_z_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+ensemble_d_DeltaRzz_z_dict_RL = {episode: {y_coord: None for y_coord in y_coord_name_list} for episode in episodes_name_RL}
+
 for episode in episodes_name_RL:
     assert np.allclose(ensemble_time_dict_RL[episode],        time_dict_RL[episode][probe])
     assert np.allclose(ensemble_global_step_dict_RL[episode], global_step_dict_RL[episode][probe])
@@ -288,52 +372,98 @@ for episode in episodes_name_RL:
             # Check all ensemble probelines use the same temporal vector
             assert np.allclose(ensemble_y_plus_dict_RL[episode][y_coord], y_plus_dict_RL[episode][probe])
             if probe == avg_probes[0]:
-                ensemble_u_dict_RL[episode][y_coord]         = u_dict_RL[episode][probe]
-                ensemble_v_dict_RL[episode][y_coord]         = v_dict_RL[episode][probe]
-                ensemble_w_dict_RL[episode][y_coord]         = w_dict_RL[episode][probe]
-                ensemble_rhou_inv_dict_RL[episode][y_coord]  = rhou_inv_dict_RL[episode][probe]
-                ensemble_rhov_inv_dict_RL[episode][y_coord]  = rhov_inv_dict_RL[episode][probe]
-                ensemble_rhow_inv_dict_RL[episode][y_coord]  = rhow_inv_dict_RL[episode][probe]
-                ensemble_rhou_vis_dict_RL[episode][y_coord]  = rhou_vis_dict_RL[episode][probe]
-                ensemble_rhov_vis_dict_RL[episode][y_coord]  = rhov_vis_dict_RL[episode][probe]
-                ensemble_rhow_vis_dict_RL[episode][y_coord]  = rhow_vis_dict_RL[episode][probe]
-                ensemble_f_rhou_dict_RL[episode][y_coord]    = f_rhou_dict_RL[episode][probe]
-                ensemble_f_rhov_dict_RL[episode][y_coord]    = f_rhov_dict_RL[episode][probe]
-                ensemble_f_rhow_dict_RL[episode][y_coord]    = f_rhow_dict_RL[episode][probe]
-                ensemble_rl_f_rhou_dict_RL[episode][y_coord] = rl_f_rhou_dict_RL[episode][probe]
-                ensemble_rl_f_rhov_dict_RL[episode][y_coord] = rl_f_rhov_dict_RL[episode][probe]
-                ensemble_rl_f_rhow_dict_RL[episode][y_coord] = rl_f_rhow_dict_RL[episode][probe]
+                ensemble_u_dict_RL[episode][y_coord]            = u_dict_RL[episode][probe]
+                ensemble_v_dict_RL[episode][y_coord]            = v_dict_RL[episode][probe]
+                ensemble_w_dict_RL[episode][y_coord]            = w_dict_RL[episode][probe]
+                ensemble_rhou_inv_dict_RL[episode][y_coord]     = rhou_inv_dict_RL[episode][probe]
+                ensemble_rhov_inv_dict_RL[episode][y_coord]     = rhov_inv_dict_RL[episode][probe]
+                ensemble_rhow_inv_dict_RL[episode][y_coord]     = rhow_inv_dict_RL[episode][probe]
+                ensemble_rhou_vis_dict_RL[episode][y_coord]     = rhou_vis_dict_RL[episode][probe]
+                ensemble_rhov_vis_dict_RL[episode][y_coord]     = rhov_vis_dict_RL[episode][probe]
+                ensemble_rhow_vis_dict_RL[episode][y_coord]     = rhow_vis_dict_RL[episode][probe]
+                ensemble_f_rhou_dict_RL[episode][y_coord]       = f_rhou_dict_RL[episode][probe]
+                ensemble_f_rhov_dict_RL[episode][y_coord]       = f_rhov_dict_RL[episode][probe]
+                ensemble_f_rhow_dict_RL[episode][y_coord]       = f_rhow_dict_RL[episode][probe]
+                ensemble_rl_f_rhou_dict_RL[episode][y_coord]    = rl_f_rhou_dict_RL[episode][probe]
+                ensemble_rl_f_rhov_dict_RL[episode][y_coord]    = rl_f_rhov_dict_RL[episode][probe]
+                ensemble_rl_f_rhow_dict_RL[episode][y_coord]    = rl_f_rhow_dict_RL[episode][probe]
+                ensemble_rl_f_rhou_curr_step_dict_RL[episode][y_coord] = rl_f_rhou_curr_step_dict_RL[episode][probe]
+                ensemble_rl_f_rhov_curr_step_dict_RL[episode][y_coord] = rl_f_rhov_curr_step_dict_RL[episode][probe]
+                ensemble_rl_f_rhow_curr_step_dict_RL[episode][y_coord] = rl_f_rhow_curr_step_dict_RL[episode][probe]
+                ensemble_d_DeltaRxj_j_dict_RL[episode][y_coord] = d_DeltaRxj_j_dict_RL[episode][probe]
+                ensemble_d_DeltaRyj_j_dict_RL[episode][y_coord] = d_DeltaRyj_j_dict_RL[episode][probe]
+                ensemble_d_DeltaRzj_j_dict_RL[episode][y_coord] = d_DeltaRzj_j_dict_RL[episode][probe]
+                ensemble_d_DeltaRxx_x_dict_RL[episode][y_coord] = d_DeltaRxx_x_dict_RL[episode][probe]
+                ensemble_d_DeltaRxy_x_dict_RL[episode][y_coord] = d_DeltaRxy_x_dict_RL[episode][probe]
+                ensemble_d_DeltaRxz_x_dict_RL[episode][y_coord] = d_DeltaRxz_x_dict_RL[episode][probe]
+                ensemble_d_DeltaRxy_y_dict_RL[episode][y_coord] = d_DeltaRxy_y_dict_RL[episode][probe]
+                ensemble_d_DeltaRyy_y_dict_RL[episode][y_coord] = d_DeltaRyy_y_dict_RL[episode][probe]
+                ensemble_d_DeltaRyz_y_dict_RL[episode][y_coord] = d_DeltaRyz_y_dict_RL[episode][probe]
+                ensemble_d_DeltaRxz_z_dict_RL[episode][y_coord] = d_DeltaRxz_z_dict_RL[episode][probe]
+                ensemble_d_DeltaRyz_z_dict_RL[episode][y_coord] = d_DeltaRyz_z_dict_RL[episode][probe]
+                ensemble_d_DeltaRzz_z_dict_RL[episode][y_coord] = d_DeltaRzz_z_dict_RL[episode][probe]
             else:
-                ensemble_u_dict_RL[episode][y_coord]         += u_dict_RL[episode][probe]
-                ensemble_v_dict_RL[episode][y_coord]         += v_dict_RL[episode][probe]
-                ensemble_w_dict_RL[episode][y_coord]         += w_dict_RL[episode][probe]
-                ensemble_rhou_inv_dict_RL[episode][y_coord]  += rhou_inv_dict_RL[episode][probe]
-                ensemble_rhov_inv_dict_RL[episode][y_coord]  += rhov_inv_dict_RL[episode][probe]
-                ensemble_rhow_inv_dict_RL[episode][y_coord]  += rhow_inv_dict_RL[episode][probe]
-                ensemble_rhou_vis_dict_RL[episode][y_coord]  += rhou_vis_dict_RL[episode][probe]
-                ensemble_rhov_vis_dict_RL[episode][y_coord]  += rhov_vis_dict_RL[episode][probe]
-                ensemble_rhow_vis_dict_RL[episode][y_coord]  += rhow_vis_dict_RL[episode][probe]
-                ensemble_f_rhou_dict_RL[episode][y_coord]    += f_rhou_dict_RL[episode][probe]
-                ensemble_f_rhov_dict_RL[episode][y_coord]    += f_rhov_dict_RL[episode][probe]
-                ensemble_f_rhow_dict_RL[episode][y_coord]    += f_rhow_dict_RL[episode][probe]
-                ensemble_rl_f_rhou_dict_RL[episode][y_coord] += rl_f_rhou_dict_RL[episode][probe]
-                ensemble_rl_f_rhov_dict_RL[episode][y_coord] += rl_f_rhov_dict_RL[episode][probe]
-                ensemble_rl_f_rhow_dict_RL[episode][y_coord] += rl_f_rhow_dict_RL[episode][probe]
-        ensemble_u_dict_RL[episode][y_coord]         /= len(avg_probes)
-        ensemble_v_dict_RL[episode][y_coord]         /= len(avg_probes)
-        ensemble_w_dict_RL[episode][y_coord]         /= len(avg_probes)
-        ensemble_rhou_inv_dict_RL[episode][y_coord]  /= len(avg_probes)
-        ensemble_rhov_inv_dict_RL[episode][y_coord]  /= len(avg_probes)
-        ensemble_rhow_inv_dict_RL[episode][y_coord]  /= len(avg_probes)
-        ensemble_rhou_vis_dict_RL[episode][y_coord]  /= len(avg_probes)
-        ensemble_rhov_vis_dict_RL[episode][y_coord]  /= len(avg_probes)
-        ensemble_rhow_vis_dict_RL[episode][y_coord]  /= len(avg_probes)
-        ensemble_f_rhou_dict_RL[episode][y_coord]    /= len(avg_probes)
-        ensemble_f_rhov_dict_RL[episode][y_coord]    /= len(avg_probes)
-        ensemble_f_rhow_dict_RL[episode][y_coord]    /= len(avg_probes)
-        ensemble_rl_f_rhou_dict_RL[episode][y_coord] /= len(avg_probes)
-        ensemble_rl_f_rhov_dict_RL[episode][y_coord] /= len(avg_probes)
-        ensemble_rl_f_rhow_dict_RL[episode][y_coord] /= len(avg_probes)
+                ensemble_u_dict_RL[episode][y_coord]            += u_dict_RL[episode][probe]
+                ensemble_v_dict_RL[episode][y_coord]            += v_dict_RL[episode][probe]
+                ensemble_w_dict_RL[episode][y_coord]            += w_dict_RL[episode][probe]
+                ensemble_rhou_inv_dict_RL[episode][y_coord]     += rhou_inv_dict_RL[episode][probe]
+                ensemble_rhov_inv_dict_RL[episode][y_coord]     += rhov_inv_dict_RL[episode][probe]
+                ensemble_rhow_inv_dict_RL[episode][y_coord]     += rhow_inv_dict_RL[episode][probe]
+                ensemble_rhou_vis_dict_RL[episode][y_coord]     += rhou_vis_dict_RL[episode][probe]
+                ensemble_rhov_vis_dict_RL[episode][y_coord]     += rhov_vis_dict_RL[episode][probe]
+                ensemble_rhow_vis_dict_RL[episode][y_coord]     += rhow_vis_dict_RL[episode][probe]
+                ensemble_f_rhou_dict_RL[episode][y_coord]       += f_rhou_dict_RL[episode][probe]
+                ensemble_f_rhov_dict_RL[episode][y_coord]       += f_rhov_dict_RL[episode][probe]
+                ensemble_f_rhow_dict_RL[episode][y_coord]       += f_rhow_dict_RL[episode][probe]
+                ensemble_rl_f_rhou_dict_RL[episode][y_coord]    += rl_f_rhou_dict_RL[episode][probe]
+                ensemble_rl_f_rhov_dict_RL[episode][y_coord]    += rl_f_rhov_dict_RL[episode][probe]
+                ensemble_rl_f_rhow_dict_RL[episode][y_coord]    += rl_f_rhow_dict_RL[episode][probe]
+                ensemble_rl_f_rhou_curr_step_dict_RL[episode][y_coord] += rl_f_rhou_curr_step_dict_RL[episode][probe]
+                ensemble_rl_f_rhov_curr_step_dict_RL[episode][y_coord] += rl_f_rhov_curr_step_dict_RL[episode][probe]
+                ensemble_rl_f_rhow_curr_step_dict_RL[episode][y_coord] += rl_f_rhow_curr_step_dict_RL[episode][probe]
+                ensemble_d_DeltaRxj_j_dict_RL[episode][y_coord] += d_DeltaRxj_j_dict_RL[episode][probe]
+                ensemble_d_DeltaRyj_j_dict_RL[episode][y_coord] += d_DeltaRyj_j_dict_RL[episode][probe]
+                ensemble_d_DeltaRzj_j_dict_RL[episode][y_coord] += d_DeltaRzj_j_dict_RL[episode][probe]
+                ensemble_d_DeltaRxx_x_dict_RL[episode][y_coord] += d_DeltaRxx_x_dict_RL[episode][probe]
+                ensemble_d_DeltaRxy_x_dict_RL[episode][y_coord] += d_DeltaRxy_x_dict_RL[episode][probe]
+                ensemble_d_DeltaRxz_x_dict_RL[episode][y_coord] += d_DeltaRxz_x_dict_RL[episode][probe]
+                ensemble_d_DeltaRxy_y_dict_RL[episode][y_coord] += d_DeltaRxy_y_dict_RL[episode][probe]
+                ensemble_d_DeltaRyy_y_dict_RL[episode][y_coord] += d_DeltaRyy_y_dict_RL[episode][probe]
+                ensemble_d_DeltaRyz_y_dict_RL[episode][y_coord] += d_DeltaRyz_y_dict_RL[episode][probe]
+                ensemble_d_DeltaRxz_z_dict_RL[episode][y_coord] += d_DeltaRxz_z_dict_RL[episode][probe]
+                ensemble_d_DeltaRyz_z_dict_RL[episode][y_coord] += d_DeltaRyz_z_dict_RL[episode][probe]
+                ensemble_d_DeltaRzz_z_dict_RL[episode][y_coord] += d_DeltaRzz_z_dict_RL[episode][probe]
+        ensemble_u_dict_RL[episode][y_coord]            /= len(avg_probes)
+        ensemble_v_dict_RL[episode][y_coord]            /= len(avg_probes)
+        ensemble_w_dict_RL[episode][y_coord]            /= len(avg_probes)
+        ensemble_rhou_inv_dict_RL[episode][y_coord]     /= len(avg_probes)
+        ensemble_rhov_inv_dict_RL[episode][y_coord]     /= len(avg_probes)
+        ensemble_rhow_inv_dict_RL[episode][y_coord]     /= len(avg_probes)
+        ensemble_rhou_vis_dict_RL[episode][y_coord]     /= len(avg_probes)
+        ensemble_rhov_vis_dict_RL[episode][y_coord]     /= len(avg_probes)
+        ensemble_rhow_vis_dict_RL[episode][y_coord]     /= len(avg_probes)
+        ensemble_f_rhou_dict_RL[episode][y_coord]       /= len(avg_probes)
+        ensemble_f_rhov_dict_RL[episode][y_coord]       /= len(avg_probes)
+        ensemble_f_rhow_dict_RL[episode][y_coord]       /= len(avg_probes)
+        ensemble_rl_f_rhou_dict_RL[episode][y_coord]    /= len(avg_probes)
+        ensemble_rl_f_rhov_dict_RL[episode][y_coord]    /= len(avg_probes)
+        ensemble_rl_f_rhow_dict_RL[episode][y_coord]    /= len(avg_probes)
+        ensemble_rl_f_rhou_curr_step_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_rl_f_rhov_curr_step_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_rl_f_rhow_curr_step_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRxj_j_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRyj_j_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRzj_j_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRxx_x_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRxy_x_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRxz_x_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRxy_y_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRyy_y_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRyz_y_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRxz_z_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRyz_z_dict_RL[episode][y_coord] /= len(avg_probes)
+        ensemble_d_DeltaRzz_z_dict_RL[episode][y_coord] /= len(avg_probes)
+del u_dict_RL, v_dict_RL, w_dict_RL, rhou_inv_dict_RL, rhov_inv_dict_RL, rhow_inv_dict_RL, rhou_vis_dict_RL, rhov_vis_dict_RL, rhow_vis_dict_RL, f_rhou_dict_RL, f_rhov_dict_RL, f_rhow_dict_RL, rl_f_rhou_dict_RL, rl_f_rhov_dict_RL, rl_f_rhow_dict_RL, rl_f_rhou_curr_step_dict_RL, rl_f_rhov_curr_step_dict_RL, rl_f_rhow_curr_step_dict_RL, d_DeltaRxj_j_dict_RL, d_DeltaRyj_j_dict_RL, d_DeltaRzj_j_dict_RL, d_DeltaRxx_x_dict_RL, d_DeltaRxy_x_dict_RL, d_DeltaRxz_x_dict_RL, d_DeltaRxy_y_dict_RL, d_DeltaRyy_y_dict_RL, d_DeltaRyz_y_dict_RL, d_DeltaRxz_z_dict_RL, d_DeltaRyz_z_dict_RL, d_DeltaRzz_z_dict_RL
 
 #--------------------------------------------------------------------------------------------
 # Plot RHS terms of drhou/dt, drhov/dt, drhow/dt N-S equations
@@ -341,6 +471,7 @@ for episode in episodes_name_RL:
 print("\nBuild frames...")
 frames_rhou      = []; frames_rhov     = []; frames_rhow       = []
 frames_rhou_zoom = []; frames_rhov_zoom = []; frames_rhow_zoom = []
+frames_d_DeltaRij_j = []
 
 for episode in episodes_name_RL:
     # Absoule value of rho*v_i and d/rho*v_i)/dx_i terms of N-S equation
@@ -375,10 +506,22 @@ for episode in episodes_name_RL:
         ensemble_w_dict_RL[episode], ensemble_rhow_inv_dict_RL[episode], ensemble_rhow_vis_dict_RL[episode], ensemble_f_rhow_dict_RL[episode], ensemble_rl_f_rhow_dict_RL[episode],
         tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode], ylim=[-5, 5], vel_name='w',
     )
+    # Frames of d_Deltaij_j along time in 3x3 subplots grid 
+    frames_d_DeltaRij_j = visualizer.build_d_DeltaRij_j_frame_from_dicts(
+        frames_d_DeltaRij_j, ensemble_y_plus_dict_RL[episode], ensemble_time_dict_RL[episode], 
+        ensemble_d_DeltaRxj_j_dict_RL[episode], ensemble_d_DeltaRyj_j_dict_RL[episode], ensemble_d_DeltaRzj_j_dict_RL[episode],
+        ensemble_d_DeltaRxx_x_dict_RL[episode], ensemble_d_DeltaRxy_x_dict_RL[episode], ensemble_d_DeltaRxz_x_dict_RL[episode],
+        ensemble_d_DeltaRxy_y_dict_RL[episode], ensemble_d_DeltaRyy_y_dict_RL[episode], ensemble_d_DeltaRyz_y_dict_RL[episode],
+        ensemble_d_DeltaRxz_z_dict_RL[episode], ensemble_d_DeltaRyz_z_dict_RL[episode], ensemble_d_DeltaRzz_z_dict_RL[episode],
+         tavg_atEpStart_RL, ensemble_global_step_dict_RL[episode],
+    )
+
 
 print("\nSave gifs from frames...")
-frames_dict      = { 'rhs_rhou':      frames_rhou,      'rhs_rhov':      frames_rhov,      'rhs_rhow': frames_rhow }
-frames_zoom_dict = { 'rhs_rhou_zoom': frames_rhou_zoom, 'rhs_rhov_zoom': frames_rhov_zoom, 'rhs_rhow_zoom': frames_rhow_zoom }
+frames_dict = { 
+    'rhs_rhou':      frames_rhou,      'rhs_rhov':      frames_rhov,      'rhs_rhow': frames_rhow,
+    'rhs_rhou_zoom': frames_rhou_zoom, 'rhs_rhov_zoom': frames_rhov_zoom, 'rhs_rhow_zoom': frames_rhow_zoom,
+    'rhs_d_DeltaRij_j': frames_d_DeltaRij_j,
+}
 visualizer.build_main_gifs_from_frames(frames_dict)
-visualizer.build_main_gifs_from_frames(frames_zoom_dict)
 print("Gifs plotted successfully!")

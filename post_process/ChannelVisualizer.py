@@ -1824,3 +1824,81 @@ class ChannelVisualizer():
         frames_rhovel.append(img)
         plt.close()
         return frames_rhovel
+
+
+# ------------------------------------ RHS terms of d_DeltaRij_j -------------------------------------------
+
+    def build_d_DeltaRij_j_fig_from_dicts(self, y_plus_dict, time, 
+                                          d_DeltaRxj_j_dict, d_DeltaRyj_j_dict, d_DeltaRzj_j_dict,
+                                          d_DeltaRxx_x_dict, d_DeltaRxy_x_dict, d_DeltaRxz_x_dict,
+                                          d_DeltaRxy_y_dict, d_DeltaRyy_y_dict, d_DeltaRyz_y_dict,
+                                          d_DeltaRxz_z_dict, d_DeltaRyz_z_dict, d_DeltaRzz_z_dict,
+                                          avg_time_RL, global_step):
+        #import pdb; pdb.set_trace()
+        y_coord_name_list = list(y_plus_dict.keys()) 
+        n_y_coord         = len(y_coord_name_list)
+        colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
+        assert n_y_coord == 4
+        fig, ax = plt.subplots(3,4,figsize=(17,12))
+        for i in range(n_y_coord):
+            y_coord = y_coord_name_list[i]
+            # d_DeltaRxj_j
+            ax[0,0].plot(time, d_DeltaRxj_j_dict[y_coord], color=colors_list[i], lw=2, label=rf"$y^+={y_plus_dict[y_coord]:.2f}$")
+            ax[0,0].set_title(r"$\partial \Delta R_{xj} / \partial x_j$", pad=10)
+            # d_DeltaRxx_x
+            ax[0,1].plot(time, d_DeltaRxx_x_dict[y_coord], color=colors_list[i], lw=2)
+            ax[0,1].set_title(r"$\partial \Delta R_{xx} / \partial x$", pad=10)
+            # d_DeltaRxy_y
+            ax[0,2].plot(time, d_DeltaRxy_y_dict[y_coord], color=colors_list[i], lw=2)
+            ax[0,2].set_title(r"$\partial \Delta R_{xy} / \partial y$", pad=10)
+            # d_DeltaRxz_z
+            ax[0,3].plot(time, d_DeltaRxz_z_dict[y_coord], color=colors_list[i], lw=2)
+            ax[0,3].set_title(r"$\partial \Delta R_{xz} / \partial z$", pad=10)
+            #####
+            # d_DeltaRyj_j
+            ax[1,0].plot(time, d_DeltaRyj_j_dict[y_coord], color=colors_list[i], lw=2)
+            ax[1,0].set_title(r"$\partial \Delta R_{yj} / \partial x_j$", pad=10)
+            # d_DeltaRyx_x
+            ax[1,1].plot(time, d_DeltaRxy_x_dict[y_coord], color=colors_list[i], lw=2)
+            ax[1,1].set_title(r"$\partial \Delta R_{yx} / \partial x$", pad=10)
+            # d_DeltaRyy_y
+            ax[1,2].plot(time, d_DeltaRyy_y_dict[y_coord], color=colors_list[i], lw=2)
+            ax[1,2].set_title(r"$\partial \Delta R_{yy} / \partial y$", pad=10)
+            # d_DeltaRyz_z
+            ax[1,3].plot(time, d_DeltaRyz_z_dict[y_coord], color=colors_list[i], lw=2)
+            ax[1,3].set_title(r"$\partial \Delta R_{yz} / \partial z$", pad=10)
+            #####
+            # d_DeltaRzj_j
+            ax[2,0].plot(time, d_DeltaRzj_j_dict[y_coord], color=colors_list[i], lw=2)
+            ax[2,0].set_title(r"$\partial \Delta R_{zj} / \partial x_j$", pad=10)
+            # d_DeltaRzx_x
+            ax[2,1].plot(time, d_DeltaRxz_x_dict[y_coord], color=colors_list[i], lw=2)
+            ax[2,1].set_title(r"$\partial \Delta R_{zx} / \partial x$", pad=10)
+            # d_DeltaRzy_y
+            ax[2,2].plot(time, d_DeltaRyz_y_dict[y_coord], color=colors_list[i], lw=2)
+            ax[2,2].set_title(r"$\partial \Delta R_{zy} / \partial y$", pad=10)
+            # d_DeltaRzz_z
+            ax[2,3].plot(time, d_DeltaRzz_z_dict[y_coord], color=colors_list[i], lw=2)
+            ax[2,3].set_title(r"$\partial \Delta R_{zz} / \partial z$", pad=10)
+        for i in range(12):
+            row,col = divmod(i,4)
+            ax[row,col].grid()
+            #ax[row, col].set_xlabel(r"averaging time [s]", labelpad=10)
+        fig.suptitle(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = ${global_step}$", y=0.97)
+        fig.tight_layout()
+        fig.subplots_adjust(right=0.85)                         
+        fig.legend(loc='center left', bbox_to_anchor=(0.86,0.5))
+        return fig
+
+    def build_d_DeltaRij_j_frame_from_dicts(self, frames, y_plus_dict, time, 
+                                            d_DeltaRxj_j_dict, d_DeltaRyj_j_dict, d_DeltaRzj_j_dict, 
+                                            d_DeltaRxx_x_dict, d_DeltaRxy_x_dict, d_DeltaRxz_x_dict,
+                                            d_DeltaRxy_y_dict, d_DeltaRyy_y_dict, d_DeltaRyz_y_dict,
+                                            d_DeltaRxz_z_dict, d_DeltaRyz_z_dict, d_DeltaRzz_z_dict,
+                                            avg_time_RL, global_step):
+        fig = self.build_d_DeltaRij_j_fig_from_dicts(y_plus_dict, time, d_DeltaRxj_j_dict, d_DeltaRyj_j_dict, d_DeltaRzj_j_dict, d_DeltaRxx_x_dict, d_DeltaRxy_x_dict, d_DeltaRxz_x_dict,d_DeltaRxy_y_dict, d_DeltaRyy_y_dict, d_DeltaRyz_y_dict,d_DeltaRxz_z_dict, d_DeltaRyz_z_dict, d_DeltaRzz_z_dict,avg_time_RL, global_step)
+        fig.canvas.draw()
+        img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+        frames.append(img)
+        plt.close()
+        return frames
