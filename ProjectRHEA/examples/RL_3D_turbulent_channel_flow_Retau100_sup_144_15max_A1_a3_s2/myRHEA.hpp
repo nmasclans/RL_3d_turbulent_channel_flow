@@ -70,18 +70,6 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhov_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhow_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
-        DistributedArray Rkk_field;
-        DistributedArray phi1_field;
-        DistributedArray phi2_field;
-        DistributedArray phi3_field;
-        DistributedArray xmap1_field;
-        DistributedArray xmap2_field;
-        DistributedArray DeltaRxx_field;               /// 3-D field of DeltaRxx
-        DistributedArray DeltaRxy_field;               /// 3-D field of DeltaRxy
-        DistributedArray DeltaRxz_field;               /// 3-D field of DeltaRxz
-        DistributedArray DeltaRyy_field;               /// 3-D field of DeltaRyy
-        DistributedArray DeltaRyz_field;               /// 3-D field of DeltaRyz
-        DistributedArray DeltaRzz_field;               /// 3-D field of DeltaRzz
         DistributedArray d_DeltaRxx_x_field;           /// 3-D field of d_DeltaRxx_x_field
         DistributedArray d_DeltaRxy_x_field;           /// 3-D field of d_DeltaRxy_x_field
         DistributedArray d_DeltaRxz_x_field;           /// 3-D field of d_DeltaRxz_x_field
@@ -115,13 +103,13 @@ class myRHEA : public FlowSolverRHEA {
         std::vector<double> twp_z_positions;        /// only used if _WITNESS_XZ_PLANES_ 0
         int num_witness_probes;
 
-        /// Cubic control regions
-        DistributedArray action_mask;
-        std::vector<std::array<std::array<double, 3>, 4>> control_cubes_vertices; /// tensor size [num_control_cubes, num_coord, num_vertices] = [unknown, 3, 4] 
-        std::vector<double> control_cubes_y_central;
-        std::string control_cubes_file; 
-        int num_control_cubes;
-        int num_control_points;
+        /// Control points
+        std::string control_file;
+        std::vector<TemporalPointProbe> temporal_control_probes;
+        std::vector<double> tcp_x_positions;
+        std::vector<double> tcp_y_positions;
+        std::vector<double> tcp_z_positions;
+        int num_control_probes;
 
         /// SmartRedis
         SmartRedisManager *manager;              /// TODO: should these vars be 'protected' or 'private'?
@@ -140,8 +128,8 @@ class myRHEA : public FlowSolverRHEA {
         bool first_actuation_period_done;
         bool last_communication;
         int n_rl_envs;
-        int state_local_size2;                   /// or nwitPar
-        int action_global_size2;                 /// or nRectangleControl
+        int state_local_size2;
+        int action_global_size2;
         double reward_local;
         std::vector<double> action_global;
         std::vector<double> state_local;
@@ -153,12 +141,11 @@ class myRHEA : public FlowSolverRHEA {
         void initSmartRedis();
         void readWitnessPoints();
         void preproceWitnessPoints();
-        void readControlCubes();
-        void getControlCubes();
+        void readControlPoints();
+        void preproceControlPoints();
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void updateState();
         void calculateReward();
-        void updateRijEigenDecomp();
 
     private:
 

@@ -33,7 +33,7 @@ params = {
     "rl_n_envs": rl_n_envs,
     ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
     "config_dir": "config_control_witness",
-    "control_cubes_filename": f"cubeControl{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
+    "control_filename": f"controlPoints{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
     "witness_filename": f"witnessXZSlices{rl_n_envs}.txt",
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,

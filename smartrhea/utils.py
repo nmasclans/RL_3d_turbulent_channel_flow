@@ -18,15 +18,16 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-def n_witness_points(fname):
+def n_points(fname):
     """
-    Return number of witness points
-    Assumption: number of lines in fname is equal to the number of witness points (ignore lines with only whitespaces)
+    Return number of witness/control points
+    Assumption: number of lines in fname is equal to the number of witness/control points (ignore lines with only whitespaces)
     """
+    logger.debug(f"[utils:n_points] Filename: {fname}")
     with open(fname, "r") as file:
-        n_witness_points_ = int(sum(1 for l in file if l.strip))
-    logger.debug(f"Number of witness points: {n_witness_points_}")
-    return n_witness_points_
+        n_points_ = int(sum(1 for l in file if l.strip))
+    logger.debug(f"Number of witness/control points: {n_points_}")
+    return n_points_
 
 
 def n_cubes(fname):
@@ -40,31 +41,17 @@ def n_cubes(fname):
     return n_cubes_
 
 
-def check_witness_xyz(fname):
+def check_points_xyz(fname):
     """
-    Make sure the witness points are written in such that the first moving coordinate is z, then x, and last y.
+    Make sure the points are written in such that the first moving coordinate is z, then x, and last y.
     Arguments:
-        fname (str): witness points filename
+        fname (str): witness/control points filename
     """
-    logger.debug(f"[utils:check_witness_xyz] filename: {fname}")
-    witness_points = np.loadtxt(fname)
-    prev_point = witness_points[0]
-    # ### Check if x changes first, then y, then z
-    # for point in witness_points[1:]:
-    #     # Ensure x changes first (y,z fixed)
-    #     if point[2] == prev_point[2] and point[1] == prev_point[1]:
-    #         assert point[0] >= prev_point[0], "Error: x should increase first, then y, then z"
-    #     # If x is reset (with different combination (y,z)), y should change next (z fixed)
-    #     elif point[2] == prev_point[2]:
-    #         assert point[1] >= prev_point[1], "Error: y should increase after x, then z"
-    #     # If both x and y are reset, z should change last
-    #     else:
-    #         assert point[2] >= prev_point[2], "Error: z should increase after x and y."
-    #     # Update previous point
-    #     prev_point = point
-    # logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is x, then y, and last z.")
+    logger.debug(f"[utils:check_points_xyz] Filename: {fname}")
+    points_list = np.loadtxt(fname)
+    prev_point = points_list[0]
     ### Check if z changes first, then x, then y
-    for point in witness_points[1:]:
+    for point in points_list[1:]:
         # Ensure z changes first (x,y fixed)
         if point[0] == prev_point[0] and point[1] == prev_point[1]:
             assert point[2] >= prev_point[2], "Error: z should increase first, then y, then x"
@@ -76,23 +63,23 @@ def check_witness_xyz(fname):
             assert point[1] >= prev_point[1], "Error: y should increase after x and z."
         # Update previous point
         prev_point = point
-    logger.debug("Successfull witness points check: witness points are written in such that the first moving coordinate is z, then x, and last y.")
+    logger.debug("Successfull witness/control points check: points are written in such that the first moving coordinate is z, then x, and last y.")
 
 
-def get_witness_xyz(fname):
+def get_points_xyz(fname):
     """
-    Gets the number of witness points in the (x, y, x) directions
+    Gets the number of points in the (x, y, x) directions
     Arguments:
         fname (str): witness points filename
     """
-    check_witness_xyz(fname)
-    witness_points = np.loadtxt(fname)
-    unique_x = np.unique(witness_points[:,0])
-    unique_y = np.unique(witness_points[:,1])
-    unique_z = np.unique(witness_points[:,2])
-    witness_xyz = [len(unique_x), len(unique_y), len(unique_z)]
-    logger.debug(f"Number of witness points in the (x, y, z) directions: {witness_xyz}")
-    return witness_xyz
+    check_points_xyz(fname)
+    points_list = np.loadtxt(fname)
+    unique_x = np.unique(points_list[:,0])
+    unique_y = np.unique(points_list[:,1])
+    unique_z = np.unique(points_list[:,2])
+    points_xyz = [len(unique_x), len(unique_y), len(unique_z)]
+    logger.debug(f"Witness/control points in the (x, y, z) directions: \n{points_xyz}")
+    return points_xyz
 
 
 def print_params(params, title=None):

@@ -15,7 +15,7 @@ from smartsim.settings import MpirunSettings, RunSettings
 from smartsim.settings.settings import create_batch_settings
 from smartsim.log import get_logger
 from smartrhea.init_smartsim import write_hosts
-from smartrhea.utils import n_witness_points, n_cubes, get_witness_xyz, numpy_str, bcolors, delete_all_files_in_dir
+from smartrhea.utils import n_points, get_points_xyz, numpy_str, bcolors, delete_all_files_in_dir
 
 EPS = 1e-8
 
@@ -47,7 +47,7 @@ class RheaEnv(py_environment.PyEnvironment):
     - cfd_n_envs: number of cdf simulations
     - rl_n_envs: number of rl environments inside a cfd simulation
     - config_dir: configuration files dir
-    - control_cubes_filename: actuators cubes filename
+    - control_filename: actuators points filename
     - witness_filename: witness points filename
     - rl_neighbors: number of witness blocks selected to compose the state
     - model_dtype: data type for the model
@@ -94,7 +94,7 @@ class RheaEnv(py_environment.PyEnvironment):
         cfd_n_envs = 2,
         rl_n_envs = 5,
         config_dir = "",
-        control_cubes_filename = "cubeControl.txt",
+        control_filename = "control.txt",
         witness_filename = "witness.txt",
         rl_neighbors = 1,
         model_dtype = np.float32,
@@ -143,7 +143,7 @@ class RheaEnv(py_environment.PyEnvironment):
         self.cfd_n_envs = cfd_n_envs
         self.rl_n_envs = rl_n_envs
         self.config_dir = config_dir
-        self.control_cubes_filename = control_cubes_filename
+        self.control_filename = control_filename
         self.witness_filename = witness_filename
         self.rl_neighbors = rl_neighbors
         self.model_dtype = model_dtype
@@ -241,9 +241,9 @@ class RheaEnv(py_environment.PyEnvironment):
 
         # State: witness points information (to obtain dimensions of state arrays)
         witness_filepath = os.path.join(self.rl_case_path, self.config_dir, self.witness_filename)
-        control_cubes_filepath = os.path.join(os.path.join(self.rl_case_path, self.config_dir, self.control_cubes_filename))
-        self.witness_xyz = get_witness_xyz(witness_filepath)
-        num_witness_points = n_witness_points(witness_filepath)
+        control_filepath = os.path.join(os.path.join(self.rl_case_path, self.config_dir, self.control_filename))
+        self.witness_xyz   = get_points_xyz(witness_filepath)
+        num_witness_points = n_points(witness_filepath)
         assert np.prod(self.witness_xyz) == num_witness_points
         self.n_state_wit    = num_witness_points
         self.n_state        = self.n_state_wit * self.state_dim
@@ -254,11 +254,10 @@ class RheaEnv(py_environment.PyEnvironment):
         # Actions
         if self.rl_n_envs > 1:
             self.n_action = 1 * self.action_dim
-            num_cubes = n_cubes(control_cubes_filepath)
-            assert self.rl_n_envs == num_cubes, f"(num. rl environments = {self.rl_n_envs}) != (num. control cubes = {num_cubes})"
-            # TODO: this assert is not done in SOD2D (where marl_n_envs=3 != n_control_rectangles=6), but consider doing assert of n_control_rectangles == rl_n_envs
+            num_control_points = n_points(control_filepath)
+            assert self.rl_n_envs == num_control_points, f"(num. rl environments = {self.rl_n_envs}) != (num. control points = {num_control_points})"
         else:   # self.rl_n_envs == 1:
-            self.n_action = n_cubes(control_cubes_filepath) * self.action_dim
+            self.n_action = n_points(control_filepath) * self.action_dim
 
         # create and allocate array objects
         self.__state       = np.zeros((self.cfd_n_envs, self.n_state_wit, self.state_dim), dtype=self.model_dtype)

@@ -186,18 +186,6 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhov_field_curr_step.setTopology(topo, "rl_f_rhov_field_curr_step");
     rl_f_rhow_field_curr_step.setTopology(topo, "rl_f_rhow_field_curr_step");
 #endif  /// of _TEMPORAL_SMOOTHING_RL_ACTION_
-    Rkk_field.setTopology(topo,   "Rkk_field");
-    phi1_field.setTopology(topo,  "phi1_field");
-    phi2_field.setTopology(topo,  "phi2_field");
-    phi3_field.setTopology(topo,  "phi3_field");
-    xmap1_field.setTopology(topo, "xmap1_field");
-    xmap2_field.setTopology(topo, "xmap2_field");
-    DeltaRxx_field.setTopology(topo, "DeltaRxx");
-    DeltaRxy_field.setTopology(topo, "DeltaRxy");
-    DeltaRxz_field.setTopology(topo, "DeltaRxz");
-    DeltaRyy_field.setTopology(topo, "DeltaRyy");
-    DeltaRyz_field.setTopology(topo, "DeltaRyz");
-    DeltaRzz_field.setTopology(topo, "DeltaRzz");
     d_DeltaRxx_x_field.setTopology(topo, "d_DeltaRxx_x_field"); 
     d_DeltaRxy_x_field.setTopology(topo, "d_DeltaRxy_x_field"); 
     d_DeltaRxz_x_field.setTopology(topo, "d_DeltaRxz_x_field"); 
@@ -210,7 +198,6 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     d_DeltaRxj_j_field.setTopology(topo, "d_DeltaRxj_j_field");
     d_DeltaRyj_j_field.setTopology(topo, "d_DeltaRyj_j_field");
     d_DeltaRzj_j_field.setTopology(topo, "d_DeltaRzj_j_field");
-    action_mask.setTopology(topo, "action_mask");
     timers->createTimer( "rl_smartredis_communications" );
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
@@ -590,7 +577,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 #else
     this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints8.txt";
 #endif
-    this->control_cubes_file = string(rl_case_path) + "/config_control_witness/cubeControl8.txt";
+    this->control_file = string(rl_case_path) + "/config_control_witness/controlPoints8.txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
     this->state_key     = "ensemble_" + tag + ".state";
@@ -602,9 +589,10 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     preproceWitnessPoints();        // updates attribute 'state_local_size2'
 
     /// Control cubic regions
-    readControlCubes();
-    getControlCubes();              // updates 'action_global_size2', 'n_rl_envs', 'action_mask'
-
+    readControlPoints();
+    preproceControlPoints();        // updates 'action_global_size2', 'n_rl_envs'
+    MPI_Abort(MPI_COMM_WORLD, 1);   // TODO: delete line
+    
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
     ///             Actions is a global array living in all processes.
@@ -841,7 +829,6 @@ void myRHEA::calculateSourceTerms() {
         if (current_time > begin_actuation_time) {
 
             if ( !first_actuation_time_done ) {     /// executed just once
-                updateRijEigenDecomp();             /// update 'Rkk_field', 'phi1_field', 'phi2_field', 'phi3_field', 'xmap1_field', 'xmap2_field' 
                 updateState();
                 calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised)
                                                     /// initializing 'l2_err_avg_u_previous' and 'l2_rl_f_previous' (if supervised)        
@@ -853,9 +840,6 @@ void myRHEA::calculateSourceTerms() {
 
             /// Check if new action is needed -> update F_pert(x,t_p) using updated RL actions a_k^p
             if (current_time - previous_actuation_time >= actuation_period) {
-
-                /// Perform Rij eigendecomposition, update 'Rkk_field', 'phi1_field', 'phi2_field', 'phi3_field', 'xmap1_field', 'xmap2_field'
-                updateRijEigenDecomp(); 
 
                 /// Store previous actuation time
                 previous_actuation_time = current_time;
@@ -949,106 +933,156 @@ void myRHEA::calculateSourceTerms() {
                     timers->start( "rl_update_DeltaRij" );
 
                     /// Initialize variables
-                    double DeltaRkk = 0.0, DeltaPhi1 = 0.0, DeltaPhi2 = 0.0, DeltaPhi3 = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
+                    int num_control_probes_local = 0; 
+                    double Rkk, phi1, phi2, phi3, xmap1, xmap2;
+                    double DeltaRkk, DeltaPhi1, DeltaPhi2, DeltaPhi3, DeltaXmap1, DeltaXmap2; 
+                    double DeltaRxx, DeltaRyy, DeltaRzz, DeltaRxy, DeltaRxz, DeltaRyz;
                     bool   isNegligibleAction, isNegligibleRkk;
                     size_t actuation_idx;
+                    double Rkk_inv, Akk;
+                    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
+                    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
+                    vector<vector<double>> Qij(3, vector<double>(3, 0.0));                
                     vector<vector<double>> DijPert(3, vector<double>(3, 0.0));
                     vector<vector<double>> QijPert(3, vector<double>(3, 0.0));
                     vector<vector<double>> RijPert(3, vector<double>(3, 0.0));
                     
-                    /// Calculate DeltaRij = Rij_perturbated - Rij_original
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                    /// --------- Calculate DeltaRij = Rij_perturbated - Rij_original ----------
+                    for(int tcp = 0; tcp < num_control_probes; ++tcp) {
+                        if( temporal_control_probes[tcp].getGlobalOwnerRank() == my_rank ) {
+                            
+                            num_control_probes_local++;
 
-                                /// If [i,j,k] is a control point (non-zero action_mask) -> introduce action
-                                if (action_mask[I1D(i,j,k)] != 0.0) {
-
-                                    /// Get perturbation values from RL agent
-                                    actuation_idx = static_cast<size_t>(action_mask[I1D(i,j,k)]) - 1;   /// type size_t
-                                    if (action_dim == 1) {
-                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
-                                        DeltaPhi1  = 0.0;
-                                        DeltaPhi2  = 0.0;
-                                        DeltaPhi3  = 0.0;
-                                        DeltaXmap1 = 0.0;
-                                        DeltaXmap2 = 0.0;
-                                    } else if (action_dim == 2) {
-                                        DeltaRkk   = 0.0;
-                                        DeltaPhi1  = 0.0;
-                                        DeltaPhi2  = 0.0;
-                                        DeltaPhi3  = 0.0;
-                                        DeltaXmap1 = action_global[actuation_idx * action_dim + 0];
-                                        DeltaXmap2 = action_global[actuation_idx * action_dim + 1];
-                                    } else if (action_dim == 3) {
-                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
-                                        DeltaPhi1  = 0.0;
-                                        DeltaPhi2  = 0.0;
-                                        DeltaPhi3  = 0.0;
-                                        DeltaXmap1 = action_global[actuation_idx * action_dim + 1];
-                                        DeltaXmap2 = action_global[actuation_idx * action_dim + 2];
-                                    } else if (action_dim == 5) {
-                                        DeltaRkk   = 0.0;
-                                        DeltaPhi1  = action_global[actuation_idx * action_dim + 0];
-                                        DeltaPhi2  = action_global[actuation_idx * action_dim + 1];
-                                        DeltaPhi3  = action_global[actuation_idx * action_dim + 2];
-                                        DeltaXmap1 = action_global[actuation_idx * action_dim + 3];
-                                        DeltaXmap2 = action_global[actuation_idx * action_dim + 4];
-                                    } else if (action_dim == 6) {
-                                        DeltaRkk   = action_global[actuation_idx * action_dim + 0];
-                                        DeltaPhi1  = action_global[actuation_idx * action_dim + 1];
-                                        DeltaPhi2  = action_global[actuation_idx * action_dim + 2];
-                                        DeltaPhi3  = action_global[actuation_idx * action_dim + 3];
-                                        DeltaXmap1 = action_global[actuation_idx * action_dim + 4];
-                                        DeltaXmap2 = action_global[actuation_idx * action_dim + 5];
-                                    } else {
-                                        cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 1,2,3,5 and 6, but action_dim = " << action_dim << endl;
-                                        MPI_Abort( MPI_COMM_WORLD, 1);
-                                    }
+                            /// Probe local indexes
+                            i = temporal_control_probes[tcp].getLocalIndexI(); 
+                            j = temporal_control_probes[tcp].getLocalIndexJ(); 
+                            k = temporal_control_probes[tcp].getLocalIndexK();
+                            
+                            /// Get perturbation values from RL agent
+                            actuation_idx = static_cast<size_t>(tcp);   /// type size_t
+                            if (action_dim == 1) {
+                                DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                DeltaPhi1  = 0.0;
+                                DeltaPhi2  = 0.0;
+                                DeltaPhi3  = 0.0;
+                                DeltaXmap1 = 0.0;
+                                DeltaXmap2 = 0.0;
+                            } else if (action_dim == 2) {
+                                DeltaRkk   = 0.0;
+                                DeltaPhi1  = 0.0;
+                                DeltaPhi2  = 0.0;
+                                DeltaPhi3  = 0.0;
+                                DeltaXmap1 = action_global[actuation_idx * action_dim + 0];
+                                DeltaXmap2 = action_global[actuation_idx * action_dim + 1];
+                            } else if (action_dim == 3) {
+                                DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                DeltaPhi1  = 0.0;
+                                DeltaPhi2  = 0.0;
+                                DeltaPhi3  = 0.0;
+                                DeltaXmap1 = action_global[actuation_idx * action_dim + 1];
+                                DeltaXmap2 = action_global[actuation_idx * action_dim + 2];
+                            } else if (action_dim == 5) {
+                                DeltaRkk   = 0.0;
+                                DeltaPhi1  = action_global[actuation_idx * action_dim + 0];
+                                DeltaPhi2  = action_global[actuation_idx * action_dim + 1];
+                                DeltaPhi3  = action_global[actuation_idx * action_dim + 2];
+                                DeltaXmap1 = action_global[actuation_idx * action_dim + 3];
+                                DeltaXmap2 = action_global[actuation_idx * action_dim + 4];
+                            } else if (action_dim == 6) {
+                                DeltaRkk   = action_global[actuation_idx * action_dim + 0];
+                                DeltaPhi1  = action_global[actuation_idx * action_dim + 1];
+                                DeltaPhi2  = action_global[actuation_idx * action_dim + 2];
+                                DeltaPhi3  = action_global[actuation_idx * action_dim + 3];
+                                DeltaXmap1 = action_global[actuation_idx * action_dim + 4];
+                                DeltaXmap2 = action_global[actuation_idx * action_dim + 5];
+                            } else {
+                                cerr << "[myRHEA::calculateSourceTerms] _ACTIVE_CONTROL_BODY_FORCE_=1 new action calculation only implemented for action_dim == 1,2,3,5 and 6, but action_dim = " << action_dim << endl;
+                                MPI_Abort( MPI_COMM_WORLD, 1);
+                            }
                                     
-                                    /// Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible 
-                                    isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaPhi1) < EPS && abs(DeltaPhi2) < EPS && abs(DeltaPhi3) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
-                                    isNegligibleRkk    = (abs(Rkk_field[I1D(i,j,k)]) < EPS);
-                                    if (isNegligibleAction || isNegligibleRkk) {
-                                        DeltaRxx_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRyy_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRzz_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRxy_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRxz_field[I1D(i,j,k)] = 0.0;
-                                        DeltaRyz_field[I1D(i,j,k)] = 0.0;
-                                    } else {
+                            /// ------- Calculate DeltaRij_field from DeltaRij d.o.f. (action), if action is not negligible ---------
+                            /// Rij trace (dof #1): Rkk
+                            Rkk                = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
+                            isNegligibleAction = (abs(DeltaRkk) < EPS && abs(DeltaPhi1) < EPS && abs(DeltaPhi2) < EPS && abs(DeltaPhi3) < EPS && abs(DeltaXmap1) < EPS && abs(DeltaXmap2) < EPS);
+                            isNegligibleRkk    = (abs(Rkk) < EPS);
+                            if (isNegligibleAction || isNegligibleRkk) {
+                                DeltaRxx = 0.0;
+                                DeltaRyy = 0.0;
+                                DeltaRzz = 0.0;
+                                DeltaRxy = 0.0;
+                                DeltaRxz = 0.0;
+                                DeltaRyz = 0.0;
+                            } else {
+                                /// -------- Perform Rij eigen-decomposition --------
+                                /// Anisotropy tensor (symmetric, trace-free)
+                                Rkk_inv = 1.0 / Rkk;
+                                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
+                                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
+                                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
+                                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
+                                Aij[1][0]  = Aij[0][1];
+                                Aij[2][0]  = Aij[0][2];
+                                Aij[2][1]  = Aij[1][2];
 
-                                        /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
-                                        /// Delta_* are standarized values between 'action_bounds' RL parameter > normalize actions to desired action bounds
-                                        Rkk_field[I1D(i,j,k)]    += DeltaRkk   * 20.0;
-                                        phi1_field[I1D(i,j,k)]   += DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
-                                        phi2_field[I1D(i,j,k)]   += DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
-                                        phi3_field[I1D(i,j,k)]   += DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
-                                        xmap1_field[I1D(i,j,k)]  += DeltaXmap1 * 1.0;          // xmap1 range: [0,1]
-                                        xmap2_field[I1D(i,j,k)]  += DeltaXmap2 * 1.0;          // xmap2 range: [0,1]
+                                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
+                                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
+                                Aij[0][0] -= Akk / 3.0;
+                                Aij[1][1] -= Akk / 3.0;
+                                Aij[2][2] -= Akk / 3.0;
 
-                                        /// Enforce realizability to perturbed Rij d.o.f (update {Rkk,phi1,phi2,phi3,xmap1,xmap2}_field, if necessary)
-                                        enforceRealizability(Rkk_field[I1D(i,j,k)], phi1_field[I1D(i,j,k)], phi2_field[I1D(i,j,k)], phi3_field[I1D(i,j,k)], xmap1_field[I1D(i,j,k)], xmap2_field[I1D(i,j,k)]);
+                                /// Aij eigen-decomposition
+                                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Dij
+                                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
 
-                                        /// Calculate perturbed & realizable Rij
-                                        eulerAngles2eigVect(phi1_field[I1D(i,j,k)], phi2_field[I1D(i,j,k)], phi3_field[I1D(i,j,k)], QijPert);   // update QijPert
-                                        barycentricCoord2eigValMatrix(xmap1_field[I1D(i,j,k)], xmap2_field[I1D(i,j,k)], DijPert);               // update DijPert
-                                        sortEigenDecomposition(QijPert, DijPert);                                                               // update QijPert & DijPert, if necessary
-                                        Rijdof2matrix(Rkk_field[I1D(i,j,k)], DijPert, QijPert, RijPert);                                        // update RijPert
+                                /// Eigen-vectors Euler ZXZ rotation angles (dof #2-4): phi1, phi2, phi3
+                                eigVect2eulerAngles(Qij, phi1, phi2, phi3);             // update phi1, phi2, phi3
 
-                                        /// Calculate perturbed & realizable DeltaRij
-                                        DeltaRxx_field[I1D(i,j,k)] = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];
-                                        DeltaRyy_field[I1D(i,j,k)] = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                                        DeltaRzz_field[I1D(i,j,k)] = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
-                                        DeltaRxy_field[I1D(i,j,k)] = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
-                                        DeltaRxz_field[I1D(i,j,k)] = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
-                                        DeltaRyz_field[I1D(i,j,k)] = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+                                /// Eigen-values Barycentric coordinates (dof #5-6): xmap1, xmap2
+                                eigValMatrix2barycentricCoord(Dij, xmap1, xmap2);       // update xmap1, xmap2
 
-                                    }
-                                }
+                                /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
+                                /// Delta_* are standarized values between 'action_bounds' RL parameter > normalize actions to desired action bounds
+                                Rkk   += DeltaRkk   * 5.0;
+                                phi1  += DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
+                                phi2  += DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
+                                phi3  += DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
+                                xmap1 += DeltaXmap1 * 1.0;          // xmap1 range: [0,1]
+                                xmap2 += DeltaXmap2 * 1.0;          // xmap2 range: [0,1]
+
+                                /// Enforce realizability to perturbed Rij d.o.f (update {Rkk,phi1,phi2,phi3,xmap1,xmap2}_field, if necessary)
+                                enforceRealizability(Rkk, phi1, phi2, phi3, xmap1, xmap2);
+
+                                /// Calculate perturbed & realizable Rij
+                                eulerAngles2eigVect(phi1, phi2, phi3, QijPert);         // update QijPert
+                                barycentricCoord2eigValMatrix(xmap1, xmap2, DijPert);   // update DijPert
+                                sortEigenDecomposition(QijPert, DijPert);               // update QijPert & DijPert, if necessary
+                                Rijdof2matrix(Rkk, DijPert, QijPert, RijPert);          // update RijPert
+
+                                /// Calculate perturbed & realizable DeltaRij
+                                DeltaRxx = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];      // local values at control probe, once per mpi process / rl environment
+                                DeltaRyy = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
+                                DeltaRzz = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                                DeltaRxy = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
+                                DeltaRxz = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                                DeltaRyz = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
+
                             }
                         }
                     }
+
+                    /// Check only 1 control probe per mpi process; if > 1 num. control probes found per mpi process then DeltaRij is updated more than once
+                    if (num_control_probes_local != 1){
+                        cerr << "[calculateSourceTerms] ERROR: Rank " << my_rank << " has num. control probes: " << num_control_probes_local << "!= 1" << endl;
+                        MPI_Abort( MPI_COMM_WORLD, 1);
+                    }
+
+                    /// TODO: !!!
+                    /// --------- Send/Recv DeltaRij values betw close mpi processes ---------
+                    /// or 
+                    /// --------- create tensor containing DeltaRij of all mpi processes (Gather?) --------
+                    TODO!!!!!
 
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_DeltaRij" );
@@ -1679,62 +1713,6 @@ void myRHEA::manageStreamwiseBulkVelocity() {
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/** Perform eigendecomposition to Reynolds stress tensor
- * 
- * From attributes 'favre_uffuff_field', 'favre_uffvff_field', 'favre_uffwff_field', 'favre_vffvff_field', 'favre_vffwff_field', 'favre_wffwff_field',
- * update attributes 'Rkk_field', 'phi1_field', 'phi2_field', 'phi3_field', 'xmap1_field', 'xmap2_field'
- */
-void myRHEA::updateRijEigenDecomp() {
-
-    /// Auxiliary variables
-    double Rkk_inv, Akk;
-    vector<vector<double>> Aij(3, vector<double>(3, 0.0));
-    vector<vector<double>> Dij(3, vector<double>(3, 0.0));
-    vector<vector<double>> Qij(3, vector<double>(3, 0.0));
-
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                
-                /// Rij trace (dof #1) - update Rkk_field
-                Rkk_field[I1D(i,j,k)] = favre_uffuff_field[I1D(i,j,k)] + favre_vffvff_field[I1D(i,j,k)] + favre_wffwff_field[I1D(i,j,k)];
-                
-                /// Anisotropy tensor (symmetric, trace-free)
-                Rkk_inv = 1.0 / Rkk_field[I1D(i,j,k)];
-                Aij[0][0]  = Rkk_inv * favre_uffuff_field[I1D(i,j,k)] - 1.0/3.0;
-                Aij[1][1]  = Rkk_inv * favre_vffvff_field[I1D(i,j,k)] - 1.0/3.0;
-                Aij[2][2]  = Rkk_inv * favre_wffwff_field[I1D(i,j,k)] - 1.0/3.0;
-                Aij[0][1]  = Rkk_inv * favre_uffvff_field[I1D(i,j,k)];
-                Aij[0][2]  = Rkk_inv * favre_uffwff_field[I1D(i,j,k)];
-                Aij[1][2]  = Rkk_inv * favre_vffwff_field[I1D(i,j,k)];
-                Aij[1][0]  = Aij[0][1];
-                Aij[2][0]  = Aij[0][2];
-                Aij[2][1]  = Aij[1][2];
-
-                /// Ensure a_ij is trace-free (previous calc. introduces computational errors)
-                Akk        = Aij[0][0] + Aij[1][1] + Aij[2][2];
-                Aij[0][0] -= Akk / 3.0;
-                Aij[1][1] -= Akk / 3.0;
-                Aij[2][2] -= Akk / 3.0;
-
-                /// Aij eigen-decomposition
-                symmetricDiagonalize(Aij, Qij, Dij);                   // update Qij, Dij
-                sortEigenDecomposition(Qij, Dij);                      // update Qij, Dij s.t. eigenvalues in decreasing order
-
-                /// Eigen-vectors Euler ZXZ rotation angles (dof #2-4) - update phi1_field, phi2_field, phi3_field
-                eigVect2eulerAngles(Qij, phi1_field[I1D(i,j,k)], phi2_field[I1D(i,j,k)], phi3_field[I1D(i,j,k)]);   
-
-                /// Eigen-values Barycentric coordinates (dof #5-6) - update xmap1_field, ,xmap2_field
-                eigValMatrix2barycentricCoord(Dij, xmap1_field[I1D(i,j,k)], xmap2_field[I1D(i,j,k)]);
-
-            }
-        }
-    }
-
-}
-
-
-///////////////////////////////////////////////////////////////////////////////
 /** Symmetric diagonalization of a 3D matrix
  * 
  * The diagonal matrix D = QT * A * Q;  and  A = Q*D*QT
@@ -2117,6 +2095,8 @@ void myRHEA::readWitnessPoints() {
             std::cerr << "Unable to open file: " << witness_file << std::endl;
             return;
         }
+
+        /// Read lines, containing witness points coordinates
         std::string line;
         while (std::getline(file, line)) {
             std::istringstream iss(line);
@@ -2125,15 +2105,15 @@ void myRHEA::readWitnessPoints() {
                 std::cerr << "Error reading line: " << line << std::endl;
                 return;
             }
-            
+
             /// Fill witness points position tensors
             twp_x_positions.push_back(ix);
             twp_y_positions.push_back(iy);
             twp_z_positions.push_back(iz);
         }
         file.close();
+
         num_witness_probes = static_cast<int>(twp_x_positions.size());
-    
         cout << "Number of witness probes (global_state_size): " << num_witness_probes << endl;
     }
 
@@ -2156,7 +2136,6 @@ void myRHEA::readWitnessPoints() {
 
 /* Pre-process witness points
    Builds 'temporal_witness_probes', vector of TemporalPointProbe elements 
-   Inspired in SOD2D subroutine: CFDSolverBase_preprocWitnessPoints
 */
 void myRHEA::preproceWitnessPoints() {
     
@@ -2193,191 +2172,149 @@ void myRHEA::preproceWitnessPoints() {
     this->state_local_size2 = state_dim * state_local_size2_counter;
     cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
-    MPI_Barrier(MPI_COMM_WORLD); /// TODO: only here for cout debugging purposes, can be deleted?
+    MPI_Barrier(MPI_COMM_WORLD);
 
 }
 
 
-/*  Read control cubes
-    Control cubes are the 3d regions where RL control actions will be applied
-    This method reads the file containing the 3 points defining the control cube
-    Several cubes can be introduced
+/// Read control points
+void myRHEA::readControlPoints(){
 
-    Defines attributes 'num_control_vertices' and 'control_cubes_vertices' in all mpi processes
-*/
-/// Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_readControlRectangles
-void myRHEA::readControlCubes(){
-
-    /// Get attrib. 'num_control_cubes' and 'control_cubes_vertices' (in rank=0)
+    /// Get attrib. 'num_control_probes' (in rank=0)
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     if(my_rank == 0) {
-        cout << "\nReading control cubes..." << endl;
+        cout << "\nReading control points..." << endl;
 
         /// Read file (only with 1 mpi process to avoid file accessing errors)
-        std::ifstream file(control_cubes_file);
+        std::ifstream file(control_file);
         if (!file.is_open()) {
-            cerr << "Unable to open file: " << control_cubes_file << endl;
+            cerr << "Unable to open file: " << control_file << endl;
             return;
         }
         
-        /// Read first line, contains the number of control cubes
-        file >> this->num_control_cubes;
-        file.ignore();                                          // Ignore the newline character after 'num_control_cubes' integer
-        
-        /// Read all following lines, contains control cube vertices
-        int cube_count   = 0;
-        std::string empty_line;
-        while (!file.eof()) { // finishes when end-of-file is reached
-            std::array<std::array<double, 3>, 4> cube_vertices;
-            for (int i = 0; i < 4; i++) {                       /// loop along the 4 vertices
-                if (!(file >> cube_vertices[i][0] >> cube_vertices[i][1] >> cube_vertices[i][2])) {
-                    cerr << "Error reading cube vertices" << endl;
-                    return;
-                }
+         /// Read lines, containing control points coordinates
+        std::string line;
+        while (std::getline(file, line)) {
+            std::istringstream iss(line);
+            double ix, iy, iz;
+            if (!(iss >> ix >> iy >> iz)) {
+                std::cerr << "Error reading line: " << line << std::endl;
+                return;
             }
-            control_cubes_vertices.push_back(cube_vertices);    // store single cube vertices in 'control_cubes_vertices' tensor
-            cube_count++;                                       // update cube count
-            std::getline(file, empty_line);                     // read the empty line separating cubes
+            
+            /// Fill control points position tensors
+            tcp_x_positions.push_back(ix);
+            tcp_y_positions.push_back(iy);
+            tcp_z_positions.push_back(iz);
         }
-
-        /// Check num. cubes read & stored corresponds to expected 'num_control_cubes'
-        if (cube_count != num_control_cubes) {
-            cerr << "Mismatch between expected and actual number of cubes" << endl;
-            cerr << "Additional info: cube_count = " << cube_count << ", num_control_cubes: " << num_control_cubes << endl;
-            return;
-        } 
-        cout << "Number of control cubes: " << num_control_cubes << endl;
-
         file.close();
-
+        
+        num_control_probes = static_cast<int>(tcp_x_positions.size());
+        cout << "Number of control probes (global_state_size): " << num_control_probes << endl;
     }
 
-    /// Broadcast the number of control cubes 'num_control_cubes' to all mpi processes
-    MPI_Bcast(&num_control_cubes, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    /// Broadcast the number of control probes to all mpi processes
+    MPI_Bcast(&num_control_probes, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    /// Resize 'control_cubes_vertices' tensor in all processes with rank != 0
+    // Resize the vectors to hold data in all processes
     if (my_rank != 0) {
-        control_cubes_vertices.resize(num_control_cubes);       /// shape [num_control_cubes, 4, 3]
+        tcp_x_positions.resize(num_control_probes);
+        tcp_y_positions.resize(num_control_probes);
+        tcp_z_positions.resize(num_control_probes);
     }
 
-    /// Broadcast the control cubes vertices coordinates from rank=0 to all processes
-    MPI_Bcast(control_cubes_vertices.data(), num_control_cubes * 4 * 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    /// Broadcast the control probes coordinates from to all processes
+    MPI_Bcast(tcp_x_positions.data(), num_control_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(tcp_y_positions.data(), num_control_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(tcp_z_positions.data(), num_control_probes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 }
 
-/*  Locate grid points within mesh partition which are located inside each cube defined by 4 vertices of 3 coordinates
-    Updates 'action_mask' field: 0.0 for no action, 1.0 for control points of 1st pseudo env (1st control cube, mpi rank 0), 2.0 for control points of 2ns pseudo env (2nd control cube, mpi rank 1), etc.
-    Updates 'num_control_points', 'action_global_size2', 'n_rl_envs'
-    Inspired in SOD2D subroutine: BLMARLFlowSolverIncomp_getControlNodes
+/* Pre-process control points
+   Builds 'temporal_control_probes', vector of TemporalPointProbe elements 
 */
-void myRHEA::getControlCubes() {
+void myRHEA::preproceControlPoints() {
 
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-      
-    /// Initialize local variables
-    std::array<std::array<double,3>,4> cube_vertices; 
-    std::array<double,3> dir1, dir2, dir3, cube_origin, vec_candidate;
-    double size1, size2, size3, x, y, z, proj1, proj2, proj3;
-    bool isInside;
-    int num_control_points_local, num_control_points_per_cube_global, num_control_points_per_cube_local;
-    control_cubes_y_central.resize(num_control_cubes);
+    if(my_rank == 0) {
+        cout << "\nPreprocessing control points..." << endl;
+    }
 
-    /// Set counters to 0
-    n_rl_envs = 0;
-    action_global_size2 = 0;                // global attribute
-    num_control_points = 0;                 // global attribute
-    num_control_points_local = 0;           // local var
-    num_control_points_per_cube_global = 0; // global var
-    num_control_points_per_cube_local = 0;  // local var
+    /// Construct (initialize) temporal point probes for control points
+    TemporalPointProbe temporal_control_probe(mesh, topo);
+    temporal_control_probes.resize( num_control_probes );
+    for(int tcp = 0; tcp < num_control_probes; ++tcp) {
+        /// Set parameters of temporal point probe
+        temporal_control_probe.setPositionX( tcp_x_positions[tcp] );
+        temporal_control_probe.setPositionY( tcp_y_positions[tcp] );
+        temporal_control_probe.setPositionZ( tcp_z_positions[tcp] );
+        /// Insert temporal point probe to vector
+        temporal_control_probes[tcp] = temporal_control_probe;
+        /// Locate closest grid point to probe
+        temporal_control_probes[tcp].locateClosestGridPointToProbe();
+    }
 
-    /// Initialize action_mask to 0 everywhere
-    action_mask = 0.0;
-    int num_cubes_local = 0;                // number of cubes contained in local mpi process
-
-    for (int icube = 0; icube < num_control_cubes; icube++) {
-
-        num_control_points_per_cube_local  = 0;
-        num_control_points_per_cube_global = 0;    
-        
-        /// Define cube vertices and direction vectors of cube -> cube defined by 3 direction vectors
-        cube_vertices = control_cubes_vertices[icube];  // take cube data of cube #icube
-        for (int icoord = 0; icoord < 3; icoord++) {
-            cube_origin[icoord] = cube_vertices[0][icoord];
-            dir1[icoord] = cube_vertices[1][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 1
-            dir2[icoord] = cube_vertices[2][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 2
-            dir3[icoord] = cube_vertices[3][icoord] - cube_vertices[0][icoord];     // direction vertex 0 -> vertex 3
-        }
-
-        /// y-coordinade of cube central point
-        control_cubes_y_central[icube] = cube_origin[1] + 0.5 * ( dir1[1] + dir2[1] + dir3[1] );
-        
-        /// Transform director vectors to unitary vectors for further calculations of dot product
-        size1 = myNorm(dir1);
-        size2 = myNorm(dir2);
-        size3 = myNorm(dir3);
-        for (int icoord = 0; icoord < 3; icoord++) {
-            dir1[icoord] = dir1[icoord] / size1;
-            dir2[icoord] = dir2[icoord] / size2;
-            dir3[icoord] = dir3[icoord] / size3;
-        }
-
-        /// Inner points: locate grid points located inside the cube & update action_mask
-        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-            for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                    
-                    /// Geometric stuff
-                    x = mesh->x[i];
-                    y = mesh->y[j];
-                    z = mesh->z[k];
-                    
-                    /// Define vector from cube origin to point
-                    vec_candidate = {x - cube_origin[0], y - cube_origin[1], z - cube_origin[2]}; 
-                    
-                    /// Define vector projection to cube unitary vectors 
-                    proj1 = myDotProduct(vec_candidate, dir1);
-                    proj2 = myDotProduct(vec_candidate, dir2);
-                    proj3 = myDotProduct(vec_candidate, dir3);
-                    
-                    /// Check condition: point is inside cube
-                    isInside =    (0 <= proj1) && (proj1 <= size1)\
-                               && (0 <= proj2) && (proj2 <= size2)\
-                               && (0 <= proj3) && (proj3 <= size3);
-
-                    /// Store point if inside the cube
-                    if (isInside) {
-                        action_mask[I1D(i,j,k)] = 1.0 + icube;
-                        num_control_points_local++;
-                        num_control_points_per_cube_local++;
-                    }
-                }
-            }
-        }
-
-        /// Check if cube contains any control point
-        MPI_Allreduce(&num_control_points_per_cube_local, &num_control_points_per_cube_global, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update num_control_points_per_cube_global
-        if (num_control_points_per_cube_global == 0){
-            cerr << "[myRHEA::getControlCubes] ERROR: Not found control points for cube #" << icube << endl;
-            MPI_Abort( MPI_COMM_WORLD, 1);
-        } else {
-            n_rl_envs++;
-        }
-
-        /// Update number of cubes in each mpi process
-        if (num_control_points_per_cube_local != 0) {
-            num_cubes_local += 1;
-        }
-
-        /// Logging
-        if (my_rank == 0) {
-            cout << "[myRHEA::getControlCubes] Cube " << icube << " has " << num_control_points_per_cube_global << " control points" << endl;
+    /// Calculate num. control probes local (of my_rank) and debugging logs
+    int num_control_probes_local = 0;
+    for(int tcp = 0; tcp < num_control_probes; ++tcp) {
+        /// Owner rank writes to file
+        if( temporal_control_probes[tcp].getGlobalOwnerRank() == my_rank ) {
+            num_control_probes_local += 1;
         }
     }
 
-    /// Calculate total num_control_points from local values
-    MPI_Allreduce(&num_control_points_local, &num_control_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'num_control_points'
+    /// Calculate 'action_local_size2'
+    int action_local_size2 = action_dim * num_control_probes_local;
+    cout << "Rank " << my_rank << " has num. local control points: " << num_control_probes_local << ", and action local size: " << action_local_size2 << endl;
+
+    /// Calculate global attributes 'action_global_size2', 'n_rl_envs' for all mpi processes
+    MPI_Allreduce(&action_local_size2,       &action_global_size2, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'action_global_size2'
+    MPI_Allreduce(&num_control_probes_local, &n_rl_envs,           1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'n_rl_envs'
+
+    /// Check 0: each mpi process contains a single control point
+    if (num_control_probes_local =! 1){
+        cerr << "[myRHEA::preproceControlCubes] ERROR: Rank " << my_rank << " has num. control points: " << num_control_probes_local << " != 1"  << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1);
+    }
+
+    /// Check 1: action_global_size2 == n_rl_envs * action_dim
+    if (action_global_size2 != n_rl_envs * action_dim){
+        cerr << "[myRHEA::preproceControlCubes] ERROR: Rank " << my_rank << " has action global size (" << action_global_size2 << ") != n_rl_envs (" << n_rl_envs << ") * action_dim (" << action_dim << ")" << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    /// Check 2: num. of control probes == num. mpi processes == num. RL environments, and mpi processes must be distributed only along y-coordinate
+    if ((np_x == 1) && (np_y == n_rl_envs) && (np_z == 1) && (num_control_probes == n_rl_envs)) {
+        /// Logging successful distribution
+        if (my_rank == 0) {
+            stringstream ss;
+            ss << "Correct RL environments (control probes) and computational domain distribution: "
+               << "1 RL environment per MPI process distributed along y-coordinate, with "
+               << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs;
+            cout << ss.str() << endl;
+        }
+    } else {
+        stringstream ss;
+        ss << "[myRHEA::preproceControlPoints] ERROR: Invalid RL environments & computational domain distribution, with "
+           << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs
+           << ", Rank " << my_rank << " has " << num_control_probes_local << " RL environments / control probes";
+        cerr << endl << ss.str() << endl;     
+        MPI_Abort( MPI_COMM_WORLD, 1);
+    }
+
+    /// Logging
+    if (my_rank == 0) {
+        cout << "Total number of control probes: " << num_control_probes << endl;
+        cout << "Action global size: " << action_global_size2 << endl;
+        cout << "Number of RL pseudo-environments: " << n_rl_envs << endl; 
+        cout << "Action dimension: " << action_dim << endl; 
+        for(int tcp = 0; tcp < num_control_probes; ++tcp) {
+            cout << "Control probe #" << tcp << " has coordinates: " << tcp_x_positions[tcp] << " " << tcp_y_positions[tcp] << " " << tcp_z_positions[tcp]
+                 << ", in Rank: " << temporal_control_probes[tcp].getGlobalOwnerRank() << endl;
+        }
+    }
 
     /// Debugging: boundaries of RL environments / mpi processes 
     cout << "Rank " << my_rank << " has RL environment / mpi process domain inner boundaries: "  
@@ -2389,57 +2326,6 @@ void myRHEA::getControlCubes() {
          << "y-idx in (" << topo->iter_common[_INNER_][_INIY_] << ", " << topo->iter_common[_INNER_][_ENDY_] << "), "
          << "z-idx in (" << topo->iter_common[_INNER_][_INIZ_] << ", " << topo->iter_common[_INNER_][_ENDZ_] << ")" << endl;
 
-    /// Check 1: num. of control cubes == num. mpi processes, and mpi processes must be distributed only along y-coordinate
-    action_global_size2 = n_rl_envs * action_dim;
-    if ((np_x == 1) && (np_y == n_rl_envs) && (np_z == 1) && (n_rl_envs == np_y) && (num_cubes_local == 1)) {
-        /// Logging successful distribution
-        if (my_rank == 0) {
-            stringstream ss;
-            ss << "[myRHEA::getControlCubes] Correct RL environments (control cubes) and computational domain distribution: "
-               << "1 RL environment per MPI process distributed along y-coordinate, with "
-               << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs;
-            cout << ss.str() << endl;
-        }
-    } else {
-        stringstream ss;
-        ss << "[myRHEA::getControlCubes] ERROR: Invalid RL environments & computational domain distribution, with "
-           << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs
-           << ", Rank " << my_rank << " has " << num_cubes_local << " RL environments / control cubes";
-        cerr << endl << ss.str() << endl;     
-        MPI_Abort( MPI_COMM_WORLD, 1);
-    }
-
-    /// Check 2: action_mask has valid values
-    MPI_Barrier(MPI_COMM_WORLD);            /// MPI_Barrier necessary for action_global_size2 to be updated by all mpi processes
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                if ( ( action_mask[I1D(i,j,k)] < 0.0 ) || ( static_cast<int>(action_mask[I1D(i,j,k)]) > action_global_size2 ) ) {
-                    cerr << "OUT OF RANGE ERROR: Invalid action_mask index at " << i << ","  << j << "," << k << ": " << action_mask[I1D(i,j,k)] 
-                            << ", action global size: " << action_global_size2 << endl;
-                    MPI_Abort(MPI_COMM_WORLD, 1);
-                }
-            }
-        }
-    }
-
-    /// Check 3: action_global_size2 == n_rl_envs * action_dim
-    if (action_global_size2 != n_rl_envs * action_dim){
-        cerr << "Rank " << my_rank << " has action global size (" << action_global_size2 << ") != n_rl_envs (" << n_rl_envs << ") * action_dim (" << action_dim << ")" << endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-
-    /// Logging
-    if (my_rank == 0) {
-        cout << "[myRHEA::getControlCubes] Total number of control points: " << num_control_points << endl;
-        cout << "[myRHEA::getControlCubes] Action global size (num. cubes with at least 1 control point): " << action_global_size2 << endl;
-        cout << "[myRHEA::getControlCubes] Number of RL pseudo-environments: " << n_rl_envs << endl; 
-        cout << "[myRHEA::getControlCubes] Action dimension: " << action_dim << endl; 
-        for (int icube = 0; icube < num_control_cubes; icube++) {
-            cout << "[myRHEA::getControlCubes] Cube #" << icube << " has central point with y-coordinate: " << control_cubes_y_central[icube] << endl;
-        }
-    }
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
 
