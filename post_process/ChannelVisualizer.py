@@ -1784,102 +1784,160 @@ class ChannelVisualizer():
 
 # ------------------------------------ RHS terms of drhou/dt, drhov/dt, drhow/dt -------------------------------------------
 
-    def build_rhovel_fig_from_dicts(self, y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim, vel_name):
-        #import pdb; pdb.set_trace()
-        y_coord_name_list = list(y_plus_dict.keys()) 
-        n_y_coord         = len(y_coord_name_list)
-        colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
-        assert n_y_coord == 4
-        fig, ax = plt.subplots(2,2,figsize=(12,6))
-        for i in range(n_y_coord):
-            y_coord = y_coord_name_list[i]
-            row, col = divmod(i, 2)
-            if i == 0:
-                ax[row, col].plot(time, rhovel_dict[y_coord],      color=colors_list[0], lw=2, label=rf"$\rho {vel_name}$ value")
-                ax[row, col].plot(time, rhovel_inv_dict[y_coord],  color=colors_list[1], lw=2, label=rf"inv. term")
-                ax[row, col].plot(time, rhovel_vis_dict[y_coord],  color=colors_list[2], lw=2, label=rf"vis. term")
-                ax[row, col].plot(time, f_rhovel_dict[y_coord],    color=colors_list[3], lw=2, label=rf"forcing term")
-                ax[row, col].plot(time, rl_f_rhovel_dict[y_coord], color=colors_list[4], lw=2, label=rf"RL term")
-            else:
-                ax[row, col].plot(time, rhovel_dict[y_coord],      color=colors_list[0], lw=2)
-                ax[row, col].plot(time, rhovel_inv_dict[y_coord],  color=colors_list[1], lw=2)
-                ax[row, col].plot(time, rhovel_vis_dict[y_coord],  color=colors_list[2], lw=2)
-                ax[row, col].plot(time, f_rhovel_dict[y_coord],    color=colors_list[3], lw=2)
-                ax[row, col].plot(time, rl_f_rhovel_dict[y_coord], color=colors_list[4], lw=2)
-            ax[row, col].set_title(rf"$y^+={y_plus_dict[y_coord]:.2f}$", pad=10)
-            if ylim is not None:
-                ax[row, col].set_ylim(ylim)
-            ax[row, col].grid()
-            #ax[row, col].set_xlabel(r"averaging time [s]", labelpad=10)
-        fig.suptitle(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = ${global_step}$", y=0.97)
-        fig.tight_layout()
-        fig.subplots_adjust(right=0.80)                         
-        fig.legend(loc='center left', bbox_to_anchor=(0.83,0.5))
-        return fig
+    def build_rhovel_fig_from_dicts(self, ensemble_dict, avg_time_RL, global_step, ylim):
 
-    def build_rhovel_frame_from_dicts(self, frames_rhovel, y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim=None, vel_name='u'):
-        fig = self.build_rhovel_fig_from_dicts(y_plus_dict, time, rhovel_dict, rhovel_inv_dict, rhovel_vis_dict, f_rhovel_dict, rl_f_rhovel_dict, avg_time_RL, global_step, ylim, vel_name)
-        fig.canvas.draw()
-        img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-        frames_rhovel.append(img)
-        plt.close()
-        return frames_rhovel
+        # Variables keys (used in probes data files)
+        time_key         = "# t [s]"
+        y_plus_key       = 'y_plus [m]'
+        rhou_key         = " u [m/s]"    # Assuming constant rho_0=1
+        rhov_key         = " v [m/s]"
+        rhow_key         = " w [m/s]"
+        rhovel_keys      = [rhou_key, rhov_key, rhow_key]
+        rhou_inv_key     = " rhou_inv_flux [kg/m2s2]"
+        rhov_inv_key     = " rhov_inv_flux [kg/m2s2]"
+        rhow_inv_key     = " rhow_inv_flux [kg/m2s2]"
+        rhovel_inv_keys  = [rhou_inv_key, rhov_inv_key, rhow_inv_key]
+        rhou_vis_key     = " rhou_vis_flux [kg/m2s2]"
+        rhov_vis_key     = " rhov_vis_flux [kg/m2s2]"
+        rhow_vis_key     = " rhow_vis_flux [kg/m2s2]"
+        rhovel_vis_keys  = [rhou_vis_key, rhov_vis_key, rhow_vis_key]
+        f_rhou_key       = " f_rhou [kg/m2s2]"
+        f_rhov_key       = " f_rhov [kg/m2s2]"
+        f_rhow_key       = " f_rhow [kg/m2s2]"
+        f_rhovel_keys    = [f_rhou_key, f_rhov_key, f_rhow_key]
+        rl_f_rhou_key    = " rl_f_rhou [kg/m2s2]"
+        rl_f_rhov_key    = " rl_f_rhov [kg/m2s2]"
+        rl_f_rhow_key    = " rl_f_rhow [kg/m2s2]"
+        rl_f_rhovel_keys = [rl_f_rhou_key, rl_f_rhov_key, rl_f_rhow_key]
+        vel_names        = ['u', 'v', 'w']
+        n_dim            = 3
+
+        #import pdb; pdb.set_trace()
+        y_coord_name_list = list(ensemble_dict.keys()) 
+        n_y_coord         = len(y_coord_name_list)
+        assert n_y_coord == 4
+        colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
+        figs_list         = []
+        for dim in range(n_dim):
+            vel_name = vel_names[dim]
+            fig, ax = plt.subplots(2,2,figsize=(12,6))
+            for i in range(n_y_coord):
+                y_coord = y_coord_name_list[i]
+                y_plus_value = ensemble_dict[y_coord][y_plus_key]
+                row, col = divmod(i, 2)
+                if i == 0:
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rhovel_keys[dim]],      color=colors_list[0], lw=2, label=rf"$\rho {vel_name}$ value")
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rhovel_inv_keys[dim]],  color=colors_list[1], lw=2, label=rf"inv. term")
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rhovel_vis_keys[dim]],  color=colors_list[2], lw=2, label=rf"vis. term")
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][f_rhovel_keys[dim]],    color=colors_list[3], lw=2, label=rf"forcing term")
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rl_f_rhovel_keys[dim]], color=colors_list[4], lw=2, label=rf"RL term")
+                else:
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rhovel_keys[dim]],      color=colors_list[0], lw=2)
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rhovel_inv_keys[dim]],  color=colors_list[1], lw=2)
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rhovel_vis_keys[dim]],  color=colors_list[2], lw=2)
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][f_rhovel_keys[dim]],    color=colors_list[3], lw=2)
+                    ax[row, col].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][rl_f_rhovel_keys[dim]], color=colors_list[4], lw=2)
+                ax[row, col].set_title(rf"$y^+={y_plus_value:.2f}$", pad=10)
+                if ylim is not None:
+                    ax[row, col].set_ylim(ylim)
+                ax[row, col].grid()
+                #ax[row, col].set_xlabel(r"averaging time [s]", labelpad=10)
+            fig.suptitle(rf"RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = ${global_step}$", y=0.97)
+            fig.tight_layout()
+            fig.subplots_adjust(right=0.80)                         
+            fig.legend(loc='center left', bbox_to_anchor=(0.83,0.5))
+            figs_list.append(fig)
+            plt.close(fig)
+        return figs_list
+
+    def build_rhovel_frame_from_dicts(self, frames_list, ensemble_dict, avg_time_RL, global_step, ylim=None):
+        figs_list = self.build_rhovel_fig_from_dicts(ensemble_dict, avg_time_RL, global_step, ylim)
+        assert len(figs_list) == len(frames_list)
+        for i in range(len(figs_list)):
+            fig = figs_list[i]
+            fig.canvas.draw()
+            img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+            frames_list[i].append(img)
+            plt.close()
+        return frames_list
 
 
 # ------------------------------------ RHS terms of d_DeltaRij_j -------------------------------------------
 
-    def build_d_DeltaRij_j_fig_from_dicts(self, y_plus_dict, time, 
-                                          d_DeltaRxj_j_dict, d_DeltaRyj_j_dict, d_DeltaRzj_j_dict,
-                                          d_DeltaRxx_x_dict, d_DeltaRxy_x_dict, d_DeltaRxz_x_dict,
-                                          d_DeltaRxy_y_dict, d_DeltaRyy_y_dict, d_DeltaRyz_y_dict,
-                                          d_DeltaRxz_z_dict, d_DeltaRyz_z_dict, d_DeltaRzz_z_dict,
-                                          avg_time_RL, global_step):
+    def build_d_DeltaRij_j_fig_from_dicts(self, ensemble_dict, avg_time_RL, global_step):
+
+        # Variables keys (used in probes data files)
+        time_key         = "# t [s]"
+        y_plus_key       = 'y_plus [m]'
+        d_DeltaRxj_j_key = " d_DeltaRxj_j [m/s2]"
+        d_DeltaRyj_j_key = " d_DeltaRyj_j [m/s2]"
+        d_DeltaRzj_j_key = " d_DeltaRzj_j [m/s2]"
+        d_DeltaRxx_x_key = " d_DeltaRxx_x [m/s2]"
+        d_DeltaRxy_x_key = " d_DeltaRxy_x [m/s2]"
+        d_DeltaRxz_x_key = " d_DeltaRxz_x [m/s2]"
+        d_DeltaRxy_y_key = " d_DeltaRxy_y [m/s2]"
+        d_DeltaRyy_y_key = " d_DeltaRyy_y [m/s2]"
+        d_DeltaRyz_y_key = " d_DeltaRyz_y [m/s2]"
+        d_DeltaRxz_z_key = " d_DeltaRxz_z [m/s2]"
+        d_DeltaRyz_z_key = " d_DeltaRyz_z [m/s2]"
+        d_DeltaRzz_z_key = " d_DeltaRzz_z [m/s2]"
+
         #import pdb; pdb.set_trace()
-        y_coord_name_list = list(y_plus_dict.keys()) 
+        y_coord_name_list = list(ensemble_dict.keys()) 
         n_y_coord         = len(y_coord_name_list)
         colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
         assert n_y_coord == 4
-        fig, ax = plt.subplots(3,4,figsize=(17,12))
+        fig, ax = plt.subplots(3,4,figsize=(16,10))
         for i in range(n_y_coord):
             y_coord = y_coord_name_list[i]
+            y_plus_value = ensemble_dict[y_coord][y_plus_key]
             # d_DeltaRxj_j
-            ax[0,0].plot(time, d_DeltaRxj_j_dict[y_coord], color=colors_list[i], lw=2, label=rf"$y^+={y_plus_dict[y_coord]:.2f}$")
+            ax[0,0].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRxj_j_key], color=colors_list[i], lw=2, label=rf"$y^+={y_plus_value:.2f}$")
             ax[0,0].set_title(r"$\partial \Delta R_{xj} / \partial x_j$", pad=10)
-            # d_DeltaRxx_x
-            ax[0,1].plot(time, d_DeltaRxx_x_dict[y_coord], color=colors_list[i], lw=2)
-            ax[0,1].set_title(r"$\partial \Delta R_{xx} / \partial x$", pad=10)
-            # d_DeltaRxy_y
-            ax[0,2].plot(time, d_DeltaRxy_y_dict[y_coord], color=colors_list[i], lw=2)
-            ax[0,2].set_title(r"$\partial \Delta R_{xy} / \partial y$", pad=10)
-            # d_DeltaRxz_z
-            ax[0,3].plot(time, d_DeltaRxz_z_dict[y_coord], color=colors_list[i], lw=2)
-            ax[0,3].set_title(r"$\partial \Delta R_{xz} / \partial z$", pad=10)
+            try:    # for some cases d_DeltaRxx_x, d_DeltaRxy_y, d_DeltaRxz_z is not stored in probes data
+                # d_DeltaRxx_x
+                ax[0,1].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRxx_x_key], color=colors_list[i], lw=2)
+                ax[0,1].set_title(r"$\partial \Delta R_{xx} / \partial x$", pad=10)
+                # d_DeltaRxy_y
+                ax[0,2].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRxy_y_key], color=colors_list[i], lw=2)
+                ax[0,2].set_title(r"$\partial \Delta R_{xy} / \partial y$", pad=10)
+                # d_DeltaRxz_z
+                ax[0,3].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRxz_z_key], color=colors_list[i], lw=2)
+                ax[0,3].set_title(r"$\partial \Delta R_{xz} / \partial z$", pad=10)
+            except KeyError:
+                pass
             #####
             # d_DeltaRyj_j
-            ax[1,0].plot(time, d_DeltaRyj_j_dict[y_coord], color=colors_list[i], lw=2)
+            ax[1,0].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRyj_j_key], color=colors_list[i], lw=2)
             ax[1,0].set_title(r"$\partial \Delta R_{yj} / \partial x_j$", pad=10)
-            # d_DeltaRyx_x
-            ax[1,1].plot(time, d_DeltaRxy_x_dict[y_coord], color=colors_list[i], lw=2)
-            ax[1,1].set_title(r"$\partial \Delta R_{yx} / \partial x$", pad=10)
-            # d_DeltaRyy_y
-            ax[1,2].plot(time, d_DeltaRyy_y_dict[y_coord], color=colors_list[i], lw=2)
-            ax[1,2].set_title(r"$\partial \Delta R_{yy} / \partial y$", pad=10)
-            # d_DeltaRyz_z
-            ax[1,3].plot(time, d_DeltaRyz_z_dict[y_coord], color=colors_list[i], lw=2)
-            ax[1,3].set_title(r"$\partial \Delta R_{yz} / \partial z$", pad=10)
+            try: 
+                # d_DeltaRyx_x
+                ax[1,1].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRxy_x_key], color=colors_list[i], lw=2)
+                ax[1,1].set_title(r"$\partial \Delta R_{yx} / \partial x$", pad=10)
+                # d_DeltaRyy_y
+                ax[1,2].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRyy_y_key], color=colors_list[i], lw=2)
+                ax[1,2].set_title(r"$\partial \Delta R_{yy} / \partial y$", pad=10)
+                # d_DeltaRyz_z
+                ax[1,3].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRyz_z_key], color=colors_list[i], lw=2)
+                ax[1,3].set_title(r"$\partial \Delta R_{yz} / \partial z$", pad=10)
+            except KeyError:
+                pass
             #####
             # d_DeltaRzj_j
-            ax[2,0].plot(time, d_DeltaRzj_j_dict[y_coord], color=colors_list[i], lw=2)
+            ax[2,0].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRzj_j_key], color=colors_list[i], lw=2)
             ax[2,0].set_title(r"$\partial \Delta R_{zj} / \partial x_j$", pad=10)
-            # d_DeltaRzx_x
-            ax[2,1].plot(time, d_DeltaRxz_x_dict[y_coord], color=colors_list[i], lw=2)
-            ax[2,1].set_title(r"$\partial \Delta R_{zx} / \partial x$", pad=10)
-            # d_DeltaRzy_y
-            ax[2,2].plot(time, d_DeltaRyz_y_dict[y_coord], color=colors_list[i], lw=2)
-            ax[2,2].set_title(r"$\partial \Delta R_{zy} / \partial y$", pad=10)
-            # d_DeltaRzz_z
-            ax[2,3].plot(time, d_DeltaRzz_z_dict[y_coord], color=colors_list[i], lw=2)
-            ax[2,3].set_title(r"$\partial \Delta R_{zz} / \partial z$", pad=10)
+            try:
+                # d_DeltaRzx_x
+                ax[2,1].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRxz_x_key], color=colors_list[i], lw=2)
+                ax[2,1].set_title(r"$\partial \Delta R_{zx} / \partial x$", pad=10)
+                # d_DeltaRzy_y
+                ax[2,2].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRyz_y_key], color=colors_list[i], lw=2)
+                ax[2,2].set_title(r"$\partial \Delta R_{zy} / \partial y$", pad=10)
+                # d_DeltaRzz_z
+                ax[2,3].plot(ensemble_dict[y_coord][time_key], ensemble_dict[y_coord][d_DeltaRzz_z_key], color=colors_list[i], lw=2)
+                ax[2,3].set_title(r"$\partial \Delta R_{zz} / \partial z$", pad=10)
+            except KeyError:
+                pass
         for i in range(12):
             row,col = divmod(i,4)
             ax[row,col].grid()
@@ -1890,13 +1948,8 @@ class ChannelVisualizer():
         fig.legend(loc='center left', bbox_to_anchor=(0.86,0.5))
         return fig
 
-    def build_d_DeltaRij_j_frame_from_dicts(self, frames, y_plus_dict, time, 
-                                            d_DeltaRxj_j_dict, d_DeltaRyj_j_dict, d_DeltaRzj_j_dict, 
-                                            d_DeltaRxx_x_dict, d_DeltaRxy_x_dict, d_DeltaRxz_x_dict,
-                                            d_DeltaRxy_y_dict, d_DeltaRyy_y_dict, d_DeltaRyz_y_dict,
-                                            d_DeltaRxz_z_dict, d_DeltaRyz_z_dict, d_DeltaRzz_z_dict,
-                                            avg_time_RL, global_step):
-        fig = self.build_d_DeltaRij_j_fig_from_dicts(y_plus_dict, time, d_DeltaRxj_j_dict, d_DeltaRyj_j_dict, d_DeltaRzj_j_dict, d_DeltaRxx_x_dict, d_DeltaRxy_x_dict, d_DeltaRxz_x_dict,d_DeltaRxy_y_dict, d_DeltaRyy_y_dict, d_DeltaRyz_y_dict,d_DeltaRxz_z_dict, d_DeltaRyz_z_dict, d_DeltaRzz_z_dict,avg_time_RL, global_step)
+    def build_d_DeltaRij_j_frame_from_dicts(self, frames, ensemble_dict, avg_time_RL, global_step):
+        fig = self.build_d_DeltaRij_j_fig_from_dicts(ensemble_dict, avg_time_RL, global_step)
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
