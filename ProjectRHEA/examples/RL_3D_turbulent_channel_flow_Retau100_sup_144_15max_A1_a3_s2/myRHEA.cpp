@@ -17,7 +17,6 @@ using namespace std;
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _RL_CONTROL_IS_SUPERVISED_ 1
-#define _SPATIAL_SMOOTHING_RL_ACTION_ 1
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
 #define _WITNESS_XZ_SLICES_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
@@ -173,11 +172,6 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhou_field.setTopology(topo, "rl_f_rhou_field");
     rl_f_rhov_field.setTopology(topo, "rl_f_rhov_field");
     rl_f_rhow_field.setTopology(topo, "rl_f_rhow_field");
-#if _SPATIAL_SMOOTHING_RL_ACTION_
-    rl_f_rhou_field_aux.setTopology(topo, "rl_f_rhou_field_aux");
-    rl_f_rhov_field_aux.setTopology(topo, "rl_f_rhov_field_aux");
-    rl_f_rhow_field_aux.setTopology(topo, "rl_f_rhow_field_aux");
-#endif  /// of _SPATIAL_SMOOTHING_RL_ACTION_
 #if _TEMPORAL_SMOOTHING_RL_ACTION_
     rl_f_rhou_field_prev_step.setTopology(topo, "rl_f_rhou_field_prev_step");
     rl_f_rhov_field_prev_step.setTopology(topo, "rl_f_rhov_field_prev_step");
@@ -186,6 +180,12 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rl_f_rhov_field_curr_step.setTopology(topo, "rl_f_rhov_field_curr_step");
     rl_f_rhow_field_curr_step.setTopology(topo, "rl_f_rhow_field_curr_step");
 #endif  /// of _TEMPORAL_SMOOTHING_RL_ACTION_
+    DeltaRxx_field.setTopology(topo, "DeltaRxx");
+    DeltaRxy_field.setTopology(topo, "DeltaRxy");
+    DeltaRxz_field.setTopology(topo, "DeltaRxz");
+    DeltaRyy_field.setTopology(topo, "DeltaRyy");
+    DeltaRyz_field.setTopology(topo, "DeltaRyz");
+    DeltaRzz_field.setTopology(topo, "DeltaRzz");
     d_DeltaRxx_x_field.setTopology(topo, "d_DeltaRxx_x_field"); 
     d_DeltaRxy_x_field.setTopology(topo, "d_DeltaRxy_x_field"); 
     d_DeltaRxz_x_field.setTopology(topo, "d_DeltaRxz_x_field"); 
@@ -591,7 +591,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     /// Control cubic regions
     readControlPoints();
     preproceControlPoints();        // updates 'action_global_size2', 'n_rl_envs'
-    MPI_Abort(MPI_COMM_WORLD, 1);   // TODO: delete line
     
     /// Allocate action data
     /// Annotation: State is stored in arrays of different sizes on each MPI rank.
@@ -601,29 +600,31 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     std::fill(action_global.begin(), action_global.end(), 0.0);
     std::fill(state_local.begin(), state_local.end(), 0.0);
 
-    /// Auxiliary variable for reward calculation
+    /// Auxiliary variables for reward calculation
 #if _RL_CONTROL_IS_SUPERVISED_
     /// -------------- Build rmsf_u,v,w_reference_field --------------
-    // Accessing the global domain decomposition data
+    
+    /// Accessing the global domain decomposition data
     int global_startY, global_j;
     int globalNy    = topo->getMesh()->getGNy();    // Total number of y-cells in the global domain
     int localNy     = topo->getlNy()-2;             // Local number of y-cells for this process (-2 for inner points only)
     int divy        = globalNy % np_y;              // Remainder for non-uniform decomposition
-    // Calculate the rank's position in the y-dimension based on rank and grid layout
+    /// Calculate the rank's position in the y-dimension based on rank and grid layout
     int plane_rank = my_rank % (np_x * np_y);
     int rank_in_y  = plane_rank / np_x;             // Rank's position in the y-dimension (row in the global grid)
-    // Calculate the global start index for this rank's local slice in the y-dimension
+    /// Calculate the global start index for this rank's local slice in the y-dimension
     if (rank_in_y < divy) {
         global_startY = rank_in_y * (localNy + 1);  // Extra cell for some ranks
     } else {
         global_startY = rank_in_y * localNy + divy; // Regular distribution for remaining ranks
     }
-    // Debugging
-    cout << "Rank " << my_rank << ": npx=" << np_x << ", npy=" << np_y 
-         << ", localNy=" << localNy << ", divy=" << divy 
-         << ", globalNy=" << globalNy << ", rank_in_y=" << rank_in_y 
-         << ", global_startY=" << global_startY << endl;
-    // Fill global profile data into local field data
+    
+    /// Debugging
+    /// cout << "[Rank " << my_rank << "] npx=" << np_x << ", npy=" << np_y 
+    ///      << ", localNy=" << localNy << ", divy=" << divy 
+    ///      << ", globalNy=" << globalNy << ", rank_in_y=" << rank_in_y 
+    ///      << ", global_startY=" << global_startY << endl;
+    /// Fill global profile data into local field data
     for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
         global_j = global_startY + (j - topo->iter_common[_INNER_][_INIY_]);
         for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -635,12 +636,12 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
             }
         }
         /// Debugging
-        cout << "Rank " << my_rank << ": j=" << j << " (local), global_j=" << global_j 
-             << ", Reference value of avg_u: " << avg_u_reference_profile[global_j]
-             << ", rmsf_u: " << rmsf_u_reference_profile[global_j]
-             << ", rmsf_v: " << rmsf_v_reference_profile[global_j]
-             << ", rmsf_w: " << rmsf_w_reference_profile[global_j] 
-             << endl;
+        /// cout << "[Rank " << my_rank << "] j=" << j << " (local), global_j=" << global_j 
+        ///      << ", Reference value of avg_u: " << avg_u_reference_profile[global_j]
+        ///      << ", rmsf_u: " << rmsf_u_reference_profile[global_j]
+        ///      << ", rmsf_v: " << rmsf_v_reference_profile[global_j]
+        ///      << ", rmsf_w: " << rmsf_w_reference_profile[global_j] 
+        ///      << endl;
     }
     /// Reward calculation auxiliary variables
     l2_err_avg_u_previous = 0.0;
@@ -666,15 +667,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
 /// Based on subroutine mod_smartredis::init_smartredis
 void myRHEA::initSmartRedis() {
-    /// TODO: transform this Fortran code of BLMARLFlowSolver_Incomp.f90 to current implementation and C++
-    /*
-    class(BLMARLFlowSolverIncomp), intent(inout) :: this
-    open(unit=443,file="./output_"//trim(adjustl(this%tag))//"/"//"control_action.txt",status='replace')
-    open(unit=445,file="./output_"//trim(adjustl(this%tag))//"/"//"control_reward.txt",status='replace')
-    */  
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-
+    
     /// Create new smart redis manager
     manager = new SmartRedisManager(state_local_size2, action_dim, action_global_size2, n_rl_envs, tag, db_clustered);
 
@@ -933,13 +926,16 @@ void myRHEA::calculateSourceTerms() {
                     timers->start( "rl_update_DeltaRij" );
 
                     /// Initialize variables
-                    int num_control_probes_local = 0; 
-                    double Rkk, phi1, phi2, phi3, xmap1, xmap2;
-                    double DeltaRkk, DeltaPhi1, DeltaPhi2, DeltaPhi3, DeltaXmap1, DeltaXmap2; 
-                    double DeltaRxx, DeltaRyy, DeltaRzz, DeltaRxy, DeltaRxz, DeltaRyz;
+                    int i,j,k;
+                    int num_control_probes_local_counter = 0; 
+                    double Rkk = 0.0, phi1 = 0.0, phi2 = 0.0, phi3 = 0.0, xmap1 = 0.0, xmap2 = 0.0;
+                    double DeltaRkk = 0.0, DeltaPhi1 = 0.0, DeltaPhi2 = 0.0, DeltaPhi3 = 0.0, DeltaXmap1 = 0.0, DeltaXmap2 = 0.0; 
+                    double DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz;
                     bool   isNegligibleAction, isNegligibleRkk;
                     size_t actuation_idx;
                     double Rkk_inv, Akk;
+                    vector<double> tcp_position(3, 0.0);
+                    vector<double> tcp_DeltaRij(6, 0.0);
                     vector<vector<double>> Aij(3, vector<double>(3, 0.0));
                     vector<vector<double>> Dij(3, vector<double>(3, 0.0));
                     vector<vector<double>> Qij(3, vector<double>(3, 0.0));                
@@ -951,12 +947,13 @@ void myRHEA::calculateSourceTerms() {
                     for(int tcp = 0; tcp < num_control_probes; ++tcp) {
                         if( temporal_control_probes[tcp].getGlobalOwnerRank() == my_rank ) {
                             
-                            num_control_probes_local++;
+                            num_control_probes_local_counter++;
 
                             /// Probe local indexes
                             i = temporal_control_probes[tcp].getLocalIndexI(); 
                             j = temporal_control_probes[tcp].getLocalIndexJ(); 
                             k = temporal_control_probes[tcp].getLocalIndexK();
+                            tcp_position = {x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)]};
                             
                             /// Get perturbation values from RL agent
                             actuation_idx = static_cast<size_t>(tcp);   /// type size_t
@@ -1007,11 +1004,11 @@ void myRHEA::calculateSourceTerms() {
                             isNegligibleRkk    = (abs(Rkk) < EPS);
                             if (isNegligibleAction || isNegligibleRkk) {
                                 DeltaRxx = 0.0;
-                                DeltaRyy = 0.0;
-                                DeltaRzz = 0.0;
                                 DeltaRxy = 0.0;
                                 DeltaRxz = 0.0;
+                                DeltaRyy = 0.0;
                                 DeltaRyz = 0.0;
+                                DeltaRzz = 0.0;
                             } else {
                                 /// -------- Perform Rij eigen-decomposition --------
                                 /// Anisotropy tensor (symmetric, trace-free)
@@ -1062,27 +1059,84 @@ void myRHEA::calculateSourceTerms() {
 
                                 /// Calculate perturbed & realizable DeltaRij
                                 DeltaRxx = RijPert[0][0] - favre_uffuff_field[I1D(i,j,k)];      // local values at control probe, once per mpi process / rl environment
-                                DeltaRyy = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
-                                DeltaRzz = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
                                 DeltaRxy = RijPert[0][1] - favre_uffvff_field[I1D(i,j,k)];
                                 DeltaRxz = RijPert[0][2] - favre_uffwff_field[I1D(i,j,k)];
+                                DeltaRyy = RijPert[1][1] - favre_vffvff_field[I1D(i,j,k)];
                                 DeltaRyz = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
-
+                                DeltaRzz = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
+                                tcp_DeltaRij = {DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz};
                             }
                         }
                     }
 
                     /// Check only 1 control probe per mpi process; if > 1 num. control probes found per mpi process then DeltaRij is updated more than once
-                    if (num_control_probes_local != 1){
-                        cerr << "[calculateSourceTerms] ERROR: Rank " << my_rank << " has num. control probes: " << num_control_probes_local << "!= 1" << endl;
+                    if (num_control_probes_local_counter != 1){
+                        cerr << "[calculateSourceTerms] ERROR: Rank " << my_rank << " has num. control probes: " << num_control_probes_local_counter << " != 1" << endl;
                         MPI_Abort( MPI_COMM_WORLD, 1);
                     }
 
-                    /// TODO: !!!
-                    /// --------- Send/Recv DeltaRij values betw close mpi processes ---------
-                    /// or 
-                    /// --------- create tensor containing DeltaRij of all mpi processes (Gather?) --------
-                    TODO!!!!!
+                    /// --------- Send/Recv DeltaRij values betw neighboring mpi processes / rl environments ---------
+                    vector<double> tcp_position_yprev(3, 0.0);
+                    vector<double> tcp_position_ynext(3, 0.0);
+                    vector<double> tcp_DeltaRij_yprev(6, 0.0);
+                    vector<double> tcp_DeltaRij_ynext(6, 0.0);
+                    MPI_Request requests2[8];
+                    int req_count2 = 0;
+                    
+                    /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
+                    if (my_rank > 0) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests2[req_count2++]);
+                        MPI_Irecv(tcp_position_yprev.data(), 3, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests2[req_count2++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - 1, 2, MPI_COMM_WORLD, &requests2[req_count2++]);
+                        MPI_Irecv(tcp_DeltaRij_yprev.data(), 6, MPI_DOUBLE, my_rank - 1, 3, MPI_COMM_WORLD, &requests2[req_count2++]);
+                    } else {
+                        tcp_position_yprev   = {tcp_position[0], 0.0, tcp_position[2]};
+                        tcp_DeltaRij_yprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    }
+                    /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
+                    if (my_rank < (n_rl_envs - 1)) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank + 1, 1,  MPI_COMM_WORLD, &requests2[req_count2++]);
+                        MPI_Irecv(tcp_position_ynext.data(), 3, MPI_DOUBLE, my_rank + 1, 0,  MPI_COMM_WORLD, &requests2[req_count2++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank + 1, 3,  MPI_COMM_WORLD, &requests2[req_count2++]);
+                        MPI_Irecv(tcp_DeltaRij_ynext.data(), 6, MPI_DOUBLE, my_rank + 1, 2,  MPI_COMM_WORLD, &requests2[req_count2++]);
+                    } else {
+                        tcp_position_ynext   = {tcp_position[0], L_y, tcp_position[2]};
+                        tcp_DeltaRij_ynext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    }
+                    /// Wait for all non-blocking communication to complete
+                    MPI_Waitall(req_count2, requests2, MPI_STATUSES_IGNORE);
+                    validateExchangedDataYDir(tcp_position, tcp_position_yprev, tcp_position_ynext);
+                    if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Performed & validated data exchange for probes positions and DeltaRij values." << endl; 
+
+                    /// Interpolate DeltaRij field from the control probes coarse grid, where DeltaRij is calculated from the received RL actions   
+                    int interp_yprev_counter = 0;
+                    int interp_ynext_counter = 0;
+                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                                if ( y_field[I1D(i,j,k)] <= tcp_position[1] ) { 
+                                    /// Local point betw previous control probe and current control probe, in the y-direction 
+                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij[0] - tcp_DeltaRij_yprev[0]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[0];
+                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[1] - tcp_DeltaRij_yprev[1]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[1];
+                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[2] - tcp_DeltaRij_yprev[2]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[2];
+                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[3] - tcp_DeltaRij_yprev[3]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[3];
+                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[4] - tcp_DeltaRij_yprev[4]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[4];
+                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[5] - tcp_DeltaRij_yprev[5]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[5];
+                                    interp_yprev_counter++;
+                                } else {
+                                    /// Local point betw next control probe and current control probe, in the y-direction 
+                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[0] - tcp_DeltaRij[0]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[0];
+                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[1] - tcp_DeltaRij[1]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[1];
+                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[2] - tcp_DeltaRij[2]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[2];
+                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[3] - tcp_DeltaRij[3]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[3];
+                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[4] - tcp_DeltaRij[4]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[4];
+                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[5] - tcp_DeltaRij[5]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[5];
+                                    interp_ynext_counter++;
+                                }
+                            }
+                        }
+                    }
+                    cout << "[myRHEA::calculateSourceTerms] [Rank " << my_rank << "] Interpolated DeltaRij in Y-Dir btw prev. & local tcp (#" << interp_yprev_counter << " points) and btw local & next tcp (#" << interp_ynext_counter << " points)" << endl;
 
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_DeltaRij" );
@@ -1121,173 +1175,9 @@ void myRHEA::calculateSourceTerms() {
                                 rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxj_j_field[I1D(i,j,k)] );
                                 rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRyj_j_field[I1D(i,j,k)] );
                                 rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRzj_j_field[I1D(i,j,k)] );
-#if _SPATIAL_SMOOTHING_RL_ACTION_
-                                /// TODO: not necessary if averaging window size 3
-                                rl_f_rhou_field_aux[I1D(i,j,k)] = rl_f_rhou_field[I1D(i,j,k)];
-                                rl_f_rhov_field_aux[I1D(i,j,k)] = rl_f_rhov_field[I1D(i,j,k)];
-                                rl_f_rhow_field_aux[I1D(i,j,k)] = rl_f_rhow_field[I1D(i,j,k)];
-#endif  /// of _SPATIAL_SMOOTHING_RL_ACTION_
                             }
                         }
                     }
-
-                    /// -------------------------------------------------------------------
-                    ///                 SPATIAL SMOOTHING OF F_pert(x,t_p)
-                    /// -------------------------------------------------------------------
-
-#if _SPATIAL_SMOOTHING_RL_ACTION_
-                    /// Calculate rl_f_rhou_field from rl_f_rhou_field_aux (idem. for v, w) + perform f_rl space averaging on bottom/top y boundaries of each mpi process 
-                    /// Allocate memory for sending/receiving boundary data slices
-                    int idx;
-                    int i_start = topo->iter_common[_INNER_][_INIX_]; int i_end = topo->iter_common[_INNER_][_ENDX_];
-                    int j_start = topo->iter_common[_INNER_][_INIY_]; int j_end = topo->iter_common[_INNER_][_ENDY_];
-                    int k_start = topo->iter_common[_INNER_][_INIZ_]; int k_end = topo->iter_common[_INNER_][_ENDZ_];
-                    int xz_slice_size = (i_end - i_start + 1) * (k_end - k_start + 1);
-                    /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                    vector<double> send_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
-                    vector<double> send_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> send_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymin_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymin_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymax_rl_f_rhou(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhov(xz_slice_size);  vector<double> recv_xz_slice_ymax_rl_f_rhow(xz_slice_size); 
-                    /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                    vector<double> send_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
-                    vector<double> send_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymin2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin2_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymax2_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax2_rl_f_rhow(xz_slice_size); 
-                    /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                    vector<double> send_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
-                    vector<double> send_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> send_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymin3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymin3_rl_f_rhow(xz_slice_size); 
-                    vector<double> recv_xz_slice_ymax3_rl_f_rhou(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhov(xz_slice_size); vector<double> recv_xz_slice_ymax3_rl_f_rhow(xz_slice_size); 
-
-                    /// Populate send_xz_slice_ymin_..., send_xz_slice_ymax_..., send_xz_slice_ymin2_... and send_xz_slice_ymax2_...  with boundary data
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                            idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                            /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                            send_xz_slice_ymin_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_start, k)]; 
-                            send_xz_slice_ymin_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_start, k)]; 
-                            send_xz_slice_ymin_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_start, k)];     
-                            send_xz_slice_ymax_rl_f_rhou[idx]  = rl_f_rhou_field[I1D(i, j_end, k)];   
-                            send_xz_slice_ymax_rl_f_rhov[idx]  = rl_f_rhov_field[I1D(i, j_end, k)];   
-                            send_xz_slice_ymax_rl_f_rhow[idx]  = rl_f_rhow_field[I1D(i, j_end, k)]; 
-                            /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                            send_xz_slice_ymin2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+1, k)]; 
-                            send_xz_slice_ymin2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+1, k)]; 
-                            send_xz_slice_ymin2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+1, k)];     
-                            send_xz_slice_ymax2_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-1, k)];   
-                            send_xz_slice_ymax2_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-1, k)];   
-                            send_xz_slice_ymax2_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-1, k)]; 
-                            /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                            send_xz_slice_ymin3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_start+2, k)]; 
-                            send_xz_slice_ymin3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_start+2, k)]; 
-                            send_xz_slice_ymin3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_start+2, k)];     
-                            send_xz_slice_ymax3_rl_f_rhou[idx] = rl_f_rhou_field[I1D(i, j_end-2, k)];   
-                            send_xz_slice_ymax3_rl_f_rhov[idx] = rl_f_rhov_field[I1D(i, j_end-2, k)];   
-                            send_xz_slice_ymax3_rl_f_rhow[idx] = rl_f_rhow_field[I1D(i, j_end-2, k)]; 
-                        }
-                    }
-
-                    /// Exchange boundary data with neighboring processes
-                    /// Info: np_y == n_rl_envs == number of MPI processes (only distributed along y-coord)
-                    /// Arrays to hold MPI request handles
-                    MPI_Request requests[36];
-                    int req_count = 0;
-                    /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
-                    if (my_rank > 0) {
-                        /// > 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank - 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
-                        /// > 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
-                        /// > 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymin3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank - 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
-                    }
-                    /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
-                    if (my_rank < (n_rl_envs - 1)) {
-                        /// >> 1st xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 1,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax_rl_f_rhou.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 0,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 3,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax_rl_f_rhov.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 2,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 5,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax_rl_f_rhow.data(),  xz_slice_size, MPI_DOUBLE, my_rank + 1, 4,  MPI_COMM_WORLD, &requests[req_count++]);
-                        /// >> 2nd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 7,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 6,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 9,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 8,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax2_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);
-                        /// >> 3rd xz-slice from pseudo-environments / mpi processes (top & bottom) boundaries
-                        MPI_Isend(send_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhou.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 15, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhov.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 14, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(send_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 17, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(recv_xz_slice_ymax3_rl_f_rhow.data(), xz_slice_size, MPI_DOUBLE, my_rank + 1, 16, MPI_COMM_WORLD, &requests[req_count++]);
-                    }
-
-                    /// Wait for all non-blocking communication to complete
-                    MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
-                    cout << "[myRHEA::calculateSourceTerms] Rank " << my_rank << " performed all data exchange for space-averaging rl action along y-coord on pseudo-environments (mpi processes) boundaries" << endl; 
-
-                    /// Apply action averaging in y-coord at the bottom/top y-coord boundaries of each mpi process
-                    /// Averaging window size: 7 
-                    /// > Averaging in pseudo-envioronments / mpi processes bottom boundary 
-                    if (my_rank > 0) {
-                        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                /// >> 1st xz_slice from bottom boundary
-                                rl_f_rhou_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhou[idx] + recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start,k)] );
-                                rl_f_rhov_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhov[idx] + recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start,k)] );
-                                rl_f_rhow_field[I1D(i,j_start,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymin3_rl_f_rhow[idx] + recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start,k)] );
-                                /// >> 2nd xz_slice from bottom boundary
-                                rl_f_rhou_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhou[idx] + recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhov_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhov[idx] + recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+1,k)] );
-                                rl_f_rhow_field[I1D(i,j_start+1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin2_rl_f_rhow[idx] + recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+1,k)] );
-                                /// >> 3rd xz_slice from bottom boundary
-                                rl_f_rhou_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_start,k)] + rl_f_rhou_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_start+2,k)] );
-                                rl_f_rhov_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_start,k)] + rl_f_rhov_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_start+2,k)] );
-                                rl_f_rhow_field[I1D(i,j_start+2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymin_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_start,k)] + rl_f_rhow_field_aux[I1D(i,j_start+1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_start+2,k)] );
-                            }
-                        }
-                    } 
-                    /// > Averaging in pseudo-envioronments / mpi processes top boundary 
-                    if (my_rank < (n_rl_envs - 1)) {
-                        for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                idx = (i - i_start) * (k_end - k_start + 1) + (k - k_start);
-                                /// >> 1st xz_slice from top boundary
-                                rl_f_rhou_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhou[idx] + recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end,k)] );
-                                rl_f_rhov_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhov[idx] + recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end,k)] );
-                                rl_f_rhow_field[I1D(i,j_end,k)]   = (1.0 / 7.0) * ( recv_xz_slice_ymax3_rl_f_rhow[idx] + recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end,k)] );
-                                /// >> 2nd xz_slice from top boundary
-                                rl_f_rhou_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhou[idx] + recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhov_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhov[idx] + recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-1,k)] );
-                                rl_f_rhow_field[I1D(i,j_end-1,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax2_rl_f_rhow[idx] + recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-1,k)] );
-                                /// >> 3rd xz_slice from top boundary
-                                rl_f_rhou_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhou[idx] + rl_f_rhou_field_aux[I1D(i,j_end,k)] + rl_f_rhou_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhou_field_aux[I1D(i,j_end-2,k)] );
-                                rl_f_rhov_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhov[idx] + rl_f_rhov_field_aux[I1D(i,j_end,k)] + rl_f_rhov_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhov_field_aux[I1D(i,j_end-2,k)] );
-                                rl_f_rhow_field[I1D(i,j_end-2,k)] = (1.0 / 7.0) * ( recv_xz_slice_ymax_rl_f_rhow[idx] + rl_f_rhow_field_aux[I1D(i,j_end,k)] + rl_f_rhow_field_aux[I1D(i,j_end-1,k)] + 4.0 * rl_f_rhow_field_aux[I1D(i,j_end-2,k)] );
-                            }
-                        }
-                    }
-#endif /// of _SPATIAL_SMOOTHING_RL_ACTION_
 
 #if _TEMPORAL_SMOOTHING_RL_ACTION_
                     /// -------------------------------------------------------------------
@@ -1516,13 +1406,12 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rhoE_field[I1D(i,j,k)] = rk_a*rhoE_0_field[I1D(i,j,k)] + rk_b*rhoE_field[I1D(i,j,k)] + rk_c*delta_t*rhoE_rhs_flux;
 
                 /// Debugging information
-                if (action_mask[I1D(i,j,k)] != 0.0) { // Actuation point    
-                    rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
-                    rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
-                    f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / ( rhou_rhs_flux + EPS ) );
-                    rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / ( rhou_rhs_flux + EPS) );
-                    ratio_counter += 1;
-                }
+                /// TODO: remove if not used for debugging
+                rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
+                rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
+                f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / ( rhou_rhs_flux + EPS ) );
+                rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / ( rhou_rhs_flux + EPS) );
+                ratio_counter += 1;
 	        }
         }
     }
@@ -1533,7 +1422,7 @@ void myRHEA::timeAdvanceConservedVariables() {
     
     /// Summarized output
     if ( my_rank < 4) {
-        cout << endl << "Rank " << my_rank << " u-RHS Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
+        cout << endl << "[Rank " << my_rank << "] u-RHS Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
     }
 
 #if _OPENACC_MANUAL_DATA_MOVEMENT_
@@ -2077,6 +1966,29 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the y-direction
+void myRHEA::validateExchangedDataYDir(const vector<double> &tcp_position, const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    // Check x and z coordinates consistency
+    bool x_match = (std::abs(tcp_position[0] - tcp_position_yprev[0]) < EPS) &&
+                   (std::abs(tcp_position[0] - tcp_position_ynext[0]) < EPS);
+    bool z_match = (std::abs(tcp_position[2] - tcp_position_yprev[2]) < EPS) &&
+                   (std::abs(tcp_position[2] - tcp_position_ynext[2]) < EPS);
+    // Check y-coordinate ordering
+    bool y_order_correct = (tcp_position_yprev[1] < tcp_position[1]) &&
+                           (tcp_position[1] < tcp_position_ynext[1]);
+    if (!(x_match && z_match && y_order_correct)) {
+        cerr << "[Rank " << my_rank << "] Data exchange validation FAILED!\n" << endl;
+        if (!x_match) cerr << "  -> X-coordinates mismatch!\n" << endl;
+        if (!z_match) cerr << "  -> Z-coordinates mismatch!\n" << endl;
+        if (!y_order_correct) cerr << "  -> Y-coordinates order incorrect!\n" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1);
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
 
 /* Read witness file and extract witness points coordinates
     Reads witness points from 'witness_file', and defines attributes:
@@ -2170,7 +2082,7 @@ void myRHEA::preproceWitnessPoints() {
     
     // Each mpi process updates attribute 'state_local_size2'
     this->state_local_size2 = state_dim * state_local_size2_counter;
-    cout << "Rank " << my_rank << " has num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
+    cout << "[Rank " << my_rank << "] num. local witness points: " << state_local_size2_counter << ", and state local size: " << state_local_size2 << endl;
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -2211,7 +2123,7 @@ void myRHEA::readControlPoints(){
         file.close();
         
         num_control_probes = static_cast<int>(tcp_x_positions.size());
-        cout << "Number of control probes (global_state_size): " << num_control_probes << endl;
+        cout << "Number of control probes: " << num_control_probes << endl;
     }
 
     /// Broadcast the number of control probes to all mpi processes
@@ -2267,21 +2179,36 @@ void myRHEA::preproceControlPoints() {
 
     /// Calculate 'action_local_size2'
     int action_local_size2 = action_dim * num_control_probes_local;
-    cout << "Rank " << my_rank << " has num. local control points: " << num_control_probes_local << ", and action local size: " << action_local_size2 << endl;
 
     /// Calculate global attributes 'action_global_size2', 'n_rl_envs' for all mpi processes
     MPI_Allreduce(&action_local_size2,       &action_global_size2, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'action_global_size2'
     MPI_Allreduce(&num_control_probes_local, &n_rl_envs,           1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); // update 'n_rl_envs'
 
+
+    /// Logging
+    cout << "[Rank " << my_rank << "] "
+         << "Local number of control probes: " << num_control_probes_local
+         << ", Total number of control probes: " << num_control_probes << " == Num. RL pseudo-environmens: " << n_rl_envs
+         << ", Local action size: " << action_local_size2
+         << ", Global action size: " << action_global_size2
+         << ", Action dimension: " << action_dim
+         << ", mpi processes grid: " << np_x << " " << np_y << " " << np_z << endl;  
+    if (my_rank == 0) {
+        for(int tcp = 0; tcp < num_control_probes; ++tcp) {
+            cout << "[Rank 0] Control probe #" << tcp << " position: " << tcp_x_positions[tcp] << " " << tcp_y_positions[tcp] << " " << tcp_z_positions[tcp]
+                << ", in Rank: " << temporal_control_probes[tcp].getGlobalOwnerRank() << endl;
+        }
+    }
+
     /// Check 0: each mpi process contains a single control point
-    if (num_control_probes_local =! 1){
-        cerr << "[myRHEA::preproceControlCubes] ERROR: Rank " << my_rank << " has num. control points: " << num_control_probes_local << " != 1"  << endl;
+    if (num_control_probes_local != 1){
+        cerr << "[myRHEA::preproceControlCubes] ERROR: [Rank " << my_rank << "] num. control points: " << num_control_probes_local << " != 1"  << endl;
         MPI_Abort( MPI_COMM_WORLD, 1);
     }
 
     /// Check 1: action_global_size2 == n_rl_envs * action_dim
     if (action_global_size2 != n_rl_envs * action_dim){
-        cerr << "[myRHEA::preproceControlCubes] ERROR: Rank " << my_rank << " has action global size (" << action_global_size2 << ") != n_rl_envs (" << n_rl_envs << ") * action_dim (" << action_dim << ")" << endl;
+        cerr << "[myRHEA::preproceControlCubes] ERROR: [Rank " << my_rank << "] action global size (" << action_global_size2 << ") != n_rl_envs (" << n_rl_envs << ") * action_dim (" << action_dim << ")" << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -2290,7 +2217,7 @@ void myRHEA::preproceControlPoints() {
         /// Logging successful distribution
         if (my_rank == 0) {
             stringstream ss;
-            ss << "Correct RL environments (control probes) and computational domain distribution: "
+            ss << "[Rank 0] Correct RL environments (control probes) and computational domain distribution: "
                << "1 RL environment per MPI process distributed along y-coordinate, with "
                << "np_x: " << np_x << ", np_y: " << np_y << ", np_z: " << np_z << ", number of RL env: " << n_rl_envs;
             cout << ss.str() << endl;
@@ -2304,27 +2231,15 @@ void myRHEA::preproceControlPoints() {
         MPI_Abort( MPI_COMM_WORLD, 1);
     }
 
-    /// Logging
-    if (my_rank == 0) {
-        cout << "Total number of control probes: " << num_control_probes << endl;
-        cout << "Action global size: " << action_global_size2 << endl;
-        cout << "Number of RL pseudo-environments: " << n_rl_envs << endl; 
-        cout << "Action dimension: " << action_dim << endl; 
-        for(int tcp = 0; tcp < num_control_probes; ++tcp) {
-            cout << "Control probe #" << tcp << " has coordinates: " << tcp_x_positions[tcp] << " " << tcp_y_positions[tcp] << " " << tcp_z_positions[tcp]
-                 << ", in Rank: " << temporal_control_probes[tcp].getGlobalOwnerRank() << endl;
-        }
-    }
-
     /// Debugging: boundaries of RL environments / mpi processes 
-    cout << "Rank " << my_rank << " has RL environment / mpi process domain inner boundaries: "  
-         << "x in (" << x_field[I1D(topo->iter_common[_INNER_][_INIX_],0,0)] << ", " << x_field[I1D(topo->iter_common[_INNER_][_ENDX_],0,0)] << "), "
-         << "y in (" << y_field[I1D(0,topo->iter_common[_INNER_][_INIY_],0)] << ", " << y_field[I1D(0,topo->iter_common[_INNER_][_ENDY_],0)] << "), "
-         << "z in (" << z_field[I1D(0,0,topo->iter_common[_INNER_][_INIZ_])] << ", " << z_field[I1D(0,0,topo->iter_common[_INNER_][_ENDZ_])] << ")" << endl;
-    cout << "Rank " << my_rank << " has inner boundaries local indices: "
-         << "x-idx in (" << topo->iter_common[_INNER_][_INIX_] << ", " << topo->iter_common[_INNER_][_ENDX_] << "), "
-         << "y-idx in (" << topo->iter_common[_INNER_][_INIY_] << ", " << topo->iter_common[_INNER_][_ENDY_] << "), "
-         << "z-idx in (" << topo->iter_common[_INNER_][_INIZ_] << ", " << topo->iter_common[_INNER_][_ENDZ_] << ")" << endl;
+    /// cout << "[Rank " << my_rank << "] RL environment / mpi process domain inner boundaries: "  
+    ///      << "x in (" << x_field[I1D(topo->iter_common[_INNER_][_INIX_],0,0)] << ", " << x_field[I1D(topo->iter_common[_INNER_][_ENDX_],0,0)] << "), "
+    ///      << "y in (" << y_field[I1D(0,topo->iter_common[_INNER_][_INIY_],0)] << ", " << y_field[I1D(0,topo->iter_common[_INNER_][_ENDY_],0)] << "), "
+    ///      << "z in (" << z_field[I1D(0,0,topo->iter_common[_INNER_][_INIZ_])] << ", " << z_field[I1D(0,0,topo->iter_common[_INNER_][_ENDZ_])] << ")" << endl;
+    /// cout << "[Rank " << my_rank << "] inner boundaries local indices: "
+    ///      << "x-idx in (" << topo->iter_common[_INNER_][_INIX_] << ", " << topo->iter_common[_INNER_][_ENDX_] << "), "
+    ///      << "y-idx in (" << topo->iter_common[_INNER_][_INIY_] << ", " << topo->iter_common[_INNER_][_ENDY_] << "), "
+    ///      << "z-idx in (" << topo->iter_common[_INNER_][_INIZ_] << ", " << topo->iter_common[_INNER_][_ENDZ_] << ")" << endl;
 
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
@@ -2462,7 +2377,7 @@ void myRHEA::calculateReward() {
     reward_local        =   c1 * ( ( l2_err_avg_u_previous - l2_err_avg_u ) / l2_err_avg_u ) \
                           + c7 * ( l2_rl_f_previous - l2_rl_f );
     /// Debugging
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << " has local reward: "  << reward_local << ", with reward terms:"
+    cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: "  << reward_local << ", with reward terms: "
          <<   c1 * l2_err_avg_u_previous / l2_err_avg_u << " " 
 	     << - c1 * l2_err_avg_u          / l2_err_avg_u << " "
 	     <<   c7 *  l2_rl_f_previous << " "
@@ -2531,7 +2446,7 @@ void myRHEA::calculateReward() {
                                    + ( c7 * l2_rl_f ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
 
     /// Debugging
-    cout << "[myRHEA::calculateReward] Rank " << my_rank << ":" << endl
+    cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Reward calculation:" << endl
          << "local reward: "  << reward_local << endl
          << "reward terms: " 
          << c1 * l2_d_avg_u / l2_avg_u_previous << " " 

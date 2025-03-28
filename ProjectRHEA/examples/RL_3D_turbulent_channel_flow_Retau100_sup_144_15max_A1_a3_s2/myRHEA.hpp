@@ -61,15 +61,18 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rl_f_rhou_field;
         DistributedArray rl_f_rhov_field;
         DistributedArray rl_f_rhow_field;
-        DistributedArray rl_f_rhou_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
-        DistributedArray rl_f_rhov_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
-        DistributedArray rl_f_rhow_field_aux;          /// only if _SPACE_AVERAGE_RL_ACTION_ 1
         DistributedArray rl_f_rhou_field_prev_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhov_field_prev_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhow_field_prev_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhou_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhov_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
         DistributedArray rl_f_rhow_field_curr_step;    /// only if _TEMPORAL_SMOOTHING_RL_ACTION_ 1
+        DistributedArray DeltaRxx_field;               /// 3-D field of DeltaRxx
+        DistributedArray DeltaRxy_field;               /// 3-D field of DeltaRxy
+        DistributedArray DeltaRxz_field;               /// 3-D field of DeltaRxz
+        DistributedArray DeltaRyy_field;               /// 3-D field of DeltaRyy
+        DistributedArray DeltaRyz_field;               /// 3-D field of DeltaRyz
+        DistributedArray DeltaRzz_field;               /// 3-D field of DeltaRzz
         DistributedArray d_DeltaRxx_x_field;           /// 3-D field of d_DeltaRxx_x_field
         DistributedArray d_DeltaRxy_x_field;           /// 3-D field of d_DeltaRxy_x_field
         DistributedArray d_DeltaRxz_x_field;           /// 3-D field of d_DeltaRxz_x_field
@@ -169,6 +172,7 @@ class myRHEA : public FlowSolverRHEA {
         /// Helper functions
         double myDotProduct(const array<double,3> &v1, const array<double,3> &v2) {return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];}
         double myNorm(const array<double,3> &v){return std::sqrt(myDotProduct(v,v));}
+        void validateExchangedDataYDir(const vector<double> &tcp_position, const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext);
 
 };
 

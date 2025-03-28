@@ -38,7 +38,7 @@ params = {
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
-    "poll_n_tries": 1000000,               # num. tries of database poll
+    "poll_n_tries": 1000000,            # num. tries of database poll
     "poll_freq_ms": 100,                # time between database poll tries [miliseconds]
     "time_key": "time",
     "step_type_key": "step_type",
@@ -125,7 +125,7 @@ env_params = {
     "rl_n_envs": params["rl_n_envs"],
     ###"n_tasks_per_env": params["n_tasks_per_env"],
     "config_dir": params["config_dir"],
-    "control_cubes_filename": params["control_cubes_filename"],
+    "control_filename": params["control_filename"],
     "witness_filename": params["witness_filename"],
     "rl_neighbors": params["rl_neighbors"],
     "model_dtype": params["model_dtype"],

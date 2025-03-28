@@ -227,7 +227,7 @@ for episode in episodes_name:
         y_data  = data_dict[episode][probe][y_key]
         assert np.allclose(y_data, y_data[0])
         y_value = float(y_data[0])
-        isBottomWall              = y_value < delta
+        isBottomWall = y_value < delta
         if isBottomWall:
             data_dict[episode][probe][y_plus_key] = y_value * rho0 * u_tau / mu0
         else:
