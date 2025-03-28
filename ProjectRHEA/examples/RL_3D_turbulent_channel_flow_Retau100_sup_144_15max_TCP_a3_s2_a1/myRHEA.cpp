@@ -1065,6 +1065,10 @@ void myRHEA::calculateSourceTerms() {
                                 DeltaRyz = RijPert[1][2] - favre_vffwff_field[I1D(i,j,k)];
                                 DeltaRzz = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
                                 tcp_DeltaRij = {DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz};
+
+                                /// Debug control probe position & DeltaRij
+                                cout << "calculateSourceTerms] [Rank " << my_rank << "] Control probe (" << tcp_position[0] << ", " << tcp_position[1] << ", " << tcp_position[2] << "): "
+                                     << "DeltaRij = (" << tcp_DeltaRij[0] << ", " << tcp_DeltaRij[1] << ", " << tcp_DeltaRij[2] << ", " << tcp_DeltaRij[3] << ", " << tcp_DeltaRij[4] << ", " << tcp_DeltaRij[5] << ")" << endl;
                             }
                         }
                     }
