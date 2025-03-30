@@ -1171,6 +1171,7 @@ void myRHEA::calculateSourceTerms() {
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
                             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                                TODO: ADAPT TO 3-D TCP GRID! VALUE MUST BE INTERPOLATED IN THE 3D SPACE, FOR ALL 3 DIRECTIONS, NOT ONLY Y-COORD!
                                 if ( y_field[I1D(i,j,k)] <= tcp_position[1] ) { 
                                     /// Local point betw previous control probe and current control probe, in the y-direction 
                                     DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij[0] - tcp_DeltaRij_yprev[0]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[0];
