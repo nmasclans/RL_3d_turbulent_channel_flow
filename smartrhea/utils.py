@@ -43,27 +43,27 @@ def n_cubes(fname):
 
 def check_points_xyz(fname):
     """
-    Make sure the points are written in such that the first moving coordinate is z, then x, and last y.
+    Make sure the points are written in such that the first moving coordinate is x, then y, and last z.
     Arguments:
         fname (str): witness/control points filename
     """
     logger.debug(f"[utils:check_points_xyz] Filename: {fname}")
     points_list = np.loadtxt(fname)
     prev_point = points_list[0]
-    ### Check if z changes first, then x, then y
+    ### Check if x changes first, then y, then z
     for point in points_list[1:]:
-        # Ensure z changes first (x,y fixed)
-        if point[0] == prev_point[0] and point[1] == prev_point[1]:
-            assert point[2] >= prev_point[2], "Error: z should increase first, then y, then x"
-        # If z is reset (with different combination (x,y)), x should change next (y fixed)
-        elif point[1] == prev_point[1]:
-            assert point[0] >= prev_point[0], "Error: x should increase after z, then y"
+        # Ensure x changes first (y,z fixed)
+        if point[1] == prev_point[1] and point[2] == prev_point[2]:
+            assert point[0] >= prev_point[0], "Error: x should increase first, then y, then z"
+        # If x is reset (with different combination (y,z)), y should change next (z fixed)
+        elif point[2] == prev_point[2]:
+            assert point[1] >= prev_point[1], "Error: y should increase after x, then z"
         # If both x and z are reset, y should change last
         else:
-            assert point[1] >= prev_point[1], "Error: y should increase after x and z."
+            assert point[2] >= prev_point[2], "Error: z should increase after x and y."
         # Update previous point
         prev_point = point
-    logger.debug("Successfull witness/control points check: points are written in such that the first moving coordinate is z, then x, and last y.")
+    logger.debug("Successfull witness/control points check: points are written in such that the first moving coordinate is x, then y, and last z.")
 
 
 def get_points_xyz(fname):

@@ -172,8 +172,10 @@ class myRHEA : public FlowSolverRHEA {
         /// Helper functions
         double myDotProduct(const array<double,3> &v1, const array<double,3> &v2) {return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];}
         double myNorm(const array<double,3> &v){return std::sqrt(myDotProduct(v,v));}
+        void validateExchangedDataXDir(const vector<double> &tcp_position, const vector<double> &tcp_position_xprev, const vector<double> &tcp_position_xnext);
         void validateExchangedDataYDir(const vector<double> &tcp_position, const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext);
-
+        void validateExchangedDataZDir(const vector<double> &tcp_position, const vector<double> &tcp_position_zprev, const vector<double> &tcp_position_znext);
+        void validateExchangedData(const vector<double> &tcp_position, const vector<double> &tcp_position_xprev, const vector<double> &tcp_position_xnext, const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext, const vector<double> &tcp_position_zprev, const vector<double> &tcp_position_znext);
 };
 
 #endif /*_MY_RHEA_*/

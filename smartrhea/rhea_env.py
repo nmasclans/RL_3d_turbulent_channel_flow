@@ -254,6 +254,7 @@ class RheaEnv(py_environment.PyEnvironment):
         # Actions
         if self.rl_n_envs > 1:
             self.n_action = 1 * self.action_dim
+            control_xyz   = get_points_xyz(control_filepath)
             num_control_points = n_points(control_filepath)
             assert self.rl_n_envs == num_control_points, f"(num. rl environments = {self.rl_n_envs}) != (num. control points = {num_control_points})"
         else:   # self.rl_n_envs == 1:
@@ -467,9 +468,7 @@ class RheaEnv(py_environment.PyEnvironment):
     def _redistribute_state(self):
         """
         Redistribute state across RL pseudo-environments.
-        Make sure the witness points are written in such that the first moving coordinate is z, then x, and last y, as RL pseudo environmnents are distributed only along y-coordinate
-        TODO: in SmartSOD2d they had: Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z. 
-              I do it differently, because i want my actuators & RL pseudo env. to be distributed along y-direction -> witness points first along z, then x, then y 
+        Make sure the witness points are written in such that the first moving coordinate is x, then y, and last z
         -> check done in rhea_env.__init__ -> utils.get_witness_xyz -> utils.check_witness_xyz
 
         Additional info:
@@ -482,9 +481,9 @@ class RheaEnv(py_environment.PyEnvironment):
         """
         # Concatenate self._state array 3 times along columns, used for building self._state_rl which include the state of neighbouring rl environments
         state_extended = np.concatenate((self.__state, self.__state, self.__state), axis=1)
-        plane_wit = self.witness_xyz[0] * self.witness_xyz[2]                   # num. witness points in x-z plane
-        block_wit = int(plane_wit * (self.witness_xyz[1] / self.rl_n_envs))     # rl_n_envs distributed along 2nd coordinate y
-        assert self.witness_xyz[1] % self.rl_n_envs == 0, f"Number of witness points in the y-direction is not multiple to the number of rl environments, with self.witness_xyz[1] = {self.witness_xyz[1]} and self.rl_n_envs = {self.rl_n_envs}"
+        plane_wit = self.witness_xyz[0] * self.witness_xyz[1]   # num. witness points in x-y plane
+        block_wit = int(plane_wit * (self.witness_xyz[2] / self.rl_n_envs))     # rl_n_envs distributed along 2nd coordinate y
+        assert self.witness_xyz[0] * self.witness_xyz[1] * self.witness_xyz[2] == self.rl_n_envs
         for i in range(self.cfd_n_envs):
             for j in range(self.rl_n_envs):
                 self.__state_rl[i * self.rl_n_envs + j,:,:] = state_extended[

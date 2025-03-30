@@ -2,12 +2,12 @@ import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.02         # action period
+t_action = 0.005        # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.5
 cfd_n_envs = 1          # num. cfd simulations run in parallel
-rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
+rl_n_envs = 48          # num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
@@ -34,7 +34,7 @@ params = {
     ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
     "config_dir": "config_control_witness",
     "control_filename": f"controlPoints{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
-    "witness_filename": f"witnessXZSlices{rl_n_envs}.txt",
+    "witness_filename": f"witnessPoints{rl_n_envs}.txt",
     "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,

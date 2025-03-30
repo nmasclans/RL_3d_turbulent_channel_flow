@@ -18,7 +18,7 @@ using namespace std;
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _RL_CONTROL_IS_SUPERVISED_ 1
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
-#define _WITNESS_XZ_SLICES_ 1
+#define _WITNESS_XZ_SLICES_ 0                       /// TODO: implement this for TCP3 which leads to witness points at same y-coord 
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
 
@@ -573,11 +573,11 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
 
     /// Additional arguments, defined here /// TODO: include this in some configuration file
 #if _WITNESS_XZ_SLICES_
-    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessXZSlices8.txt";
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessXZSlices48.txt";
 #else
-    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints8.txt";
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints48.txt";
 #endif
-    this->control_file = string(rl_case_path) + "/config_control_witness/controlPoints8.txt";
+    this->control_file = string(rl_case_path) + "/config_control_witness/controlPoints48.txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
     this->state_key     = "ensemble_" + tag + ".state";
@@ -1067,7 +1067,7 @@ void myRHEA::calculateSourceTerms() {
                                 tcp_DeltaRij = {DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz};
 
                                 /// Debug control probe position & DeltaRij
-                                cout << "calculateSourceTerms] [Rank " << my_rank << "] Control probe (" << tcp_position[0] << ", " << tcp_position[1] << ", " << tcp_position[2] << "): "
+                                cout << "[calculateSourceTerms] [Rank " << my_rank << "] Control probe (" << tcp_position[0] << ", " << tcp_position[1] << ", " << tcp_position[2] << "): "
                                      << "DeltaRij = (" << tcp_DeltaRij[0] << ", " << tcp_DeltaRij[1] << ", " << tcp_DeltaRij[2] << ", " << tcp_DeltaRij[3] << ", " << tcp_DeltaRij[4] << ", " << tcp_DeltaRij[5] << ")" << endl;
                             }
                         }
@@ -1080,36 +1080,89 @@ void myRHEA::calculateSourceTerms() {
                     }
 
                     /// --------- Send/Recv DeltaRij values betw neighboring mpi processes / rl environments ---------
-                    vector<double> tcp_position_yprev(3, 0.0);
-                    vector<double> tcp_position_ynext(3, 0.0);
-                    vector<double> tcp_DeltaRij_yprev(6, 0.0);
-                    vector<double> tcp_DeltaRij_ynext(6, 0.0);
-                    MPI_Request requests2[8];
-                    int req_count2 = 0;
+                    vector<double> tcp_position_xprev(3, 0.0), tcp_position_xnext(3, 0.0); 
+                    vector<double> tcp_position_yprev(3, 0.0), tcp_position_ynext(3, 0.0); 
+                    vector<double> tcp_position_zprev(3, 0.0), tcp_position_znext(3, 0.0);
+                    vector<double> tcp_DeltaRij_xprev(6, 0.0), tcp_DeltaRij_xnext(6, 0.0); 
+                    vector<double> tcp_DeltaRij_yprev(6, 0.0), tcp_DeltaRij_ynext(6, 0.0); 
+                    vector<double> tcp_DeltaRij_zprev(6, 0.0), tcp_DeltaRij_znext(6, 0.0);
+                    MPI_Request requests[24];
+                    int req_count = 0;
+
+                    /// Compute mpi process coordinates in the coarse TCP 3D grid
+                    int tcp_iz = my_rank / (np_x * np_y);
+                    int tcp_iy = (my_rank % (np_x * np_y)) / np_x;
+                    int tcp_ix = my_rank % np_x;
                     
-                    /// > Exchange data between current & previous pseudo-environment / mpi process in y-axis
-                    if (my_rank > 0) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests2[req_count2++]);
-                        MPI_Irecv(tcp_position_yprev.data(), 3, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests2[req_count2++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - 1, 2, MPI_COMM_WORLD, &requests2[req_count2++]);
-                        MPI_Irecv(tcp_DeltaRij_yprev.data(), 6, MPI_DOUBLE, my_rank - 1, 3, MPI_COMM_WORLD, &requests2[req_count2++]);
+                    /// Exchange in x-direction
+                    /// ...with previous TCP in the x-direction
+                    if (tcp_ix > 0) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_position_xprev.data(), 3, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - 1, 2, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_DeltaRij_xprev.data(), 6, MPI_DOUBLE, my_rank - 1, 3, MPI_COMM_WORLD, &requests[req_count++]);
                     } else {
-                        tcp_position_yprev   = {tcp_position[0], 0.0, tcp_position[2]};
+                        tcp_position_xprev = {0.0, tcp_position[1], tcp_position[2]};
+                        tcp_DeltaRij_xprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    }
+                    /// ...with next TCP in the x-direction
+                    if (tcp_ix < np_x - 1) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_position_xnext.data(), 3, MPI_DOUBLE, my_rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank + 1, 3, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_DeltaRij_xnext.data(), 6, MPI_DOUBLE, my_rank + 1, 2, MPI_COMM_WORLD, &requests[req_count++]);
+                    } else {
+                        tcp_position_xnext = {L_x, tcp_position[1], tcp_position[2]};
+                        tcp_DeltaRij_xnext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    }
+
+                    /// Exchange in y-direction
+                    /// ...with previous TCP in the y-direction
+                    if (tcp_iy > 0) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - np_x, 4, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_position_yprev.data(), 3, MPI_DOUBLE, my_rank - np_x, 5, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - np_x, 6, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_DeltaRij_yprev.data(), 6, MPI_DOUBLE, my_rank - np_x, 7, MPI_COMM_WORLD, &requests[req_count++]);
+                    } else {
+                        tcp_position_yprev = {tcp_position[0], 0.0, tcp_position[2]};
                         tcp_DeltaRij_yprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
                     }
-                    /// > Exchange data between current & next pseudo-environment / mpi process in y-axis
-                    if (my_rank < (n_rl_envs - 1)) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank + 1, 1,  MPI_COMM_WORLD, &requests2[req_count2++]);
-                        MPI_Irecv(tcp_position_ynext.data(), 3, MPI_DOUBLE, my_rank + 1, 0,  MPI_COMM_WORLD, &requests2[req_count2++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank + 1, 3,  MPI_COMM_WORLD, &requests2[req_count2++]);
-                        MPI_Irecv(tcp_DeltaRij_ynext.data(), 6, MPI_DOUBLE, my_rank + 1, 2,  MPI_COMM_WORLD, &requests2[req_count2++]);
+                    /// ...with next TCP in the y-direction
+                    if (tcp_iy < np_y - 1) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank + np_x, 5, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_position_ynext.data(), 3, MPI_DOUBLE, my_rank + np_x, 4, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank + np_x, 7, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_DeltaRij_ynext.data(), 6, MPI_DOUBLE, my_rank + np_x, 6, MPI_COMM_WORLD, &requests[req_count++]);
                     } else {
-                        tcp_position_ynext   = {tcp_position[0], L_y, tcp_position[2]};
+                        tcp_position_ynext = {tcp_position[0], L_y, tcp_position[2]};
                         tcp_DeltaRij_ynext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
                     }
+
+                    /// Exchange in z-direction
+                    /// ...with previous TCP in the z-direction
+                    if (tcp_iz > 0) {
+                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - np_x * np_y, 8,  MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_position_zprev.data(), 3, MPI_DOUBLE, my_rank - np_x * np_y, 9,  MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - np_x * np_y, 10, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_DeltaRij_zprev.data(), 6, MPI_DOUBLE, my_rank - np_x * np_y, 11, MPI_COMM_WORLD, &requests[req_count++]);
+                    } else {
+                        tcp_position_zprev = {tcp_position[0], tcp_position[1], 0.0};
+                        tcp_DeltaRij_zprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    }
+                    /// ...with next TCP in the z-direction
+                    if (tcp_iz < np_z - 1) {
+                        MPI_Isend(tcp_position.data(), 3,       MPI_DOUBLE, my_rank + np_x * np_y, 9,  MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_position_znext.data(), 3, MPI_DOUBLE, my_rank + np_x * np_y, 8,  MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Isend(tcp_DeltaRij.data(), 6,       MPI_DOUBLE, my_rank + np_x * np_y, 11, MPI_COMM_WORLD, &requests[req_count++]);
+                        MPI_Irecv(tcp_DeltaRij_znext.data(), 6, MPI_DOUBLE, my_rank + np_x * np_y, 10, MPI_COMM_WORLD, &requests[req_count++]);
+                    } else {
+                        tcp_position_znext = {tcp_position[0], tcp_position[1], L_z};
+                        tcp_DeltaRij_znext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    }
+                    
                     /// Wait for all non-blocking communication to complete
-                    MPI_Waitall(req_count2, requests2, MPI_STATUSES_IGNORE);
-                    validateExchangedDataYDir(tcp_position, tcp_position_yprev, tcp_position_ynext);
+                    MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
+                    validateExchangedData(tcp_position, tcp_position_xprev, tcp_position_xnext, tcp_position_yprev, tcp_position_ynext, tcp_position_zprev, tcp_position_znext);
                     if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Performed & validated data exchange for probes positions and DeltaRij values." << endl; 
 
                     /// Interpolate DeltaRij field from the control probes coarse grid, where DeltaRij is calculated from the received RL actions   
@@ -1304,13 +1357,6 @@ void myRHEA::timeAdvanceConservedVariables() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    /// TODO: check, remove lines below
-    /// Debugging variables
-    double rhou_inv_flux_ratio   = 0.0;
-    double rhou_vis_flux_ratio   = 0.0;
-    double f_rhou_field_ratio    = 0.0;
-    double rl_f_rhou_field_ratio = 0.0;
-    int ratio_counter            = 0;
 #if _TEMPORAL_SMOOTHING_RL_ACTION_
     double actuation_period_fraction = ( current_time - previous_actuation_time ) / actuation_period;;
     double f1 = exp(-1.0 / actuation_period_fraction);
@@ -1409,24 +1455,8 @@ void myRHEA::timeAdvanceConservedVariables() {
                 rhow_field[I1D(i,j,k)] = rk_a*rhow_0_field[I1D(i,j,k)] + rk_b*rhow_field[I1D(i,j,k)] + rk_c*delta_t*rhow_rhs_flux;
                 rhoE_field[I1D(i,j,k)] = rk_a*rhoE_0_field[I1D(i,j,k)] + rk_b*rhoE_field[I1D(i,j,k)] + rk_c*delta_t*rhoE_rhs_flux;
 
-                /// Debugging information
-                /// TODO: remove if not used for debugging
-                rhou_inv_flux_ratio          += std::abs( rhou_inv_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
-                rhou_vis_flux_ratio          += std::abs( rhou_vis_flux[I1D(i,j,k)]   / ( rhou_rhs_flux + EPS ) );
-                f_rhou_field_ratio           += std::abs( f_rhou_field[I1D(i,j,k)]    / ( rhou_rhs_flux + EPS ) );
-                rl_f_rhou_field_ratio        += std::abs( rl_f_rhou_field[I1D(i,j,k)] / ( rhou_rhs_flux + EPS) );
-                ratio_counter += 1;
 	        }
         }
-    }
-    rhou_inv_flux_ratio          /= ratio_counter;
-    rhou_vis_flux_ratio          /= ratio_counter;
-    f_rhou_field_ratio           /= ratio_counter;
-    rl_f_rhou_field_ratio        /= ratio_counter;
-    
-    /// Summarized output
-    if ( my_rank < 4) {
-        cout << endl << "[Rank " << my_rank << "] u-RHS Ratios: " << rhou_inv_flux_ratio << ", " << rhou_vis_flux_ratio << ", " << f_rhou_field_ratio << ", " << rl_f_rhou_field_ratio << endl;
     }
 
 #if _OPENACC_MANUAL_DATA_MOVEMENT_
@@ -1970,6 +2000,31 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the x-direction
+void myRHEA::validateExchangedDataXDir(const vector<double> &tcp_position, const vector<double> &tcp_position_xprev, const vector<double> &tcp_position_xnext) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    // Check y and z coordinates consistency
+    bool y_match = (std::abs(tcp_position[1] - tcp_position_xprev[1]) < EPS) &&
+                   (std::abs(tcp_position[1] - tcp_position_xnext[1]) < EPS);
+    bool z_match = (std::abs(tcp_position[2] - tcp_position_xprev[2]) < EPS) &&
+                   (std::abs(tcp_position[2] - tcp_position_xnext[2]) < EPS);
+    // Check x-coordinate ordering
+    bool x_order_correct = (tcp_position_xprev[0] < tcp_position[0]) &&
+                           (tcp_position[0] < tcp_position_xnext[0]);
+    if (!(y_match && z_match && x_order_correct)) {
+        cerr << "[Rank " << my_rank << "] X-Direction Data exchange validation FAILED!\n"
+             << "TCP x-prev position: " << tcp_position_xprev[0] << " " << tcp_position_xprev[1] << " " << tcp_position_xprev[2] << "\n"
+             << "TCP position:        " << tcp_position[0]       << " " << tcp_position[1]       << " " << tcp_position[2] << "\n"
+             << "TCP x-next position: " << tcp_position_xnext[0] << " " << tcp_position_xnext[1] << " " << tcp_position_xnext[2] << endl;
+        if (!y_match) cerr << "  -> Y-coordinates mismatch!" << endl;
+        if (!z_match) cerr << "  -> Z-coordinates mismatch!" << endl;
+        if (!x_order_correct) cerr << "  -> X-coordinates order incorrect!" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1);
+    }
+}
+
 /// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the y-direction
 void myRHEA::validateExchangedDataYDir(const vector<double> &tcp_position, const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext) {
     int my_rank;
@@ -1983,7 +2038,10 @@ void myRHEA::validateExchangedDataYDir(const vector<double> &tcp_position, const
     bool y_order_correct = (tcp_position_yprev[1] < tcp_position[1]) &&
                            (tcp_position[1] < tcp_position_ynext[1]);
     if (!(x_match && z_match && y_order_correct)) {
-        cerr << "[Rank " << my_rank << "] Data exchange validation FAILED!\n" << endl;
+        cerr << "[Rank " << my_rank << "] Y-Direction Data exchange validation FAILED!\n"
+             << "TCP y-prev position: " << tcp_position_yprev[0] << " " << tcp_position_yprev[1] << " " << tcp_position_yprev[2] << "\n"
+             << "TCP position:        " << tcp_position[0]       << " " << tcp_position[1]       << " " << tcp_position[2] << "\n"
+             << "TCP y-next position: " << tcp_position_ynext[0] << " " << tcp_position_ynext[1] << " " << tcp_position_ynext[2] << endl;
         if (!x_match) cerr << "  -> X-coordinates mismatch!\n" << endl;
         if (!z_match) cerr << "  -> Z-coordinates mismatch!\n" << endl;
         if (!y_order_correct) cerr << "  -> Y-coordinates order incorrect!\n" << endl;
@@ -1991,6 +2049,39 @@ void myRHEA::validateExchangedDataYDir(const vector<double> &tcp_position, const
     }
 }
 
+/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the z-direction
+void myRHEA::validateExchangedDataZDir(const vector<double> &tcp_position, const vector<double> &tcp_position_zprev, const vector<double> &tcp_position_znext) {
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    // Check x and y coordinates consistency
+    bool x_match = (std::abs(tcp_position[0] - tcp_position_zprev[0]) < EPS) &&
+                   (std::abs(tcp_position[0] - tcp_position_znext[0]) < EPS);
+    bool y_match = (std::abs(tcp_position[1] - tcp_position_zprev[1]) < EPS) &&
+                   (std::abs(tcp_position[1] - tcp_position_znext[1]) < EPS);
+    // Check z-coordinate ordering
+    bool z_order_correct = (tcp_position_zprev[2] < tcp_position[2]) &&
+                           (tcp_position[2] < tcp_position_znext[2]);
+    if (!(x_match && y_match && z_order_correct)) {
+        cerr << "[Rank " << my_rank << "] Z-Direction Data exchange validation FAILED!\n"
+             << "TCP z-prev position: " << tcp_position_zprev[0] << " " << tcp_position_zprev[1] << " " << tcp_position_zprev[2] << "\n"
+             << "TCP position:        " << tcp_position[0]       << " " << tcp_position[1]       << " " << tcp_position[2] << "\n"
+             << "TCP z-next position: " << tcp_position_znext[0] << " " << tcp_position_znext[1] << " " << tcp_position_znext[2] << endl;
+        if (!x_match) cerr << "  -> X-coordinates mismatch!\n" << endl;
+        if (!y_match) cerr << "  -> Y-coordinates mismatch!\n" << endl;
+        if (!z_order_correct) cerr << "  -> Z-coordinates order incorrect!\n" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1);
+    }
+}
+
+/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in all x,y,z-directions
+void myRHEA::validateExchangedData(const vector<double> &tcp_position, 
+                                   const vector<double> &tcp_position_xprev, const vector<double> &tcp_position_xnext,
+                                   const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext,
+                                   const vector<double> &tcp_position_zprev, const vector<double> &tcp_position_znext) {
+    validateExchangedDataXDir(tcp_position, tcp_position_xprev, tcp_position_xnext);
+    validateExchangedDataYDir(tcp_position, tcp_position_yprev, tcp_position_ynext);
+    validateExchangedDataZDir(tcp_position, tcp_position_zprev, tcp_position_znext);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -2197,12 +2288,6 @@ void myRHEA::preproceControlPoints() {
          << ", Global action size: " << action_global_size2
          << ", Action dimension: " << action_dim
          << ", mpi processes grid: " << np_x << " " << np_y << " " << np_z << endl;  
-    if (my_rank == 0) {
-        for(int tcp = 0; tcp < num_control_probes; ++tcp) {
-            cout << "[Rank 0] Control probe #" << tcp << " position: " << tcp_x_positions[tcp] << " " << tcp_y_positions[tcp] << " " << tcp_z_positions[tcp]
-                << ", in Rank: " << temporal_control_probes[tcp].getGlobalOwnerRank() << endl;
-        }
-    }
 
     /// Check 0: each mpi process contains a single control point
     if (num_control_probes_local != 1){
@@ -2216,8 +2301,8 @@ void myRHEA::preproceControlPoints() {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    /// Check 2: num. of control probes == num. mpi processes == num. RL environments, and mpi processes must be distributed only along y-coordinate
-    if ((np_x == 1) && (np_y == n_rl_envs) && (np_z == 1) && (num_control_probes == n_rl_envs)) {
+    /// Check 2: num. of control probes == num. mpi processes == num. RL environments
+    if ((np_x * np_y * np_z == n_rl_envs) && (num_control_probes == n_rl_envs)) {
         /// Logging successful distribution
         if (my_rank == 0) {
             stringstream ss;
@@ -2233,6 +2318,21 @@ void myRHEA::preproceControlPoints() {
            << ", Rank " << my_rank << " has " << num_control_probes_local << " RL environments / control probes";
         cerr << endl << ss.str() << endl;     
         MPI_Abort( MPI_COMM_WORLD, 1);
+    }
+
+    /// Check 3: tcp ordering correspond to mpi processes distribution order 
+    int tcp_global_owner;
+    if (my_rank == 0){
+        for(int tcp = 0; tcp < num_control_probes; ++tcp) {
+            tcp_global_owner = temporal_control_probes[tcp].getGlobalOwnerRank();
+            if (tcp_global_owner == tcp) {
+                cout << "Control probe #" << tcp << " at position (" << tcp_x_positions[tcp] << ", " << tcp_y_positions[tcp] << ", " << tcp_z_positions[tcp]
+                     << ") is owned by mpi process with Rank " << tcp_global_owner << endl;
+            } else {
+                cerr << "[myRHEA::preproceControlPoints] ERROR: mismatch between temporal control probe #" << tcp << " != mpi process rank #" << tcp_global_owner << endl;
+                MPI_Abort( MPI_COMM_WORLD, 1); 
+            }  
+        }
     }
 
     /// Debugging: boundaries of RL environments / mpi processes 
