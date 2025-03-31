@@ -37,14 +37,14 @@ const double u_tau      = 1.0;					    /// Friction velocity
 const double tau_w      = rho_0*u_tau*u_tau;		/// Wall shear stress
 const double mu         = rho_0*u_tau*delta/Re_tau;	/// Dynamic viscosity	
 const double nu         = u_tau*delta/Re_tau;		/// Kinematic viscosity	
-//const double kappa      = c_p*mu/Pr;				/// Thermal conductivity	
+//const double kappa    = c_p*mu/Pr;				/// Thermal conductivity	
 const double Re_b       = pow( Re_tau/0.09, 1.0/0.88 );		/// Bulk (approximated) Reynolds number
 const double u_b        = nu*Re_b/( 2.0*delta );		    /// Bulk (approximated) velocity
 const double P_0        = rho_0*u_b*u_b/( gamma_0*Ma*Ma );	/// Reference pressure
-//const double T_0        = P_0/( rho_0*R_specific );		/// Reference temperature
-//const double L_x        = 4.0*pi*delta;			/// Streamwise length
-//const double L_y        = 2.0*delta;				/// Wall-normal height
-//const double L_z        = 4.0*pi*delta/3.0;		/// Spanwise width
+//const double T_0      = P_0/( rho_0*R_specific );	/// Reference temperature
+//const double L_x      = 4.0*pi*delta;			    /// Streamwise length
+//const double L_y      = 2.0*delta;				/// Wall-normal height
+//const double L_z      = 4.0*pi*delta/3.0;		    /// Spanwise width
 const double kappa_vK   = 0.41;                     /// von Kármán constant
 const double y_0        = nu/( 9.0*u_tau );         /// Smooth-wall roughness
 const double u_0        = ( u_tau/kappa_vK )*( log( delta/y_0 ) + ( y_0/delta ) - 1.0 );    /// Volume average of a log-law velocity profile
@@ -1079,122 +1079,9 @@ void myRHEA::calculateSourceTerms() {
                         MPI_Abort( MPI_COMM_WORLD, 1);
                     }
 
-                    /// --------- Send/Recv DeltaRij values betw neighboring mpi processes / rl environments ---------
-                    vector<double> tcp_position_xprev(3, 0.0), tcp_position_xnext(3, 0.0); 
-                    vector<double> tcp_position_yprev(3, 0.0), tcp_position_ynext(3, 0.0); 
-                    vector<double> tcp_position_zprev(3, 0.0), tcp_position_znext(3, 0.0);
-                    vector<double> tcp_DeltaRij_xprev(6, 0.0), tcp_DeltaRij_xnext(6, 0.0); 
-                    vector<double> tcp_DeltaRij_yprev(6, 0.0), tcp_DeltaRij_ynext(6, 0.0); 
-                    vector<double> tcp_DeltaRij_zprev(6, 0.0), tcp_DeltaRij_znext(6, 0.0);
-                    MPI_Request requests[24];
-                    int req_count = 0;
-
-                    /// Compute mpi process coordinates in the coarse TCP 3D grid
-                    int tcp_iz = my_rank / (np_x * np_y);
-                    int tcp_iy = (my_rank % (np_x * np_y)) / np_x;
-                    int tcp_ix = my_rank % np_x;
-                    
-                    /// Exchange in x-direction
-                    /// ...with previous TCP in the x-direction
-                    if (tcp_ix > 0) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_position_xprev.data(), 3, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - 1, 2, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_DeltaRij_xprev.data(), 6, MPI_DOUBLE, my_rank - 1, 3, MPI_COMM_WORLD, &requests[req_count++]);
-                    } else {
-                        tcp_position_xprev = {0.0, tcp_position[1], tcp_position[2]};
-                        tcp_DeltaRij_xprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                    }
-                    /// ...with next TCP in the x-direction
-                    if (tcp_ix < np_x - 1) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_position_xnext.data(), 3, MPI_DOUBLE, my_rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank + 1, 3, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_DeltaRij_xnext.data(), 6, MPI_DOUBLE, my_rank + 1, 2, MPI_COMM_WORLD, &requests[req_count++]);
-                    } else {
-                        tcp_position_xnext = {L_x, tcp_position[1], tcp_position[2]};
-                        tcp_DeltaRij_xnext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                    }
-
-                    /// Exchange in y-direction
-                    /// ...with previous TCP in the y-direction
-                    if (tcp_iy > 0) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - np_x, 4, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_position_yprev.data(), 3, MPI_DOUBLE, my_rank - np_x, 5, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - np_x, 6, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_DeltaRij_yprev.data(), 6, MPI_DOUBLE, my_rank - np_x, 7, MPI_COMM_WORLD, &requests[req_count++]);
-                    } else {
-                        tcp_position_yprev = {tcp_position[0], 0.0, tcp_position[2]};
-                        tcp_DeltaRij_yprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                    }
-                    /// ...with next TCP in the y-direction
-                    if (tcp_iy < np_y - 1) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank + np_x, 5, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_position_ynext.data(), 3, MPI_DOUBLE, my_rank + np_x, 4, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank + np_x, 7, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_DeltaRij_ynext.data(), 6, MPI_DOUBLE, my_rank + np_x, 6, MPI_COMM_WORLD, &requests[req_count++]);
-                    } else {
-                        tcp_position_ynext = {tcp_position[0], L_y, tcp_position[2]};
-                        tcp_DeltaRij_ynext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                    }
-
-                    /// Exchange in z-direction
-                    /// ...with previous TCP in the z-direction
-                    if (tcp_iz > 0) {
-                        MPI_Isend(tcp_position.data(),       3, MPI_DOUBLE, my_rank - np_x * np_y, 8,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_position_zprev.data(), 3, MPI_DOUBLE, my_rank - np_x * np_y, 9,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(tcp_DeltaRij.data(),       6, MPI_DOUBLE, my_rank - np_x * np_y, 10, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_DeltaRij_zprev.data(), 6, MPI_DOUBLE, my_rank - np_x * np_y, 11, MPI_COMM_WORLD, &requests[req_count++]);
-                    } else {
-                        tcp_position_zprev = {tcp_position[0], tcp_position[1], 0.0};
-                        tcp_DeltaRij_zprev = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                    }
-                    /// ...with next TCP in the z-direction
-                    if (tcp_iz < np_z - 1) {
-                        MPI_Isend(tcp_position.data(), 3,       MPI_DOUBLE, my_rank + np_x * np_y, 9,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_position_znext.data(), 3, MPI_DOUBLE, my_rank + np_x * np_y, 8,  MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Isend(tcp_DeltaRij.data(), 6,       MPI_DOUBLE, my_rank + np_x * np_y, 11, MPI_COMM_WORLD, &requests[req_count++]);
-                        MPI_Irecv(tcp_DeltaRij_znext.data(), 6, MPI_DOUBLE, my_rank + np_x * np_y, 10, MPI_COMM_WORLD, &requests[req_count++]);
-                    } else {
-                        tcp_position_znext = {tcp_position[0], tcp_position[1], L_z};
-                        tcp_DeltaRij_znext = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                    }
-                    
-                    /// Wait for all non-blocking communication to complete
-                    MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
-                    validateExchangedData(tcp_position, tcp_position_xprev, tcp_position_xnext, tcp_position_yprev, tcp_position_ynext, tcp_position_zprev, tcp_position_znext);
-                    if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Performed & validated data exchange for probes positions and DeltaRij values." << endl; 
-
-                    /// Interpolate DeltaRij field from the control probes coarse grid, where DeltaRij is calculated from the received RL actions   
-                    int interp_yprev_counter = 0;
-                    int interp_ynext_counter = 0;
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                TODO: ADAPT TO 3-D TCP GRID! VALUE MUST BE INTERPOLATED IN THE 3D SPACE, FOR ALL 3 DIRECTIONS, NOT ONLY Y-COORD!
-                                if ( y_field[I1D(i,j,k)] <= tcp_position[1] ) { 
-                                    /// Local point betw previous control probe and current control probe, in the y-direction 
-                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij[0] - tcp_DeltaRij_yprev[0]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[0];
-                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[1] - tcp_DeltaRij_yprev[1]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[1];
-                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[2] - tcp_DeltaRij_yprev[2]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[2];
-                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[3] - tcp_DeltaRij_yprev[3]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[3];
-                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[4] - tcp_DeltaRij_yprev[4]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[4];
-                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[5] - tcp_DeltaRij_yprev[5]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[5];
-                                    interp_yprev_counter++;
-                                } else {
-                                    /// Local point betw next control probe and current control probe, in the y-direction 
-                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[0] - tcp_DeltaRij[0]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[0];
-                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[1] - tcp_DeltaRij[1]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[1];
-                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[2] - tcp_DeltaRij[2]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[2];
-                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[3] - tcp_DeltaRij[3]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[3];
-                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[4] - tcp_DeltaRij[4]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[4];
-                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[5] - tcp_DeltaRij[5]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[5];
-                                    interp_ynext_counter++;
-                                }
-                            }
-                        }
-                    }
-                    cout << "[myRHEA::calculateSourceTerms] [Rank " << my_rank << "] Interpolated DeltaRij in Y-Dir btw prev. & local tcp (#" << interp_yprev_counter << " points) and btw local & next tcp (#" << interp_ynext_counter << " points)" << endl;
+                    /// Interpolate DeltaRij at (fine) mesh points from action-based DeltaRij values at (coarse) TCP 3-D grid
+                    /// > update DeltaRij_field: DeltaRxx_field, DeltaRxy_field, DeltaRxz_field, DeltaRyy_field, DeltaRyz_field, DeltaRzz_field
+                    interpolateDeltaRij(tcp_position, tcp_DeltaRij);
 
                     MPI_Barrier(MPI_COMM_WORLD);
                     timers->stop( "rl_update_DeltaRij" );
@@ -1999,6 +1886,318 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &tcp_DeltaRij) {
+
+    /// --------- Send/Recv DeltaRij values betw neighboring mpi processes / rl environments ---------
+
+    /// Data exchange between neighboring temporal control probes (tcp), with single tcp per mpi process
+    /// Send/Receive 9 values per data exchange: position (x,y,z) and DeltaRij (DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz) at tcp of corresponding mpi process
+    vector<double> tcp_data_000(9, 0.0), tcp_data_100(9, 0.0), tcp_data_200(9, 0.0), tcp_data_010(9, 0.0), tcp_data_110(9, 0.0), tcp_data_210(9, 0.0), tcp_data_020(9, 0.0), tcp_data_120(9, 0.0), tcp_data_220(9, 0.0);
+    vector<double> tcp_data_001(9, 0.0), tcp_data_101(9, 0.0), tcp_data_201(9, 0.0), tcp_data_011(9, 0.0), tcp_data_111(9, 0.0), tcp_data_211(9, 0.0), tcp_data_021(9, 0.0), tcp_data_121(9, 0.0), tcp_data_221(9, 0.0);
+    vector<double> tcp_data_002(9, 0.0), tcp_data_102(9, 0.0), tcp_data_202(9, 0.0), tcp_data_012(9, 0.0), tcp_data_112(9, 0.0), tcp_data_212(9, 0.0), tcp_data_022(9, 0.0), tcp_data_122(9, 0.0), tcp_data_222(9, 0.0);
+
+    
+    /// Known data for local TCP of mpi process, central point of coarse 3x3x3 TCP grid of neighbouring TCPs.
+    tcp_data_111 = {tcp_position[0], tcp_position[1], tcp_position[2], tcp_DeltaRij[0], tcp_deltaRij[1], tcp_deltaRij[2], tcp_deltaRij[3], tcp_deltaRij[4], tcp_deltaRij[5]};
+    
+    /// Get tcp of other mpi process (other than current process with corresponding TCP idx: 111)
+    /// > update tcp_data_xxx
+    getTcpMeshData(
+        tcp_data_000(9, 0.0), tcp_data_100(9, 0.0), tcp_data_200(9, 0.0), tcp_data_010(9, 0.0), tcp_data_110(9, 0.0), tcp_data_210(9, 0.0), tcp_data_020(9, 0.0), tcp_data_120(9, 0.0), tcp_data_220(9, 0.0),
+        tcp_data_001(9, 0.0), tcp_data_101(9, 0.0), tcp_data_201(9, 0.0), tcp_data_011(9, 0.0), tcp_data_111(9, 0.0), tcp_data_211(9, 0.0), tcp_data_021(9, 0.0), tcp_data_121(9, 0.0), tcp_data_221(9, 0.0),
+        tcp_data_002(9, 0.0), tcp_data_102(9, 0.0), tcp_data_202(9, 0.0), tcp_data_012(9, 0.0), tcp_data_112(9, 0.0), tcp_data_212(9, 0.0), tcp_data_022(9, 0.0), tcp_data_122(9, 0.0), tcp_data_222(9, 0.0),
+    );
+
+    .......
+
+    TODO: incorporate in getTcpMeshData, the following code, adapted:
+
+                    validateExchangedData(tcp_position, tcp_position_xprev, tcp_position_xnext, tcp_position_yprev, tcp_position_ynext, tcp_position_zprev, tcp_position_znext);
+                    if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Performed & validated data exchange for probes positions and DeltaRij values." << endl; 
+
+    .....
+
+    TODO: from tcp_data_xxx (27 nodes) choose sub-cube nodes interp_data_xxx (8 nodes) 
+    TODO: from interp_data_xxx apply trilinear interpolation 
+
+    .....
+
+
+    
+
+                    /// Interpolate DeltaRij field from the control probes coarse grid, where DeltaRij is calculated from the received RL actions   
+                    int interp_yprev_counter = 0;
+                    int interp_ynext_counter = 0;
+                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                                TODO: ADAPT TO 3-D TCP GRID! VALUE MUST BE INTERPOLATED IN THE 3D SPACE, FOR ALL 3 DIRECTIONS, NOT ONLY Y-COORD!
+                                if ( y_field[I1D(i,j,k)] <= tcp_position[1] ) { 
+                                    /// Local point betw previous control probe and current control probe, in the y-direction 
+                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij[0] - tcp_DeltaRij_yprev[0]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[0];
+                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[1] - tcp_DeltaRij_yprev[1]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[1];
+                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[2] - tcp_DeltaRij_yprev[2]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[2];
+                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[3] - tcp_DeltaRij_yprev[3]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[3];
+                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[4] - tcp_DeltaRij_yprev[4]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[4];
+                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[5] - tcp_DeltaRij_yprev[5]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[5];
+                                    interp_yprev_counter++;
+                                } else {
+                                    /// Local point betw next control probe and current control probe, in the y-direction 
+                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[0] - tcp_DeltaRij[0]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[0];
+                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[1] - tcp_DeltaRij[1]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[1];
+                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[2] - tcp_DeltaRij[2]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[2];
+                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[3] - tcp_DeltaRij[3]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[3];
+                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[4] - tcp_DeltaRij[4]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[4];
+                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[5] - tcp_DeltaRij[5]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[5];
+                                    interp_ynext_counter++;
+                                }
+                            }
+                        }
+                    }
+                    cout << "[myRHEA::calculateSourceTerms] [Rank " << my_rank << "] Interpolated DeltaRij in Y-Dir btw prev. & local tcp (#" << interp_yprev_counter << " points) and btw local & next tcp (#" << interp_ynext_counter << " points)" << endl;
+
+
+
+
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+void myRHEA::getTcpMeshData(
+        vector<double> &tcp_data_000(9, 0.0), vector<double> &tcp_data_100(9, 0.0), vector<double> &tcp_data_200(9, 0.0), vector<double> &tcp_data_010(9, 0.0), vector<double> &tcp_data_110(9, 0.0), vector<double> &tcp_data_210(9, 0.0), vector<double> &tcp_data_020(9, 0.0), vector<double> &tcp_data_120(9, 0.0), vector<double> &tcp_data_220(9, 0.0),
+        vector<double> &tcp_data_001(9, 0.0), vector<double> &tcp_data_101(9, 0.0), vector<double> &tcp_data_201(9, 0.0), vector<double> &tcp_data_011(9, 0.0), vector<double> &tcp_data_111(9, 0.0), vector<double> &tcp_data_211(9, 0.0), vector<double> &tcp_data_021(9, 0.0), vector<double> &tcp_data_121(9, 0.0), vector<double> &tcp_data_221(9, 0.0),
+        vector<double> &tcp_data_002(9, 0.0), vector<double> &tcp_data_102(9, 0.0), vector<double> &tcp_data_202(9, 0.0), vector<double> &tcp_data_012(9, 0.0), vector<double> &tcp_data_112(9, 0.0), vector<double> &tcp_data_212(9, 0.0), vector<double> &tcp_data_022(9, 0.0), vector<double> &tcp_data_122(9, 0.0), vector<double> &tcp_data_222(9, 0.0),
+    ) {
+
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    
+    /// Data exchange auxiliary variables 
+    MPI_Request requests[52];
+    int req_count = 0;
+
+    /// Compute mpi process coordinates in the coarse TCP 3D grid
+    int tcp_iz = my_rank / (np_x * np_y);
+    int tcp_iy = (my_rank % (np_x * np_y)) / np_x;
+    int tcp_ix = my_rank % np_x;
+    
+    /// ----- Data exchange in (x)-direction -----
+    /// Exchange data between TCP 111 <-> 011
+    if (tcp_ix > 0) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);      /// from 111 to 011
+        MPI_Irecv(tcp_data_011.data(), 9, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);      /// from 011 to 111
+    } else {
+        tcp_data_011 = {0.0, tcp_data_111[1], tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 211
+    if (tcp_ix < np_x - 1) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);      /// from 111 to 211
+        MPI_Irecv(tcp_data_211.data(), 9, MPI_DOUBLE, my_rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);      /// from 211 to 111
+    } else {
+        tcp_data_211 = {L_x, tcp_data_111[1], tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    
+    /// ----- Data exchange in (y)-direction -----
+    /// Exchange data between TCP 111 <-> 101
+    if (tcp_iy > 0) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x, 2, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 101
+        MPI_Irecv(tcp_data_101.data(), 9, MPI_DOUBLE, my_rank - np_x, 3, MPI_COMM_WORLD, &requests[req_count++]);   /// from 101 to 111
+    } else {
+        tcp_data_101 = {tcp_data_111[0], 0.0, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 121
+    if (tcp_iy < np_y - 1) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x, 3, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 121
+        MPI_Irecv(tcp_data_121.data(), 9, MPI_DOUBLE, my_rank + np_x, 2, MPI_COMM_WORLD, &requests[req_count++]);   /// from 121 to 111
+    } else {
+        tcp_data_121 = {tcp_data_111[0], L_y, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (z)-direction -----
+    /// Exchange data between TCP 111 <-> 110
+    if (tcp_iz > 0) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y, 4, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 110
+        MPI_Irecv(tcp_data_110.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y, 5, MPI_COMM_WORLD, &requests[req_count++]);   /// from 110 to 111
+    } else {
+        tcp_data_110 = {tcp_data_111[0], tcp_data_111[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 112
+    if (tcp_iz < np_z - 1) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y, 5, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 112
+        MPI_Irecv(tcp_data_112.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y, 4, MPI_COMM_WORLD, &requests[req_count++]);   /// from 112 to 111
+    } else {
+        tcp_data_112 = {tcp_data_111[0], tcp_data_111[1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (x,y)-direction -----    (tcp 000,111,222)
+    /// Exchange data between TCP 111 <-> 001
+    if ((tcp_ix > 0) && (tcp_iy > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x - 1, 6, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 001
+        MPI_Irecv(tcp_data_001.data(), 9, MPI_DOUBLE, my_rank - np_x - 1, 7, MPI_COMM_WORLD, &requests[req_count++]);   /// from 001 to 111
+    } else {
+        tcp_data_001 = {0.0, 0.0, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 221
+    if ((tcp_ix < np_x - 1) && (tcp_iy < np_y - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x + 1, 7, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 221
+        MPI_Irecv(tcp_data_221.data(), 9, MPI_DOUBLE, my_rank + np_x + 1, 6, MPI_COMM_WORLD, &requests[req_count++]);   /// from 221 to 111
+    } else {
+        tcp_data_221 = {L_x, L_y, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (-x,y)-direction -----   (tcp 201, 111, 021)
+    /// Exchange data between TCP 111 <-> 201
+    if ((tcp_ix < np_x - 1) && (tcp_iy > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x + 1, 8, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 201
+        MPI_Irecv(tcp_data_201.data(), 9, MPI_DOUBLE, my_rank - np_x + 1, 9, MPI_COMM_WORLD, &requests[req_count++]);   /// from 201 to 111
+    } else {
+        tcp_data_201 = {L_x, 0.0, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 021
+    if ((tcp_ix > 0) && (tcp_iy < np_y - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x - 1, 9, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 021
+        MPI_Irecv(tcp_data_021.data(), 9, MPI_DOUBLE, my_rank + np_x - 1, 8, MPI_COMM_WORLD, &requests[req_count++]);   /// from 021 to 111
+    } else {
+        tcp_data_021 = {0.0, L_y, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (x,z)-direction -----    (tcp 010,111,212)
+    /// Exchange data between TCP 111 <-> 010
+    if ((tcp_ix > 0) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 010
+        MPI_Irecv(tcp_data_010.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);   /// from 010 to 111
+    } else {
+        tcp_data_010 = {0.0, tcp_data_111[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 212
+    if ((tcp_ix < np_x - 1) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 212
+        MPI_Irecv(tcp_data_212.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);   /// from 212 to 111
+    } else {
+        tcp_data_212 = {L_x, tcp_data_111[1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (-x,z)-direction -----    (tcp 210,111,012)
+    /// Exchange data between TCP 111 <-> 210
+    if ((tcp_ix < np_x - 1) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 210
+        MPI_Irecv(tcp_data_210.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);   /// from 210 to 111
+    } else {
+        tcp_data_210 = {L_x, tcp_data_111[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 012
+    if ((tcp_ix > 0) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 012
+        MPI_Irecv(tcp_data_012.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);   /// from 012 to 111
+    } else {
+        tcp_data_012 = {0.0, tcp_data_111[1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (y,z)-direction -----    (tcp 100,111,122)
+    /// Exchange data between TCP 111 <-> 100
+    if ((tcp_iy > 0) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x, 14, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 100
+        MPI_Irecv(tcp_data_100.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x, 15, MPI_COMM_WORLD, &requests[req_count++]);   /// from 100 to 111
+    } else {
+        tcp_data_100 = {tcp_data_111[0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 122
+    if ((tcp_iy < np_y - 1) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x, 15, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 122
+        MPI_Irecv(tcp_data_122.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x, 14, MPI_COMM_WORLD, &requests[req_count++]);   /// from 122 to 111
+    } else {
+        tcp_data_122 = {tcp_data_111[0], L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (-y,z)-direction -----    (tcp 120,111,102)
+    /// Exchange data between TCP 111 <-> 120
+    if ((tcp_iy < np_y - 1) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x, 16, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 120
+        MPI_Irecv(tcp_data_120.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x, 17, MPI_COMM_WORLD, &requests[req_count++]);   /// from 120 to 111
+    } else {
+        tcp_data_120 = {tcp_data_111[0], L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 102
+    if ((tcp_iy > 0) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x, 17, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 102
+        MPI_Irecv(tcp_data_102.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x, 16, MPI_COMM_WORLD, &requests[req_count++]);   /// from 102 to 111
+    } else {
+        tcp_data_102 = {tcp_data_111[0], 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (x,y,z)-direction -----  (tcp 000,111,222)
+    /// Exchange data between TCP 111 <-> 000
+    if ( (tcp_ix > 0) && (tcp_iy > 0) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x - 1, 18,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 000
+        MPI_Irecv(tcp_data_000.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x - 1, 19,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 222 to 111
+    } else {
+        tcp_data_000 = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 222
+    if ((tcp_ix < np_x - 1) && (tcp_iy < np_y - 1) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x + 1, 19,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 222
+        MPI_Irecv(tcp_data_222.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x + 1, 18,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 222 to 111
+    } else {
+        tcp_data_222 = {L_x, L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (-x,y,z)-direction -----  (tcp 200,111,022)
+    /// Exchange data between TCP 111 <-> 200
+    if ((tcp_ix < np_x - 1) && (tcp_iy > 0) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x + 1, 20,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 200
+        MPI_Irecv(tcp_data_200.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x + 1, 21,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 200 to 111
+    } else {
+        tcp_data_200 = {L_x, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 022
+    if ((tcp_ix > 0) && (tcp_iy < np_y - 1) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x - 1, 21,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 022
+        MPI_Irecv(tcp_data_022.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x - 1, 20,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 022 to 111
+    } else {
+        tcp_data_022 = {0.0, L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (x,-y,z)-direction -----  (tcp 020,111,202)
+    /// Exchange data between TCP 111 <-> 020
+    if ( (tcp_ix > 0) && (tcp_iy < np_y - 1) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x - 1, 22,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 020
+        MPI_Irecv(tcp_data_020.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x - 1, 23,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 020 to 111
+    } else {
+        tcp_data_020 = {0.0, L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 202
+    if ((tcp_ix < np_x - 1) && (tcp_iy > 0) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x + 1, 23,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 202
+        MPI_Irecv(tcp_data_202.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x + 1, 22,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 202 to 111
+    } else {
+        tcp_data_202 = {L_x, 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// ----- Data exchange in (x,y,-z)-direction -----  (tcp 002,111,220)
+    /// Exchange data between TCP 111 <-> 002
+    if ( (tcp_ix > 0) && (tcp_iy > 0) && (tcp_iz < np_z - 1)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x - 1, 24,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 002
+        MPI_Irecv(tcp_data_002.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x - 1, 25,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 002 to 111
+    } else {
+        tcp_data_002 = {0.0, 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+    /// Exchange data between TCP 111 <-> 220
+    if ((tcp_ix < np_x - 1) && (tcp_iy < np_y - 1) && (tcp_iz > 0)) {
+        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x + 1, 25,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 220
+        MPI_Irecv(tcp_data_220.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x + 1, 24,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 220 to 111
+    } else {
+        tcp_data_220 = {L_x, L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    }
+
+    /// Wait for all non-blocking communication to complete
+    MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
+
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
