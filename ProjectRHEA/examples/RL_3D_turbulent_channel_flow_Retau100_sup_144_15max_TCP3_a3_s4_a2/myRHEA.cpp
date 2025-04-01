@@ -1902,6 +1902,10 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
     constexpr int YI_STEP = 3;
     constexpr int ZI_STEP = 9;
 
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+    if (my_rank == 0) cout << "[interpolateDeltaRij] Interpolating DeltaRij..." << cout;
 
     /// --------- Send/Recv DeltaRij values betw neighboring mpi processes / rl environments ---------
 
@@ -1943,6 +1947,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
             }
         }
     }
+    if (my_rank == 0) cout << "[interpolateDeltaRij] DeltaRij interpolated successfully from TCP data" << cout;
 
 };
 
@@ -2217,6 +2222,8 @@ void myRHEA::exchangeTcpData(vector<vector<double>> &tcp_data, const int &tcp_da
 
     /// Validate data
     validateExchangeTcpData(tcp_data, central_tcp_index, xi_step, yi_step, zi_step); 
+
+    if (my_rank == 0) cout << "[exchangeTcpData] TCP Positions and DeltaRij data exchanged" << cout;
 
 }
 
