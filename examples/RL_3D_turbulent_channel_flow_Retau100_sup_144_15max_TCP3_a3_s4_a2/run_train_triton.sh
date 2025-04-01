@@ -46,15 +46,15 @@ make RL_CASE_PATH=$TRAIN_RL_CASE_PATH RHEA_PATH=$RHEA_PATH
 echo ">>> ProjectRHEA compiled!"
 cd "$TRAIN_RL_CASE_PATH"
 
-#### # Activate conda environment for the current session
-#### eval "$(conda shell.bash hook)"
-#### conda activate smartrhea-env-v2
-#### echo ">>> Conda environment 'smartrhea-env-v2' activated"
-#### 
-#### # Run training
-#### echo ">>> Running training 'run.py'..."
-#### python3 "$SMARTRHEA_PATH"/run.py
-#### 
-#### # Wait for the command to finish
-#### wait $pid
-#### echo ">>> Background process finished"
+# Activate conda environment for the current session
+eval "$(conda shell.bash hook)"
+conda activate smartrhea-env-v2
+echo ">>> Conda environment 'smartrhea-env-v2' activated"
+
+# Run training
+echo ">>> Running training 'run.py'..."
+python3 "$SMARTRHEA_PATH"/run.py
+
+# Wait for the command to finish
+wait $pid
+echo ">>> Background process finished"
