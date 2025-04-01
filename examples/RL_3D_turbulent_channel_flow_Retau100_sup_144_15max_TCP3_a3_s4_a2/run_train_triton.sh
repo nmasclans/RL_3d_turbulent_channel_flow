@@ -14,8 +14,8 @@ trap cleanup SIGINT SIGTERM
 # Environmental variables
 REPO_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
-export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_sup_144_15max_TCP3_a3_s2_a2
-export TRAIN_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_sup_144_15max_TCP3_a3_s2_a2
+export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_sup_144_15max_TCP3_a3_s4_a2
+export TRAIN_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_sup_144_15max_TCP3_a3_s4_a2
 export EVAL_RL_CASE_PATH=""
 export SMARTRHEA_PATH=$REPO_DIR/smartrhea
 export RUN_MODE=train 
@@ -46,15 +46,15 @@ make RL_CASE_PATH=$TRAIN_RL_CASE_PATH RHEA_PATH=$RHEA_PATH
 echo ">>> ProjectRHEA compiled!"
 cd "$TRAIN_RL_CASE_PATH"
 
-# Activate conda environment for the current session
-eval "$(conda shell.bash hook)"
-conda activate smartrhea-env-v2
-echo ">>> Conda environment 'smartrhea-env-v2' activated"
-
-# Run training
-echo ">>> Running training 'run.py'..."
-python3 "$SMARTRHEA_PATH"/run.py
-
-# Wait for the command to finish
-wait $pid
-echo ">>> Background process finished"
+#### # Activate conda environment for the current session
+#### eval "$(conda shell.bash hook)"
+#### conda activate smartrhea-env-v2
+#### echo ">>> Conda environment 'smartrhea-env-v2' activated"
+#### 
+#### # Run training
+#### echo ">>> Running training 'run.py'..."
+#### python3 "$SMARTRHEA_PATH"/run.py
+#### 
+#### # Wait for the command to finish
+#### wait $pid
+#### echo ">>> Background process finished"

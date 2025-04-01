@@ -77,7 +77,7 @@ const double avg_u_bulk_min = 14.665 - 0.565;
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 int action_dim = 3;
-int state_dim  = 2;
+int state_dim  = 4;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -2657,7 +2657,9 @@ void myRHEA::updateState() {
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
             state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+1] = y_field[I1D(i_index,j_index,k_index)] / delta;
+            state_local[state_local_size2_counter+1] = x_field[I1D(i_index,j_index,k_index)] / L_x;
+            state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / L_y;
+            state_local[state_local_size2_counter+3] = z_field[I1D(i_index,j_index,k_index)] / L_z;
 #endif /// of _WITNESS_XZ_SLICES_
 
             /// Update local state counter
