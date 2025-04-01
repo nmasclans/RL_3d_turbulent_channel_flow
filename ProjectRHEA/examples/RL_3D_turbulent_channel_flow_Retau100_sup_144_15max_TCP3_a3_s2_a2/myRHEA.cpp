@@ -1888,95 +1888,115 @@ void myRHEA::Rijdof2matrix(const double &Rkk, const vector<vector<double>> &D, c
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
+/// tcp_position: position of the unique, local temporal control probe (TCP) of local mpi process
+///       tensor<double> tcp_position(3) = {x, y, z}
+/// tcp_DeltaRij: DeltaRij tensor at the unique, local temporal control probe (TCP) of local mpi process
+///       tensor<double> tcp_DeltaRij(6) = {DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz}
 void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &tcp_DeltaRij) {
+
+    constexpr int TCP_DATA_SIZE = 9;
+    constexpr int NUM_TCP_NEIGHBORS = 27;
+    constexpr int CENTRAL_TCP_INDEX = NUM_NEIGHBORS / 2; // = 13 for NUM_TCP_NEIGHBORS = 27
+    /// 3x3x3 TCP mesh for NUM_TCP_NEIGHBORS = 27:
+    constexpr int X_IDX_STEP = 1;
+    constexpr int Y_IDX_STEP = 3;
+    constexpr int Z_IDX_STEP = 9;
+
 
     /// --------- Send/Recv DeltaRij values betw neighboring mpi processes / rl environments ---------
 
     /// Data exchange between neighboring temporal control probes (tcp), with single tcp per mpi process
     /// Send/Receive 9 values per data exchange: position (x,y,z) and DeltaRij (DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz) at tcp of corresponding mpi process
-    vector<double> tcp_data_000(9, 0.0), tcp_data_100(9, 0.0), tcp_data_200(9, 0.0), tcp_data_010(9, 0.0), tcp_data_110(9, 0.0), tcp_data_210(9, 0.0), tcp_data_020(9, 0.0), tcp_data_120(9, 0.0), tcp_data_220(9, 0.0);
-    vector<double> tcp_data_001(9, 0.0), tcp_data_101(9, 0.0), tcp_data_201(9, 0.0), tcp_data_011(9, 0.0), tcp_data_111(9, 0.0), tcp_data_211(9, 0.0), tcp_data_021(9, 0.0), tcp_data_121(9, 0.0), tcp_data_221(9, 0.0);
-    vector<double> tcp_data_002(9, 0.0), tcp_data_102(9, 0.0), tcp_data_202(9, 0.0), tcp_data_012(9, 0.0), tcp_data_112(9, 0.0), tcp_data_212(9, 0.0), tcp_data_022(9, 0.0), tcp_data_122(9, 0.0), tcp_data_222(9, 0.0);
+    vector<vector<double>> tcp_data(NUM_TCP_NEIGHBORS, vector<double>(TCP_DATA_SIZE, 0.0));
+    /////////vector<double> tcp_data_000(9, 0.0), tcp_data_100(9, 0.0), tcp_data_200(9, 0.0), tcp_data_010(9, 0.0), tcp_data_110(9, 0.0), tcp_data_210(9, 0.0), tcp_data_020(9, 0.0), tcp_data_120(9, 0.0), tcp_data_220(9, 0.0);
+    /////////vector<double> tcp_data_001(9, 0.0), tcp_data_101(9, 0.0), tcp_data_201(9, 0.0), tcp_data_011(9, 0.0), tcp_data_111(9, 0.0), tcp_data_211(9, 0.0), tcp_data_021(9, 0.0), tcp_data_121(9, 0.0), tcp_data_221(9, 0.0);
+    /////////vector<double> tcp_data_002(9, 0.0), tcp_data_102(9, 0.0), tcp_data_202(9, 0.0), tcp_data_012(9, 0.0), tcp_data_112(9, 0.0), tcp_data_212(9, 0.0), tcp_data_022(9, 0.0), tcp_data_122(9, 0.0), tcp_data_222(9, 0.0);
 
+    /// Set local TCP data of current mpi process (central point in the coarse 3x3x3 grid of TCP)
+    tcp_data[CENTRAL_TCP_INDEX] = {tcp_position[0], tcp_position[1], tcp_position[2], 
+                                   tcp_DeltaRij[0], tcp_deltaRij[1], tcp_deltaRij[2], tcp_deltaRij[3], tcp_deltaRij[4], tcp_deltaRij[5]};
     
-    /// Known data for local TCP of mpi process, central point of coarse 3x3x3 TCP grid of neighbouring TCPs.
-    tcp_data_111 = {tcp_position[0], tcp_position[1], tcp_position[2], tcp_DeltaRij[0], tcp_deltaRij[1], tcp_deltaRij[2], tcp_deltaRij[3], tcp_deltaRij[4], tcp_deltaRij[5]};
+    // Fetch TCP data from neighboring MPI processes (unique TCP per MPI process)
+    exchangeTcpData(tcp_data, TCP_DATA_SIZE, NUM_TCP_NEIGHBORS, CENTRAL_TCP_INDEX, X_IDX_STEP, Y_IDX_STEP, Z_IDX_STEP);   /// update tcp_data
     
-    /// Get tcp of other mpi process (other than current process with corresponding TCP idx: 111)
-    /// > update tcp_data_xxx
-    getTcpMeshData(
-        tcp_data_000, tcp_data_100, tcp_data_200, tcp_data_010, tcp_data_110, tcp_data_210, tcp_data_020, tcp_data_120, tcp_data_220,
-        tcp_data_001, tcp_data_101, tcp_data_201, tcp_data_011, tcp_data_111, tcp_data_211, tcp_data_021, tcp_data_121, tcp_data_221,
-        tcp_data_002, tcp_data_102, tcp_data_202, tcp_data_012, tcp_data_112, tcp_data_212, tcp_data_022, tcp_data_122, tcp_data_222,
-    );
-
-    /// Validate data
-    validateExchangedData(
-        tcp_data_000, tcp_data_100, tcp_data_200, tcp_data_010, tcp_data_110, tcp_data_210, tcp_data_020, tcp_data_120, tcp_data_220,
-        tcp_data_001, tcp_data_101, tcp_data_201, tcp_data_011, tcp_data_111, tcp_data_211, tcp_data_021, tcp_data_121, tcp_data_221,
-        tcp_data_002, tcp_data_102, tcp_data_202, tcp_data_012, tcp_data_112, tcp_data_212, tcp_data_022, tcp_data_122, tcp_data_222,
-    ); 
-        
-
-       
-    .....
-
-    TODO: from tcp_data_xxx (27 nodes) choose sub-cube nodes interp_data_xxx (8 nodes) 
-    TODO: from interp_data_xxx apply trilinear interpolation 
-
-    .....
-
-
-    
-
-                    /// Interpolate DeltaRij field from the control probes coarse grid, where DeltaRij is calculated from the received RL actions   
-                    int interp_yprev_counter = 0;
-                    int interp_ynext_counter = 0;
-                    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-                            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                                TODO: ADAPT TO 3-D TCP GRID! VALUE MUST BE INTERPOLATED IN THE 3D SPACE, FOR ALL 3 DIRECTIONS, NOT ONLY Y-COORD!
-                                if ( y_field[I1D(i,j,k)] <= tcp_position[1] ) { 
-                                    /// Local point betw previous control probe and current control probe, in the y-direction 
-                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij[0] - tcp_DeltaRij_yprev[0]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[0];
-                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[1] - tcp_DeltaRij_yprev[1]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[1];
-                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[2] - tcp_DeltaRij_yprev[2]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[2];
-                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij[3] - tcp_DeltaRij_yprev[3]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[3];
-                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[4] - tcp_DeltaRij_yprev[4]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[4];
-                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij[5] - tcp_DeltaRij_yprev[5]) / (tcp_position[1] - tcp_position_yprev[1]) ) * (y_field[I1D(i,j,k)] - tcp_position_yprev[1]) + tcp_DeltaRij_yprev[5];
-                                    interp_yprev_counter++;
-                                } else {
-                                    /// Local point betw next control probe and current control probe, in the y-direction 
-                                    DeltaRxx_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[0] - tcp_DeltaRij[0]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[0];
-                                    DeltaRxy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[1] - tcp_DeltaRij[1]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[1];
-                                    DeltaRxz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[2] - tcp_DeltaRij[2]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[2];
-                                    DeltaRyy_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[3] - tcp_DeltaRij[3]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[3];
-                                    DeltaRyz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[4] - tcp_DeltaRij[4]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[4];
-                                    DeltaRzz_field[I1D(i,j,k)] = ( (tcp_DeltaRij_ynext[5] - tcp_DeltaRij[5]) / (tcp_position_ynext[1] - tcp_position[1]) ) * (y_field[I1D(i,j,k)] - tcp_position[1])       + tcp_DeltaRij[5];
-                                    interp_ynext_counter++;
-                                }
-                            }
-                        }
-                    }
-                    cout << "[myRHEA::calculateSourceTerms] [Rank " << my_rank << "] Interpolated DeltaRij in Y-Dir btw prev. & local tcp (#" << interp_yprev_counter << " points) and btw local & next tcp (#" << interp_ynext_counter << " points)" << endl;
-
-
-
+    /// Perform DeltaRij interpolation of mesh points from 8 TCP data (from 27 TCP available neighbours)
+    int tcp_000_x_offset, tcp_000_y_offset, tcp_000_z_offset;
+    int tcp_000;
+    const double x_central = tcp_data[CENTRAL_TCP_INDEX][0];
+    const double y_central = tcp_data[CENTRAL_TCP_INDEX][1];
+    const double z_central = tcp_data[CENTRAL_TCP_INDEX][2];
+    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                /// Compare 'central' and interpolation points for all local mesh point
+                /// The value of DeltaRij at each local mesh point is interpolated using 8 closest TCP of current and neighbouring mpi process 
+                /// 'central' position corresponds to the local TCP at mpi process (unique per mpi process)
+                tcp_000_x_offset = (x_field[I1D(i,j,k)] < x_central) ? -1 : 0;
+                tcp_000_y_offset = (y_field[I1D(i,j,k)] < y_central) ? -1 : 0;
+                tcp_000_z_offset = (z_field[I1D(i,j,k)] < z_central) ? -1 : 0;
+                tcp_000 = CENTRAL_TCP_INDEX + (tcp_000_x_offset * XI_STEP) + (tcp_000_y_offset * YI_STEP) + (tcp_000_z_offset * ZI_STEP); 
+                /// Perform interpolation
+                /// c_interpolated         = trilinearInterpolation(const double &x,     const double &y,     const double &z,     const double &x0,     const double &x1,             const double &y0,     const double &y1,             const double &z0,     const double &z1,             const double &f000,   const double &f100,           const double &f010,                       const double &f110,                   const double &f001,           const double &f101,                   const double &f011,                   const double &f111);
+                DeltaRxx_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][3], tcp_data[tcp_000+XI_STEP][3], tcp_data[tcp_000+YI_STEP]DeltaRij_010[3], tcp_data[tcp_000+XI_STEP+YI_STEP][3], tcp_data[tcp_000+ZI_STEP][3], tcp_data[tcp_000+XI_STEP+ZI_STEP][3], tcp_data[tcp_000+YI_STEP+ZI_STEP][3], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][3]);
+                DeltaRxy_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][4], tcp_data[tcp_000+XI_STEP][4], tcp_data[tcp_000+YI_STEP]DeltaRij_010[4], tcp_data[tcp_000+XI_STEP+YI_STEP][4], tcp_data[tcp_000+ZI_STEP][4], tcp_data[tcp_000+XI_STEP+ZI_STEP][4], tcp_data[tcp_000+YI_STEP+ZI_STEP][4], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][4]);
+                DeltaRxz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][5], tcp_data[tcp_000+XI_STEP][5], tcp_data[tcp_000+YI_STEP]DeltaRij_010[5], tcp_data[tcp_000+XI_STEP+YI_STEP][5], tcp_data[tcp_000+ZI_STEP][5], tcp_data[tcp_000+XI_STEP+ZI_STEP][5], tcp_data[tcp_000+YI_STEP+ZI_STEP][5], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][5]);
+                DeltaRyy_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][6], tcp_data[tcp_000+XI_STEP][6], tcp_data[tcp_000+YI_STEP]DeltaRij_010[6], tcp_data[tcp_000+XI_STEP+YI_STEP][6], tcp_data[tcp_000+ZI_STEP][6], tcp_data[tcp_000+XI_STEP+ZI_STEP][6], tcp_data[tcp_000+YI_STEP+ZI_STEP][6], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][6]);
+                DeltaRyz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][7], tcp_data[tcp_000+XI_STEP][7], tcp_data[tcp_000+YI_STEP]DeltaRij_010[7], tcp_data[tcp_000+XI_STEP+YI_STEP][7], tcp_data[tcp_000+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+ZI_STEP][7], tcp_data[tcp_000+YI_STEP+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][7]);
+                DeltaRzz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][8], tcp_data[tcp_000+XI_STEP][8], tcp_data[tcp_000+YI_STEP]DeltaRij_010[8], tcp_data[tcp_000+XI_STEP+YI_STEP][8], tcp_data[tcp_000+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+ZI_STEP][8], tcp_data[tcp_000+YI_STEP+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][8]);
+            }
+        }
+    }
 
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////
-
-void myRHEA::getTcpMeshData(
-        vector<double> &tcp_data_000, vector<double> &tcp_data_100, vector<double> &tcp_data_200, vector<double> &tcp_data_010, vector<double> &tcp_data_110, vector<double> &tcp_data_210, vector<double> &tcp_data_020, vector<double> &tcp_data_120, vector<double> &tcp_data_220,
-        vector<double> &tcp_data_001, vector<double> &tcp_data_101, vector<double> &tcp_data_201, vector<double> &tcp_data_011, vector<double> &tcp_data_111, vector<double> &tcp_data_211, vector<double> &tcp_data_021, vector<double> &tcp_data_121, vector<double> &tcp_data_221,
-        vector<double> &tcp_data_002, vector<double> &tcp_data_102, vector<double> &tcp_data_202, vector<double> &tcp_data_012, vector<double> &tcp_data_112, vector<double> &tcp_data_212, vector<double> &tcp_data_022, vector<double> &tcp_data_122, vector<double> &tcp_data_222,
-    ) {
+/// TODO: add function description
+/*  
+    vector<vector<double>> tcp_data(NUM_TCP_NEIGHBORS, vector<double>(TCP_DATA_SIZE, 0.0))
+    Contains TCP_DAT_SIZE = 9-dim data (x, y, z, DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz) for each NUM_TCP_NEIGHBORS = 27 :
+        tcp_data_000, tcp_data_100, tcp_data_200, tcp_data_010, tcp_data_110, tcp_data_210, tcp_data_020, tcp_data_120, tcp_data_220,
+        tcp_data_001, tcp_data_101, tcp_data_201, tcp_data_011, tcp_data_111, tcp_data_211, tcp_data_021, tcp_data_121, tcp_data_221,
+        tcp_data_002, tcp_data_102, tcp_data_202, tcp_data_012, tcp_data_112, tcp_data_212, tcp_data_022, tcp_data_122, tcp_data_222,
+    Correspondence betw tcp_data idx and neighbouring tcp 3x3x3 grid:
+        vector<double> tcp_data_000 = tcp_data[0]  = tcp_data[central_tcp_index-1-3-9];
+        vector<double> tcp_data_100 = tcp_data[1]  = tcp_data[central_tcp_index  -3-9];
+        vector<double> tcp_data_200 = tcp_data[2]  = tcp_data[central_tcp_index+1-3-9];
+        vector<double> tcp_data_010 = tcp_data[3]  = tcp_data[central_tcp_index-1  -9];
+        vector<double> tcp_data_110 = tcp_data[4]  = tcp_data[central_tcp_index    -9];
+        vector<double> tcp_data_210 = tcp_data[5]  = tcp_data[central_tcp_index-1  -9];
+        vector<double> tcp_data_020 = tcp_data[6]  = tcp_data[central_tcp_index-1+3-9];
+        vector<double> tcp_data_120 = tcp_data[7]  = tcp_data[central_tcp_index  +3-9];
+        vector<double> tcp_data_220 = tcp_data[8]  = tcp_data[central_tcp_index+1+3-9];
+        vector<double> tcp_data_001 = tcp_data[9]  = tcp_data[central_tcp_index-1-3];
+        vector<double> tcp_data_101 = tcp_data[10] = tcp_data[central_tcp_index  -3];
+        vector<double> tcp_data_201 = tcp_data[11] = tcp_data[central_tcp_index+1-3];
+        vector<double> tcp_data_011 = tcp_data[12] = tcp_data[central_tcp_index-1];
+        vector<double> tcp_data_111 = tcp_data[13] = tcp_data[central_tcp_index];
+        vector<double> tcp_data_211 = tcp_data[14] = tcp_data[central_tcp_index-1];
+        vector<double> tcp_data_021 = tcp_data[15] = tcp_data[central_tcp_index-1+3];
+        vector<double> tcp_data_121 = tcp_data[16] = tcp_data[central_tcp_index  +3];
+        vector<double> tcp_data_221 = tcp_data[17] = tcp_data[central_tcp_index+1+3];
+        vector<double> tcp_data_002 = tcp_data[18] = tcp_data[central_tcp_index-1-3+9];
+        vector<double> tcp_data_102 = tcp_data[19] = tcp_data[central_tcp_index  -3+9];
+        vector<double> tcp_data_202 = tcp_data[20] = tcp_data[central_tcp_index+1-3+9];
+        vector<double> tcp_data_012 = tcp_data[21] = tcp_data[central_tcp_index-1  +9];
+        vector<double> tcp_data_112 = tcp_data[22] = tcp_data[central_tcp_index    +9];
+        vector<double> tcp_data_212 = tcp_data[23] = tcp_data[central_tcp_index+1  +9];
+        vector<double> tcp_data_022 = tcp_data[24] = tcp_data[central_tcp_index-1+3+9];
+        vector<double> tcp_data_122 = tcp_data[25] = tcp_data[central_tcp_index  +3+9];
+        vector<double> tcp_data_222 = tcp_data[26] = tcp_data[central_tcp_index+1+3+9];
+}
+*/ 
+void myRHEA::exchangeTcpData(vector<vector<double>> &tcp_data, const int &tcp_data_size, const int &num_tcp_neighbors, const int &central_tcp_index, const int &xi_step, const int &yi_step, const int &zi_step) {
 
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+    if (num_tcp_neighbors != 27) {
+        cerr << "Function 'exchangeTcpData' implemented for num_tcp_neighbors = 27 (3x3x3 TCP grid), but num_tcp_neighbors = " << num_tcp_neighbors << " found." << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     
     /// Data exchange auxiliary variables 
     MPI_Request requests[52];
@@ -1988,311 +2008,264 @@ void myRHEA::getTcpMeshData(
     int tcp_ix = my_rank % np_x;
     
     /// ----- Data exchange in (x)-direction -----
-    /// Exchange data between TCP 111 <-> 011
+    /// Exchange data between TCP 111 [13] <-> 011 [12]
     if (tcp_ix > 0) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);      /// from 111 to 011
-        MPI_Irecv(tcp_data_011.data(), 9, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);      /// from 011 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),           tcp_data_size, MPI_DOUBLE, my_rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);      /// from 111 to 011
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);      /// from 011 to 111
     } else {
-        tcp_data_011 = {0.0, tcp_data_111[1], tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step] = {0.0, tcp_data[central_tcp_index][1], tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 211
+    /// Exchange data between TCP 111 [13] <-> 211 [14]
     if (tcp_ix < np_x - 1) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);      /// from 111 to 211
-        MPI_Irecv(tcp_data_211.data(), 9, MPI_DOUBLE, my_rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);      /// from 211 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),           tcp_data_size, MPI_DOUBLE, my_rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);      /// from 111 to 211
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);      /// from 211 to 111
     } else {
-        tcp_data_211 = {L_x, tcp_data_111[1], tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step] = {L_x, tcp_data[central_tcp_index][1], tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
     
     /// ----- Data exchange in (y)-direction -----
-    /// Exchange data between TCP 111 <-> 101
+    /// Exchange data between TCP 111 [13] <-> 101 [10]
     if (tcp_iy > 0) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x, 2, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 101
-        MPI_Irecv(tcp_data_101.data(), 9, MPI_DOUBLE, my_rank - np_x, 3, MPI_COMM_WORLD, &requests[req_count++]);   /// from 101 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),           tcp_data_size, MPI_DOUBLE, my_rank - np_x, 2, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 101
+        MPI_Irecv(tcp_data[central_tcp_index-yi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x, 3, MPI_COMM_WORLD, &requests[req_count++]);   /// from 101 to 111
     } else {
-        tcp_data_101 = {tcp_data_111[0], 0.0, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-yi_step] = {tcp_data[central_tcp_index][0], 0.0, tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 121
+    /// Exchange data between TCP 111 [13] <-> 121 [16]
     if (tcp_iy < np_y - 1) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x, 3, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 121
-        MPI_Irecv(tcp_data_121.data(), 9, MPI_DOUBLE, my_rank + np_x, 2, MPI_COMM_WORLD, &requests[req_count++]);   /// from 121 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),           tcp_data_size, MPI_DOUBLE, my_rank + np_x, 3, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 121
+        MPI_Irecv(tcp_data[central_tcp_index+yi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x, 2, MPI_COMM_WORLD, &requests[req_count++]);   /// from 121 to 111
     } else {
-        tcp_data_121 = {tcp_data_111[0], L_y, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+yi_step] = {tcp_data[central_tcp_index][0], L_y, tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (z)-direction -----
-    /// Exchange data between TCP 111 <-> 110
+    /// Exchange data between TCP 111 [13] <-> 110 [4]
     if (tcp_iz > 0) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y, 4, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 110
-        MPI_Irecv(tcp_data_110.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y, 5, MPI_COMM_WORLD, &requests[req_count++]);   /// from 110 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),           tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y, 4, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 110
+        MPI_Irecv(tcp_data[central_tcp_index-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y, 5, MPI_COMM_WORLD, &requests[req_count++]);   /// from 110 to 111
     } else {
-        tcp_data_110 = {tcp_data_111[0], tcp_data_111[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-zi_step] = {tcp_data[central_tcp_index][0], tcp_data[central_tcp_index][1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 112
+    /// Exchange data between TCP 111 [13] <-> 112 [22]
     if (tcp_iz < np_z - 1) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y, 5, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 112
-        MPI_Irecv(tcp_data_112.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y, 4, MPI_COMM_WORLD, &requests[req_count++]);   /// from 112 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),           tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y, 5, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 112
+        MPI_Irecv(tcp_data[central_tcp_index+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y, 4, MPI_COMM_WORLD, &requests[req_count++]);   /// from 112 to 111
     } else {
-        tcp_data_112 = {tcp_data_111[0], tcp_data_111[1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+zi_step] = {tcp_data[central_tcp_index][0], tcp_data[central_tcp_index][1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
-    /// ----- Data exchange in (x,y)-direction -----    (tcp 000,111,222)
-    /// Exchange data between TCP 111 <-> 001
+    /// ----- Data exchange in (x,y)-direction -----    (tcp 001,111,221)
+    /// Exchange data between TCP 111 [13] <-> 001 [9]
     if ((tcp_ix > 0) && (tcp_iy > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x - 1, 6, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 001
-        MPI_Irecv(tcp_data_001.data(), 9, MPI_DOUBLE, my_rank - np_x - 1, 7, MPI_COMM_WORLD, &requests[req_count++]);   /// from 001 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank - np_x - 1, 6, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 001
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step-yi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x - 1, 7, MPI_COMM_WORLD, &requests[req_count++]);   /// from 001 to 111
     } else {
-        tcp_data_001 = {0.0, 0.0, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step-yi_step] = {0.0, 0.0, tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 221
+    /// Exchange data between TCP 111 [13] <-> 221 [17]
     if ((tcp_ix < np_x - 1) && (tcp_iy < np_y - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x + 1, 7, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 221
-        MPI_Irecv(tcp_data_221.data(), 9, MPI_DOUBLE, my_rank + np_x + 1, 6, MPI_COMM_WORLD, &requests[req_count++]);   /// from 221 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank + np_x + 1, 7, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 221
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step+yi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x + 1, 6, MPI_COMM_WORLD, &requests[req_count++]);   /// from 221 to 111
     } else {
-        tcp_data_221 = {L_x, L_y, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step+yi_step] = {L_x, L_y, tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (-x,y)-direction -----   (tcp 201, 111, 021)
-    /// Exchange data between TCP 111 <-> 201
+    /// Exchange data between TCP 111 [13] <-> 201 [11]
     if ((tcp_ix < np_x - 1) && (tcp_iy > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x + 1, 8, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 201
-        MPI_Irecv(tcp_data_201.data(), 9, MPI_DOUBLE, my_rank - np_x + 1, 9, MPI_COMM_WORLD, &requests[req_count++]);   /// from 201 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank - np_x + 1, 8, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 201
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step-yi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x + 1, 9, MPI_COMM_WORLD, &requests[req_count++]);   /// from 201 to 111
     } else {
-        tcp_data_201 = {L_x, 0.0, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step-yi_step] = {L_x, 0.0, tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 021
+    /// Exchange data between TCP 111 [13] <-> 021 [15]
     if ((tcp_ix > 0) && (tcp_iy < np_y - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x - 1, 9, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 021
-        MPI_Irecv(tcp_data_021.data(), 9, MPI_DOUBLE, my_rank + np_x - 1, 8, MPI_COMM_WORLD, &requests[req_count++]);   /// from 021 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank + np_x - 1, 9, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 021
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step+yi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x - 1, 8, MPI_COMM_WORLD, &requests[req_count++]);   /// from 021 to 111
     } else {
-        tcp_data_021 = {0.0, L_y, tcp_data_111[2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step+yi_step] = {0.0, L_y, tcp_data[central_tcp_index][2], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (x,z)-direction -----    (tcp 010,111,212)
-    /// Exchange data between TCP 111 <-> 010
+    /// Exchange data between TCP 111 [13] <-> 010 [3]
     if ((tcp_ix > 0) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 010
-        MPI_Irecv(tcp_data_010.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);   /// from 010 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - 1, 10, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 010
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - 1, 11, MPI_COMM_WORLD, &requests[req_count++]);   /// from 010 to 111
     } else {
-        tcp_data_010 = {0.0, tcp_data_111[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step-zi_step] = {0.0, tcp_data[central_tcp_index][1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 212
+    /// Exchange data between TCP 111 [13] <-> 212 [23]
     if ((tcp_ix < np_x - 1) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 212
-        MPI_Irecv(tcp_data_212.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);   /// from 212 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + 1, 11, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 212
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + 1, 10, MPI_COMM_WORLD, &requests[req_count++]);   /// from 212 to 111
     } else {
-        tcp_data_212 = {L_x, tcp_data_111[1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step+zi_step] = {L_x, tcp_data[central_tcp_index][1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (-x,z)-direction -----    (tcp 210,111,012)
-    /// Exchange data between TCP 111 <-> 210
+    /// Exchange data between TCP 111 [13] <-> 210 [5]
     if ((tcp_ix < np_x - 1) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 210
-        MPI_Irecv(tcp_data_210.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);   /// from 210 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + 1, 12, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 210
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + 1, 13, MPI_COMM_WORLD, &requests[req_count++]);   /// from 210 to 111
     } else {
-        tcp_data_210 = {L_x, tcp_data_111[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step-zi_step] = {L_x, tcp_data[central_tcp_index][1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 012
+    /// Exchange data between TCP 111 [13] <-> 012 [21]
     if ((tcp_ix > 0) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 012
-        MPI_Irecv(tcp_data_012.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);   /// from 012 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - 1, 13, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 012
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - 1, 12, MPI_COMM_WORLD, &requests[req_count++]);   /// from 012 to 111
     } else {
-        tcp_data_012 = {0.0, tcp_data_111[1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step+zi_step] = {0.0, tcp_data[central_tcp_index][1], L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (y,z)-direction -----    (tcp 100,111,122)
-    /// Exchange data between TCP 111 <-> 100
+    /// Exchange data between TCP 111 [13] <-> 100 [1]
     if ((tcp_iy > 0) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x, 14, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 100
-        MPI_Irecv(tcp_data_100.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x, 15, MPI_COMM_WORLD, &requests[req_count++]);   /// from 100 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - np_x, 14, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 100
+        MPI_Irecv(tcp_data[central_tcp_index-yi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - np_x, 15, MPI_COMM_WORLD, &requests[req_count++]);   /// from 100 to 111
     } else {
-        tcp_data_100 = {tcp_data_111[0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-yi_step-zi_step] = {tcp_data[central_tcp_index][0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 122
+    /// Exchange data between TCP 111 [13] <-> 122 [25]
     if ((tcp_iy < np_y - 1) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x, 15, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 122
-        MPI_Irecv(tcp_data_122.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x, 14, MPI_COMM_WORLD, &requests[req_count++]);   /// from 122 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + np_x, 15, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 122
+        MPI_Irecv(tcp_data[central_tcp_index+yi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + np_x, 14, MPI_COMM_WORLD, &requests[req_count++]);   /// from 122 to 111
     } else {
-        tcp_data_122 = {tcp_data_111[0], L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+yi_step+zi_step] = {tcp_data[central_tcp_index][0], L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (-y,z)-direction -----    (tcp 120,111,102)
-    /// Exchange data between TCP 111 <-> 120
+    /// Exchange data between TCP 111 [13] <-> 120 [7]
     if ((tcp_iy < np_y - 1) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x, 16, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 120
-        MPI_Irecv(tcp_data_120.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x, 17, MPI_COMM_WORLD, &requests[req_count++]);   /// from 120 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + np_x, 16, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 120
+        MPI_Irecv(tcp_data[central_tcp_index+yi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + np_x, 17, MPI_COMM_WORLD, &requests[req_count++]);   /// from 120 to 111
     } else {
-        tcp_data_120 = {tcp_data_111[0], L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+yi_step-zi_step] = {tcp_data[central_tcp_index][0], L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 102
+    /// Exchange data between TCP 111 [13] <-> 102 [19]
     if ((tcp_iy > 0) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x, 17, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 102
-        MPI_Irecv(tcp_data_102.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x, 16, MPI_COMM_WORLD, &requests[req_count++]);   /// from 102 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - np_x, 17, MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 102
+        MPI_Irecv(tcp_data[central_tcp_index-yi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - np_x, 16, MPI_COMM_WORLD, &requests[req_count++]);   /// from 102 to 111
     } else {
-        tcp_data_102 = {tcp_data_111[0], 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-yi_step+zi_step] = {tcp_data[central_tcp_index][0], 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (x,y,z)-direction -----  (tcp 000,111,222)
-    /// Exchange data between TCP 111 <-> 000
+    /// Exchange data between TCP 111 [13] <-> 000 [0]
     if ( (tcp_ix > 0) && (tcp_iy > 0) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x - 1, 18,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 000
-        MPI_Irecv(tcp_data_000.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x - 1, 19,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 222 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - np_x - 1, 18,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 000
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step-yi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - np_x - 1, 19,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 000 to 111
     } else {
-        tcp_data_000 = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step-yi_step-zi_step] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 222
+    /// Exchange data between TCP 111 [13] <-> 222 [26]
     if ((tcp_ix < np_x - 1) && (tcp_iy < np_y - 1) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x + 1, 19,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 222
-        MPI_Irecv(tcp_data_222.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x + 1, 18,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 222 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + np_x + 1, 19,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 222
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step+yi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + np_x + 1, 18,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 222 to 111
     } else {
-        tcp_data_222 = {L_x, L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step+yi_step+zi_step] = {L_x, L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (-x,y,z)-direction -----  (tcp 200,111,022)
-    /// Exchange data between TCP 111 <-> 200
+    /// Exchange data between TCP 111 [13] <-> 200 [2]
     if ((tcp_ix < np_x - 1) && (tcp_iy > 0) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x + 1, 20,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 200
-        MPI_Irecv(tcp_data_200.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y - np_x + 1, 21,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 200 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - np_x + 1, 20,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 200
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step-yi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y - np_x + 1, 21,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 200 to 111
     } else {
-        tcp_data_200 = {L_x, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step-yi_step-zi_step] = {L_x, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 022
+    /// Exchange data between TCP 111 [13] <-> 022 [24]
     if ((tcp_ix > 0) && (tcp_iy < np_y - 1) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x - 1, 21,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 022
-        MPI_Irecv(tcp_data_022.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y + np_x - 1, 20,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 022 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + np_x - 1, 21,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 022
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step+yi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y + np_x - 1, 20,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 022 to 111
     } else {
-        tcp_data_022 = {0.0, L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step+yi_step+zi_step] = {0.0, L_y, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (x,-y,z)-direction -----  (tcp 020,111,202)
-    /// Exchange data between TCP 111 <-> 020
+    /// Exchange data between TCP 111 [13] <-> 020 [6]
     if ( (tcp_ix > 0) && (tcp_iy < np_y - 1) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x - 1, 22,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 020
-        MPI_Irecv(tcp_data_020.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x - 1, 23,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 020 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + np_x - 1, 22,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 020
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step+yi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + np_x - 1, 23,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 020 to 111
     } else {
-        tcp_data_020 = {0.0, L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step+yi_step-zi_step] = {0.0, L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 202
+    /// Exchange data between TCP 111 [13] <-> 202 [20]
     if ((tcp_ix < np_x - 1) && (tcp_iy > 0) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x + 1, 23,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 202
-        MPI_Irecv(tcp_data_202.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x + 1, 22,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 202 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - np_x + 1, 23,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 202
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step-yi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - np_x + 1, 22,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 202 to 111
     } else {
-        tcp_data_202 = {L_x, 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step-yi_step+zi_step] = {L_x, 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// ----- Data exchange in (x,y,-z)-direction -----  (tcp 002,111,220)
-    /// Exchange data between TCP 111 <-> 002
+    /// Exchange data between TCP 111 [13] <-> 002 [18]
     if ( (tcp_ix > 0) && (tcp_iy > 0) && (tcp_iz < np_z - 1)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x - 1, 24,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 002
-        MPI_Irecv(tcp_data_002.data(), 9, MPI_DOUBLE, my_rank + np_x * np_y - np_x - 1, 25,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 002 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - np_x - 1, 24,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 002
+        MPI_Irecv(tcp_data[central_tcp_index-xi_step-yi_step+zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank + np_x * np_y - np_x - 1, 25,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 002 to 111
     } else {
-        tcp_data_002 = {0.0, 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index-xi_step-yi_step+zi_step] = {0.0, 0.0, L_z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    /// Exchange data between TCP 111 <-> 220
+    /// Exchange data between TCP 111 [13] <-> 220 [8]
     if ((tcp_ix < np_x - 1) && (tcp_iy < np_y - 1) && (tcp_iz > 0)) {
-        MPI_Isend(tcp_data_111.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x + 1, 25,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 220
-        MPI_Irecv(tcp_data_220.data(), 9, MPI_DOUBLE, my_rank - np_x * np_y + np_x + 1, 24,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 220 to 111
+        MPI_Isend(tcp_data[central_tcp_index].data(),                           tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + np_x + 1, 25,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 111 to 220
+        MPI_Irecv(tcp_data[central_tcp_index+xi_step+yi_step-zi_step].data(),   tcp_data_size, MPI_DOUBLE, my_rank - np_x * np_y + np_x + 1, 24,  MPI_COMM_WORLD, &requests[req_count++]);   /// from 220 to 111
     } else {
-        tcp_data_220 = {L_x, L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tcp_data[central_tcp_index+xi_step+yi_step-zi_step] = {L_x, L_y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
 
     /// Wait for all non-blocking communication to complete
     MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
 
+    /// Validate data
+    validateExchangeTcpData(tcp_data, central_tcp_index, xi_step, yi_step, zi_step); 
 }
 
 
-///////////////////////////////////////////////////////////////////////////////
-
 /// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in all x,y,z-directions
-void myRHEA::validateExchangedData(
-        const vector<double> &tcp_data_000, const vector<double> &tcp_data_100, const vector<double> &tcp_data_200, const vector<double> &tcp_data_010, const vector<double> &tcp_data_110, const vector<double> &tcp_data_210, const vector<double> &tcp_data_020, const vector<double> &tcp_data_120, const vector<double> &tcp_data_220,
-        const vector<double> &tcp_data_001, const vector<double> &tcp_data_101, const vector<double> &tcp_data_201, const vector<double> &tcp_data_011, const vector<double> &tcp_data_111, const vector<double> &tcp_data_211, const vector<double> &tcp_data_021, const vector<double> &tcp_data_121, const vector<double> &tcp_data_221,
-        const vector<double> &tcp_data_002, const vector<double> &tcp_data_102, const vector<double> &tcp_data_202, const vector<double> &tcp_data_012, const vector<double> &tcp_data_112, const vector<double> &tcp_data_212, const vector<double> &tcp_data_022, const vector<double> &tcp_data_122, const vector<double> &tcp_data_222,
-    ) {
+void myRHEA::validateExchangeTcpData(vector<vector<double>> &tcp_data, const int &central_tcp_index, const int &xi_step, const int &yi_step, const int &zi_step) {
     
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    /// Check coordinates match at y-z planes (x_match), x-z planes (y_match) and x-y planes (z_match) 
-    bool x_match =  (std::abs(tcp_data_000[0] - tcp_data_010[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_020[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_001[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_011[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_021[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_002[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_012[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_022[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_110[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_120[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_101[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_111[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_121[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_102[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_112[0]) < EPS) &&
-                    (std::abs(tcp_data_100[0] - tcp_data_122[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_210[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_220[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_201[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_211[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_221[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_202[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_212[0]) < EPS) &&
-                    (std::abs(tcp_data_200[0] - tcp_data_222[0]) < EPS);
+    /// Check x-coordinates match at y-z planes (x_match)
+    bool x_match = true;
+    for (int y_offset = -1; y_offset <= 1; ++y_offset) {
+        for (int z_offset = -1; z_offset <= 1; ++z_offset) {
+            int index = central_tcp_index + y_offset * yi_step + z_offset * zi_step;
+            if (!checkMatch(tcp_data[central_tcp_index][0], tcp_data[index][0])) {
+                x_match = false;
+            }
+        }
+    }
 
-    bool y_match =  (std::abs(tcp_data_000[0] - tcp_data_100[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_200[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_001[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_101[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_201[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_002[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_102[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_202[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_110[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_210[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_011[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_111[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_211[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_012[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_112[0]) < EPS) &&
-                    (std::abs(tcp_data_010[0] - tcp_data_212[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_120[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_220[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_021[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_121[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_221[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_022[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_122[0]) < EPS) &&
-                    (std::abs(tcp_data_020[0] - tcp_data_222[0]) < EPS);
-
-    bool z_match =  (std::abs(tcp_data_000[0] - tcp_data_100[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_200[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_010[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_110[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_210[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_020[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_120[0]) < EPS) &&
-                    (std::abs(tcp_data_000[0] - tcp_data_220[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_101[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_201[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_011[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_111[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_211[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_021[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_121[0]) < EPS) &&
-                    (std::abs(tcp_data_001[0] - tcp_data_221[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_102[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_202[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_012[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_112[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_212[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_022[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_122[0]) < EPS) &&
-                    (std::abs(tcp_data_002[0] - tcp_data_222[0]) < EPS);
+    /// Check y-coordinates match at x-z planes (y_match)
+    bool y_match = true;
+    for (int x_offset = -1; x_offset <= 1; ++x_offset) {
+        for (int z_offset = -1; z_offset <= 1; ++z_offset) {
+            int index = central_tcp_index + x_offset * xi_step + z_offset * zi_step;
+            if (!checkMatch(tcp_data[central_tcp_index][1], tcp_data[index][1])) {
+                y_match = false;
+            }
+        }
+    }
+    
+    /// Check z-coordinates match at x-y planes (z_match) 
+    bool z_match = true;
+    for (int x_offset = -1; x_offset <= 1; ++x_offset) {
+        for (int y_offset = -1; y_offset <= 1; ++y_offset) {
+            int index = central_tcp_index + x_offset * xi_step + y_offset * yi_step;
+            if (!checkMatch(tcp_data[central_tcp_index][2], tcp_data[index][2])) {
+                z_match = false;
+            }
+        }
+    }
 
     /// Check coordinates ordering (taking into account x,y,z_match is checked already)
-    bool x_order_correct = (tcp_data_f000[0] < tcp_data_100[0] < tcp_data_200[0]);
-    bool y_order_correct = (tcp_data_f000[1] < tcp_data_010[1] < tcp_data_020[1]);
-    bool y_order_correct = (tcp_data_f000[2] < tcp_data_001[2] < tcp_data_002[2]);
+    bool x_order_correct = (tcp_data[central_tcp_index-xi_step][0] < tcp_data[central_tcp_index][0] < tcp_data[central_tcp_index+xi_step][0]);
+    bool y_order_correct = (tcp_data[central_tcp_index-yi_step][1] < tcp_data[central_tcp_index][1] < tcp_data[central_tcp_index+yi_step][1]);
+    bool y_order_correct = (tcp_data[central_tcp_index-zi_step][2] < tcp_data[central_tcp_index][2] < tcp_data[central_tcp_index+zi_step][2]);
 
     if (!(x_match && y_match && z_match && x_order_correct && y_order_correct && z_order_correct)) {
         cerr << "[Rank " << my_rank << "] Data exchange validation FAILED!\n" << endl;
@@ -2304,8 +2277,45 @@ void myRHEA::validateExchangedData(
         if (!z_order_correct) cerr << "  -> Z-coordinates order incorrect!\n" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1);
     } else {
-        if (my_rank == 0) cout << "Data exchanged and validated" << endl;
+        if (my_rank == 0) cout << "TCP Data exchanged and validated" << endl;
     }
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Check var1 & var2 doubles have same value, with tolerance EPS
+
+bool myRHEA::checkMatch(const double &var1, const double &var2) {
+    if (std::abs(var1 - var2) > EPS) {
+        return false;
+    }
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Perform trilinear interpolation
+
+double myRHEA::trilinearInterpolation(const double &x, const double &y, const double &z, const double &x0, const double &x1, const double &y0, const double &y1, const double &z0, const double &z1, const double &f000, const double &f100, const double &f010, const double &f110, const double &f001, const double &f101, const double &f011, const double &f111) {
+
+    // Calculate interpolation factors
+    double tx = ( x - x0 )/( x1 - x0 );
+    double ty = ( y - y0 )/( y1 - y0 );
+    double tz = ( z - z0 )/( z1 - z0 );
+
+    // Interpolate along x for each (y, z)
+    double c00 = f000*( 1.0 - tx ) + f100*tx;
+    double c01 = f001*( 1.0 - tx ) + f101*tx;
+    double c10 = f010*( 1.0 - tx ) + f110*tx;
+    double c11 = f011*( 1.0 - tx ) + f111*tx;
+
+    // Interpolate along y for each z
+    double c0 = c00*( 1.0 - ty ) + c10*ty;
+    double c1 = c01*( 1.0 - ty ) + c11*ty;
+
+    // Interpolate along z
+    double c = c0*( 1.0 - tz ) + c1*tz;
+
+    return c;
 
 }
 
