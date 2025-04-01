@@ -180,5 +180,6 @@ class myRHEA : public FlowSolverRHEA {
         bool checkMatch(const double &var1, const double &var2);
         double trilinearInterpolation(const double &x, const double &y, const double &z, const double &x0, const double &x1, const double &y0, const double &y1, const double &z0, const double &z1, const double &f000, const double &f100, const double &f010, const double &f110, const double &f001, const double &f101, const double &f011, const double &f111);
 
+};
 
 #endif /*_MY_RHEA_*/
