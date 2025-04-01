@@ -1906,18 +1906,20 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
     /// Get tcp of other mpi process (other than current process with corresponding TCP idx: 111)
     /// > update tcp_data_xxx
     getTcpMeshData(
-        tcp_data_000(9, 0.0), tcp_data_100(9, 0.0), tcp_data_200(9, 0.0), tcp_data_010(9, 0.0), tcp_data_110(9, 0.0), tcp_data_210(9, 0.0), tcp_data_020(9, 0.0), tcp_data_120(9, 0.0), tcp_data_220(9, 0.0),
-        tcp_data_001(9, 0.0), tcp_data_101(9, 0.0), tcp_data_201(9, 0.0), tcp_data_011(9, 0.0), tcp_data_111(9, 0.0), tcp_data_211(9, 0.0), tcp_data_021(9, 0.0), tcp_data_121(9, 0.0), tcp_data_221(9, 0.0),
-        tcp_data_002(9, 0.0), tcp_data_102(9, 0.0), tcp_data_202(9, 0.0), tcp_data_012(9, 0.0), tcp_data_112(9, 0.0), tcp_data_212(9, 0.0), tcp_data_022(9, 0.0), tcp_data_122(9, 0.0), tcp_data_222(9, 0.0),
+        tcp_data_000, tcp_data_100, tcp_data_200, tcp_data_010, tcp_data_110, tcp_data_210, tcp_data_020, tcp_data_120, tcp_data_220,
+        tcp_data_001, tcp_data_101, tcp_data_201, tcp_data_011, tcp_data_111, tcp_data_211, tcp_data_021, tcp_data_121, tcp_data_221,
+        tcp_data_002, tcp_data_102, tcp_data_202, tcp_data_012, tcp_data_112, tcp_data_212, tcp_data_022, tcp_data_122, tcp_data_222,
     );
 
-    .......
+    /// Validate data
+    validateExchangedData(
+        tcp_data_000, tcp_data_100, tcp_data_200, tcp_data_010, tcp_data_110, tcp_data_210, tcp_data_020, tcp_data_120, tcp_data_220,
+        tcp_data_001, tcp_data_101, tcp_data_201, tcp_data_011, tcp_data_111, tcp_data_211, tcp_data_021, tcp_data_121, tcp_data_221,
+        tcp_data_002, tcp_data_102, tcp_data_202, tcp_data_012, tcp_data_112, tcp_data_212, tcp_data_022, tcp_data_122, tcp_data_222,
+    ); 
+        
 
-    TODO: incorporate in getTcpMeshData, the following code, adapted:
-
-                    validateExchangedData(tcp_position, tcp_position_xprev, tcp_position_xnext, tcp_position_yprev, tcp_position_ynext, tcp_position_zprev, tcp_position_znext);
-                    if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Performed & validated data exchange for probes positions and DeltaRij values." << endl; 
-
+       
     .....
 
     TODO: from tcp_data_xxx (27 nodes) choose sub-cube nodes interp_data_xxx (8 nodes) 
@@ -1968,9 +1970,9 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
 ///////////////////////////////////////////////////////////////////////////////
 
 void myRHEA::getTcpMeshData(
-        vector<double> &tcp_data_000(9, 0.0), vector<double> &tcp_data_100(9, 0.0), vector<double> &tcp_data_200(9, 0.0), vector<double> &tcp_data_010(9, 0.0), vector<double> &tcp_data_110(9, 0.0), vector<double> &tcp_data_210(9, 0.0), vector<double> &tcp_data_020(9, 0.0), vector<double> &tcp_data_120(9, 0.0), vector<double> &tcp_data_220(9, 0.0),
-        vector<double> &tcp_data_001(9, 0.0), vector<double> &tcp_data_101(9, 0.0), vector<double> &tcp_data_201(9, 0.0), vector<double> &tcp_data_011(9, 0.0), vector<double> &tcp_data_111(9, 0.0), vector<double> &tcp_data_211(9, 0.0), vector<double> &tcp_data_021(9, 0.0), vector<double> &tcp_data_121(9, 0.0), vector<double> &tcp_data_221(9, 0.0),
-        vector<double> &tcp_data_002(9, 0.0), vector<double> &tcp_data_102(9, 0.0), vector<double> &tcp_data_202(9, 0.0), vector<double> &tcp_data_012(9, 0.0), vector<double> &tcp_data_112(9, 0.0), vector<double> &tcp_data_212(9, 0.0), vector<double> &tcp_data_022(9, 0.0), vector<double> &tcp_data_122(9, 0.0), vector<double> &tcp_data_222(9, 0.0),
+        vector<double> &tcp_data_000, vector<double> &tcp_data_100, vector<double> &tcp_data_200, vector<double> &tcp_data_010, vector<double> &tcp_data_110, vector<double> &tcp_data_210, vector<double> &tcp_data_020, vector<double> &tcp_data_120, vector<double> &tcp_data_220,
+        vector<double> &tcp_data_001, vector<double> &tcp_data_101, vector<double> &tcp_data_201, vector<double> &tcp_data_011, vector<double> &tcp_data_111, vector<double> &tcp_data_211, vector<double> &tcp_data_021, vector<double> &tcp_data_121, vector<double> &tcp_data_221,
+        vector<double> &tcp_data_002, vector<double> &tcp_data_102, vector<double> &tcp_data_202, vector<double> &tcp_data_012, vector<double> &tcp_data_112, vector<double> &tcp_data_212, vector<double> &tcp_data_022, vector<double> &tcp_data_122, vector<double> &tcp_data_222,
     ) {
 
     int my_rank;
@@ -2201,86 +2203,110 @@ void myRHEA::getTcpMeshData(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the x-direction
-void myRHEA::validateExchangedDataXDir(const vector<double> &tcp_position, const vector<double> &tcp_position_xprev, const vector<double> &tcp_position_xnext) {
+/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in all x,y,z-directions
+void myRHEA::validateExchangedData(
+        const vector<double> &tcp_data_000, const vector<double> &tcp_data_100, const vector<double> &tcp_data_200, const vector<double> &tcp_data_010, const vector<double> &tcp_data_110, const vector<double> &tcp_data_210, const vector<double> &tcp_data_020, const vector<double> &tcp_data_120, const vector<double> &tcp_data_220,
+        const vector<double> &tcp_data_001, const vector<double> &tcp_data_101, const vector<double> &tcp_data_201, const vector<double> &tcp_data_011, const vector<double> &tcp_data_111, const vector<double> &tcp_data_211, const vector<double> &tcp_data_021, const vector<double> &tcp_data_121, const vector<double> &tcp_data_221,
+        const vector<double> &tcp_data_002, const vector<double> &tcp_data_102, const vector<double> &tcp_data_202, const vector<double> &tcp_data_012, const vector<double> &tcp_data_112, const vector<double> &tcp_data_212, const vector<double> &tcp_data_022, const vector<double> &tcp_data_122, const vector<double> &tcp_data_222,
+    ) {
+    
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    // Check y and z coordinates consistency
-    bool y_match = (std::abs(tcp_position[1] - tcp_position_xprev[1]) < EPS) &&
-                   (std::abs(tcp_position[1] - tcp_position_xnext[1]) < EPS);
-    bool z_match = (std::abs(tcp_position[2] - tcp_position_xprev[2]) < EPS) &&
-                   (std::abs(tcp_position[2] - tcp_position_xnext[2]) < EPS);
-    // Check x-coordinate ordering
-    bool x_order_correct = (tcp_position_xprev[0] < tcp_position[0]) &&
-                           (tcp_position[0] < tcp_position_xnext[0]);
-    if (!(y_match && z_match && x_order_correct)) {
-        cerr << "[Rank " << my_rank << "] X-Direction Data exchange validation FAILED!\n"
-             << "TCP x-prev position: " << tcp_position_xprev[0] << " " << tcp_position_xprev[1] << " " << tcp_position_xprev[2] << "\n"
-             << "TCP position:        " << tcp_position[0]       << " " << tcp_position[1]       << " " << tcp_position[2] << "\n"
-             << "TCP x-next position: " << tcp_position_xnext[0] << " " << tcp_position_xnext[1] << " " << tcp_position_xnext[2] << endl;
-        if (!y_match) cerr << "  -> Y-coordinates mismatch!" << endl;
-        if (!z_match) cerr << "  -> Z-coordinates mismatch!" << endl;
-        if (!x_order_correct) cerr << "  -> X-coordinates order incorrect!" << endl;
-        MPI_Abort( MPI_COMM_WORLD, 1);
-    }
-}
 
-/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the y-direction
-void myRHEA::validateExchangedDataYDir(const vector<double> &tcp_position, const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext) {
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    // Check x and z coordinates consistency
-    bool x_match = (std::abs(tcp_position[0] - tcp_position_yprev[0]) < EPS) &&
-                   (std::abs(tcp_position[0] - tcp_position_ynext[0]) < EPS);
-    bool z_match = (std::abs(tcp_position[2] - tcp_position_yprev[2]) < EPS) &&
-                   (std::abs(tcp_position[2] - tcp_position_ynext[2]) < EPS);
-    // Check y-coordinate ordering
-    bool y_order_correct = (tcp_position_yprev[1] < tcp_position[1]) &&
-                           (tcp_position[1] < tcp_position_ynext[1]);
-    if (!(x_match && z_match && y_order_correct)) {
-        cerr << "[Rank " << my_rank << "] Y-Direction Data exchange validation FAILED!\n"
-             << "TCP y-prev position: " << tcp_position_yprev[0] << " " << tcp_position_yprev[1] << " " << tcp_position_yprev[2] << "\n"
-             << "TCP position:        " << tcp_position[0]       << " " << tcp_position[1]       << " " << tcp_position[2] << "\n"
-             << "TCP y-next position: " << tcp_position_ynext[0] << " " << tcp_position_ynext[1] << " " << tcp_position_ynext[2] << endl;
-        if (!x_match) cerr << "  -> X-coordinates mismatch!\n" << endl;
-        if (!z_match) cerr << "  -> Z-coordinates mismatch!\n" << endl;
-        if (!y_order_correct) cerr << "  -> Y-coordinates order incorrect!\n" << endl;
-        MPI_Abort( MPI_COMM_WORLD, 1);
-    }
-}
+    /// Check coordinates match at y-z planes (x_match), x-z planes (y_match) and x-y planes (z_match) 
+    bool x_match =  (std::abs(tcp_data_000[0] - tcp_data_010[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_020[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_001[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_011[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_021[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_002[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_012[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_022[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_110[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_120[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_101[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_111[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_121[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_102[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_112[0]) < EPS) &&
+                    (std::abs(tcp_data_100[0] - tcp_data_122[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_210[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_220[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_201[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_211[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_221[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_202[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_212[0]) < EPS) &&
+                    (std::abs(tcp_data_200[0] - tcp_data_222[0]) < EPS);
 
-/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in the z-direction
-void myRHEA::validateExchangedDataZDir(const vector<double> &tcp_position, const vector<double> &tcp_position_zprev, const vector<double> &tcp_position_znext) {
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    // Check x and y coordinates consistency
-    bool x_match = (std::abs(tcp_position[0] - tcp_position_zprev[0]) < EPS) &&
-                   (std::abs(tcp_position[0] - tcp_position_znext[0]) < EPS);
-    bool y_match = (std::abs(tcp_position[1] - tcp_position_zprev[1]) < EPS) &&
-                   (std::abs(tcp_position[1] - tcp_position_znext[1]) < EPS);
-    // Check z-coordinate ordering
-    bool z_order_correct = (tcp_position_zprev[2] < tcp_position[2]) &&
-                           (tcp_position[2] < tcp_position_znext[2]);
-    if (!(x_match && y_match && z_order_correct)) {
-        cerr << "[Rank " << my_rank << "] Z-Direction Data exchange validation FAILED!\n"
-             << "TCP z-prev position: " << tcp_position_zprev[0] << " " << tcp_position_zprev[1] << " " << tcp_position_zprev[2] << "\n"
-             << "TCP position:        " << tcp_position[0]       << " " << tcp_position[1]       << " " << tcp_position[2] << "\n"
-             << "TCP z-next position: " << tcp_position_znext[0] << " " << tcp_position_znext[1] << " " << tcp_position_znext[2] << endl;
+    bool y_match =  (std::abs(tcp_data_000[0] - tcp_data_100[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_200[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_001[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_101[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_201[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_002[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_102[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_202[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_110[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_210[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_011[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_111[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_211[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_012[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_112[0]) < EPS) &&
+                    (std::abs(tcp_data_010[0] - tcp_data_212[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_120[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_220[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_021[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_121[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_221[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_022[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_122[0]) < EPS) &&
+                    (std::abs(tcp_data_020[0] - tcp_data_222[0]) < EPS);
+
+    bool z_match =  (std::abs(tcp_data_000[0] - tcp_data_100[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_200[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_010[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_110[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_210[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_020[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_120[0]) < EPS) &&
+                    (std::abs(tcp_data_000[0] - tcp_data_220[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_101[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_201[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_011[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_111[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_211[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_021[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_121[0]) < EPS) &&
+                    (std::abs(tcp_data_001[0] - tcp_data_221[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_102[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_202[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_012[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_112[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_212[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_022[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_122[0]) < EPS) &&
+                    (std::abs(tcp_data_002[0] - tcp_data_222[0]) < EPS);
+
+    /// Check coordinates ordering (taking into account x,y,z_match is checked already)
+    bool x_order_correct = (tcp_data_f000[0] < tcp_data_100[0] < tcp_data_200[0]);
+    bool y_order_correct = (tcp_data_f000[1] < tcp_data_010[1] < tcp_data_020[1]);
+    bool y_order_correct = (tcp_data_f000[2] < tcp_data_001[2] < tcp_data_002[2]);
+
+    if (!(x_match && y_match && z_match && x_order_correct && y_order_correct && z_order_correct)) {
+        cerr << "[Rank " << my_rank << "] Data exchange validation FAILED!\n" << endl;
         if (!x_match) cerr << "  -> X-coordinates mismatch!\n" << endl;
         if (!y_match) cerr << "  -> Y-coordinates mismatch!\n" << endl;
+        if (!z_match) cerr << "  -> Z-coordinates mismatch!\n" << endl;
+        if (!x_order_correct) cerr << "  -> X-coordinates order incorrect!\n" << endl;
+        if (!y_order_correct) cerr << "  -> Y-coordinates order incorrect!\n" << endl;
         if (!z_order_correct) cerr << "  -> Z-coordinates order incorrect!\n" << endl;
         MPI_Abort( MPI_COMM_WORLD, 1);
+    } else {
+        if (my_rank == 0) cout << "Data exchanged and validated" << endl;
     }
-}
 
-/// Validate exchanged data (local control probe coordinates) between neighbouring mpi processes in all x,y,z-directions
-void myRHEA::validateExchangedData(const vector<double> &tcp_position, 
-                                   const vector<double> &tcp_position_xprev, const vector<double> &tcp_position_xnext,
-                                   const vector<double> &tcp_position_yprev, const vector<double> &tcp_position_ynext,
-                                   const vector<double> &tcp_position_zprev, const vector<double> &tcp_position_znext) {
-    validateExchangedDataXDir(tcp_position, tcp_position_xprev, tcp_position_xnext);
-    validateExchangedDataYDir(tcp_position, tcp_position_yprev, tcp_position_ynext);
-    validateExchangedDataZDir(tcp_position, tcp_position_zprev, tcp_position_znext);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
