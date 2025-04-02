@@ -213,6 +213,27 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
     ///rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
     ///rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
+
+    /// Add fields to write in .h5 and .xdmf files 
+    writer_reader->addField(&DeltaRxx);
+    writer_reader->addField(&DeltaRxy);
+    writer_reader->addField(&DeltaRxz);
+    writer_reader->addField(&DeltaRyy);
+    writer_reader->addField(&DeltaRyz);
+    writer_reader->addField(&DeltaRzz);
+    writer_reader->addField(&d_DeltaRxx_x_field);
+    writer_reader->addField(&d_DeltaRxy_x_field);
+    writer_reader->addField(&d_DeltaRxz_x_field);
+    writer_reader->addField(&d_DeltaRxy_y_field);
+    writer_reader->addField(&d_DeltaRyy_y_field);
+    writer_reader->addField(&d_DeltaRyz_y_field);
+    writer_reader->addField(&d_DeltaRxz_z_field);
+    writer_reader->addField(&d_DeltaRyz_z_field);
+    writer_reader->addField(&d_DeltaRzz_z_field);
+    writer_reader->addField(&d_DeltaRxj_j_field);
+    writer_reader->addField(&d_DeltaRyj_j_field);
+    writer_reader->addField(&d_DeltaRzj_j_field);
+
 #endif  /// of _RL_CONTROL_IS_SUPERVISED_
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step);
     initSmartRedis();
