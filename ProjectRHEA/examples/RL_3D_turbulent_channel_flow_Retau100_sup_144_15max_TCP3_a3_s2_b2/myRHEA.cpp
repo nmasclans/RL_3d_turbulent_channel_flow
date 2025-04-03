@@ -210,8 +210,8 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 #endif  /// of _RL_CONTROL_IS_SUPERVISED_
 
     /// Add fields to write in .h5 and .xdmf files 
-    writer_reader->addField(&d_DeltaRxx_x_field);
-    writer_reader->addField(&d_DeltaRxy_x_field);
+    writer_reader->addField(&d_DeltaRxx_x_field);   /// TODO: cause execution error during initializeFromRestart because these fields not in restart file
+    writer_reader->addField(&d_DeltaRxy_x_field);   /// TODO: these lines only for debugging, remove to avoid execution errors
     writer_reader->addField(&d_DeltaRxz_x_field);
     writer_reader->addField(&d_DeltaRxy_y_field);
     writer_reader->addField(&d_DeltaRyy_y_field);
@@ -2101,7 +2101,7 @@ void myRHEA::exchangeTcpData(vector<vector<double>> &tcp_data_pos, vector<vector
     int tcp_iz = my_rank / (np_x * np_y);
     int tcp_iy = (my_rank % (np_x * np_y)) / np_x;
     int tcp_ix = my_rank % np_x;
-    cout << "[exchangeTcpData] [Rank " << my_rank << "] TPC has indexes (tcp_ix, tcp_iy, tcp_iz) = " << tcp_ix << ", " << tcp_iy << ", " << tcp_iz << ")" << endl;
+    cout << "[exchangeTcpData] [Rank " << my_rank << "] TPC has indexes (tcp_ix, tcp_iy, tcp_iz) = (" << tcp_ix << ", " << tcp_iy << ", " << tcp_iz << ")" << endl;
     
     /// ----- Data exchange in (x)-direction -----
     /// Exchange data between TCP 111 [0] <-> 011 [1]
@@ -2187,12 +2187,13 @@ void myRHEA::validateExchangeTcpData(const vector<vector<double>> &tcp_data_pos)
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
+    /// Check shared coordinate values
     /// Check x-coordinates match at y-z planes (x_match)
-    bool x_match = checkMatch(tcp_data_pos[0][0], tcp_data_pos[1][0]) && checkMatch(tcp_data_pos[0][0], tcp_data_pos[2][0]) ;
+    bool x_match = checkMatch({tcp_data_pos[0][0], tcp_data_pos[3][0], tcp_data_pos[4][0], tcp_data_pos[5][0], tcp_data_pos[6][0]});
     /// Check y-coordinates match at x-z planes (y_match)
-    bool y_match = checkMatch(tcp_data_pos[0][1], tcp_data_pos[3][1]) && checkMatch(tcp_data_pos[0][1], tcp_data_pos[4][1]) ;
+    bool y_match = checkMatch({tcp_data_pos[0][1], tcp_data_pos[1][1], tcp_data_pos[2][1], tcp_data_pos[5][1], tcp_data_pos[6][1]});
     /// Check z-coordinates match at x-y planes (z_match) 
-    bool z_match = checkMatch(tcp_data_pos[0][2], tcp_data_pos[5][2]) && checkMatch(tcp_data_pos[0][2], tcp_data_pos[6][2]) ;
+    bool z_match = checkMatch({tcp_data_pos[0][2], tcp_data_pos[1][2], tcp_data_pos[2][2], tcp_data_pos[3][2], tcp_data_pos[4][2]});
 
     /// Check coordinates ordering (taking into account x,y,z_match is checked already)
     bool x_order_correct = (tcp_data_pos[1][0] < tcp_data_pos[0][0]) && (tcp_data_pos[0][0] < tcp_data_pos[2][0]);
@@ -2200,7 +2201,14 @@ void myRHEA::validateExchangeTcpData(const vector<vector<double>> &tcp_data_pos)
     bool z_order_correct = (tcp_data_pos[5][2] < tcp_data_pos[0][2]) && (tcp_data_pos[0][2] < tcp_data_pos[6][2]);
 
     if (!(x_match && y_match && z_match && x_order_correct && y_order_correct && z_order_correct)) {
-        cerr << "[Rank " << my_rank << "] Data exchange validation FAILED!\n" << endl;
+        cerr << "[Rank " << my_rank << "] Data exchange validation FAILED!, with tcp_data_pos:\n"
+             << tcp_data_pos[0][0] << " " << tcp_data_pos[0][1] << " " << tcp_data_pos[0][2] << "\n"
+             << tcp_data_pos[1][0] << " " << tcp_data_pos[1][1] << " " << tcp_data_pos[1][2] << "\n" 
+             << tcp_data_pos[2][0] << " " << tcp_data_pos[2][1] << " " << tcp_data_pos[2][2] << "\n" 
+             << tcp_data_pos[3][0] << " " << tcp_data_pos[3][1] << " " << tcp_data_pos[3][2] << "\n" 
+             << tcp_data_pos[4][0] << " " << tcp_data_pos[4][1] << " " << tcp_data_pos[4][2] << "\n" 
+             << tcp_data_pos[5][0] << " " << tcp_data_pos[5][1] << " " << tcp_data_pos[5][2] << "\n"
+             << tcp_data_pos[6][0] << " " << tcp_data_pos[6][1] << " " << tcp_data_pos[6][2] << "\n" << endl;
         if (!x_match) cerr << "  -> X-coordinates mismatch!\n" << endl;
         if (!y_match) cerr << "  -> Y-coordinates mismatch!\n" << endl;
         if (!z_match) cerr << "  -> Z-coordinates mismatch!\n" << endl;
@@ -2215,11 +2223,18 @@ void myRHEA::validateExchangeTcpData(const vector<vector<double>> &tcp_data_pos)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Check var1 & var2 doubles have same value, with tolerance EPS
+/// Check input doubles have the same value within EPS tolerance
+bool myRHEA::checkMatch(initializer_list<double> values) {
+    if (values.size() < 2) return true;
 
-bool myRHEA::checkMatch(const double &var1, const double &var2) {
-    if (std::abs(var1 - var2) > EPS) {
-        return false;
+    auto it = values.begin();
+    double first = *it;
+    ++it;
+
+    for (; it != values.end(); ++it) {
+        if (std::abs(*it - first) > EPS) {
+            return false;
+        }
     }
     return true;
 }
