@@ -44,7 +44,7 @@ else:
 restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
 restart_data_file_averaging_time = 2.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0    = restart_data_file_time - restart_data_file_averaging_time 
-rl_n_envs  = 8   # num. actuators (control cubes) per cfd simulation 
+rl_n_envs  = 48   # num. actuators (control cubes) per cfd simulation 
 
 # --- Post-processing parameters ---
 verbose = False
