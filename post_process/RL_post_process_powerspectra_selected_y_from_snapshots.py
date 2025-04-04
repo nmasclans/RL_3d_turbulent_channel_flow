@@ -30,9 +30,10 @@ try :
     Re_tau     = float(sys.argv[4])     # Friction Reynolds number [-]
     dt_phys    = float(sys.argv[5])
     case_dir   = sys.argv[6]
-    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Case directory: {case_dir}")
+    rl_n_envs  = int(sys.argv[7])
+    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Case directory: {case_dir}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
-    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir>")
+    raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <rl_n_envs>")
 
 # Training post-processing directory
 postDir = train_name
@@ -56,7 +57,6 @@ cmap = plt.get_cmap('RdBu_r')  # Replace with your desired colormap
 t_episode_train = 1.0
 dt_phys = 1e-4
 cfd_n_envs = 1
-rl_n_envs  = 8
 simulation_time_per_train_step   = t_episode_train * cfd_n_envs       # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))

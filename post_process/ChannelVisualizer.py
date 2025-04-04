@@ -889,7 +889,8 @@ class ChannelVisualizer():
                 plt.ylabel(ylabel_name, fontsize=16)
             plt.grid(axis="y")
             plt.title(f"RL step = {global_step}", fontsize=16)
-            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            if (rl_n_envs < 15):
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             plt.tight_layout()
             figs_dict[i_act] = fig
             plt.close()
@@ -914,7 +915,8 @@ class ChannelVisualizer():
             plt.ylabel("Action " + action_dict[i_act], fontsize=16)
             plt.grid(axis="y")
             plt.title(f"RL step = {global_step}", fontsize=16)
-            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            if (rl_n_envs < 15):
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             plt.tight_layout()
             figs_dict[i_act] = fig
             plt.close()
@@ -949,7 +951,8 @@ class ChannelVisualizer():
             plt.xlabel("Action " + action_dict[i_act], fontsize=16)
             plt.ylabel("PDF", fontsize=16)
             plt.title(f"RL step = {global_step}", fontsize=16)
-            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            if (rl_n_envs < 15):
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             plt.tight_layout()
             figs_dict[i_act] = fig
             plt.close()

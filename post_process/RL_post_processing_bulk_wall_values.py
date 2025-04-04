@@ -26,9 +26,10 @@ try :
     t_episode_train = float(sys.argv[5])
     case_dir        = sys.argv[6]
     run_mode        = sys.argv[7]
-    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}")
+    rl_n_envs       = int(sys.argv[8])
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
-    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <run_mode>")
+    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <case_dir> <run_mode> <rl_n_envs>")
 
 if run_mode == "train":
     print("Run mode is set to training")
@@ -66,7 +67,6 @@ max_length_legend_RL = 10
 
 # RL parameters
 cfd_n_envs = 1
-rl_n_envs  = 8
 delta_iteration_nonRL            = 10000
 simulation_time_per_train_step   = t_episode_train                    # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step

@@ -29,9 +29,10 @@ try :
     train_name = sys.argv[2]
     case_dir   = sys.argv[3]
     run_mode   = sys.argv[4]
-    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}")
+    rl_n_envs  = int(sys.argv[5])
+    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
-    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <case_dir>")
+    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <case_dir> <rl_n_envs>")
 
 if run_mode == "train":
     print("Run mode is set to training")
@@ -43,8 +44,7 @@ else:
 # --- Simulation parameters ---
 restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
 restart_data_file_averaging_time = 2.0  # restart_data_file attribute 'AveragingTime'
-t_avg_0    = restart_data_file_time - restart_data_file_averaging_time 
-rl_n_envs  = 8   # num. actuators (control cubes) per cfd simulation 
+t_avg_0 = restart_data_file_time - restart_data_file_averaging_time 
 
 # --- Post-processing parameters ---
 verbose = False
