@@ -1055,12 +1055,12 @@ void myRHEA::calculateSourceTerms() {
 
                                 /// Build perturbed Rij d.o.f. -> x_new = x_old + Delta_x * x_old
                                 /// Delta_* are standarized values between 'action_bounds' RL parameter > normalize actions to desired action bounds
-                                Rkk   += DeltaRkk   * 5.0;
+                                Rkk   += DeltaRkk   * 20.0;
                                 phi1  += DeltaPhi1  * M_PI;         // phi1 range: [-pi,pi]
                                 phi2  += DeltaPhi2  * M_PI / 2.0;   // phi2 range: [0,pi]
                                 phi3  += DeltaPhi3  * M_PI;         // phi3 range: [-pi,pi]
-                                xmap1 += DeltaXmap1 * 1.0;          // xmap1 range: [0,1]
-                                xmap2 += DeltaXmap2 * 1.0;          // xmap2 range: [0,1]
+                                xmap1 += DeltaXmap1 * 5.0;          // xmap1 range: [0,1]
+                                xmap2 += DeltaXmap2 * 5.0;          // xmap2 range: [0,1]
 
                                 /// Enforce realizability to perturbed Rij d.o.f (update {Rkk,phi1,phi2,phi3,xmap1,xmap2}_field, if necessary)
                                 enforceRealizability(Rkk, phi1, phi2, phi3, xmap1, xmap2);

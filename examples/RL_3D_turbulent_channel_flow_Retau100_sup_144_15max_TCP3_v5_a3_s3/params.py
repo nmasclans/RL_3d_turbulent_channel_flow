@@ -63,27 +63,27 @@ params = {
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file_3210000.h5", # 'random_choice' or filename as restart_data_file.h5
     "net": (128, 128),                              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 0.001,                                                            
+    "learning_rate": 0.01,                                                            
     # Recommended: 1e-4 - 1e-3
     "importance_ratio_clipping": 0.2,                                                   
     # Clipping parameter controls how much the new policy can deviate from the old policy
     # Recommended: 0.2 - 0.5, 0.2 used in most implementations
     # If updates are too volatile, you can decrease to 0.1
-    "entropy_regularization": 0.01,                       
+    "entropy_regularization": 0.001,                       
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence
     # Recommended: 0.01 - 0.05, or 0.01 - 0.02
-    "policy_l2_reg": 1e-5,
+    "policy_l2_reg": 1e-6,
     # Regularization coefficient for the policy network to prevent overfitting
     # Recommended: 1e-4 - 1e-3 -> small reg. effect without overly constraining the model
-    "value_function_l2_reg": 1e-5,
+    "value_function_l2_reg": 1e-6,
     # Regularization for the value network (critic) to prevent overfitting
     # Recommended: 1e-4 - 1e-3 -> small reg. effect without overly constraining the model
-    "shared_vars_l2_reg": 1e-5,
+    "shared_vars_l2_reg": 1e-6,
     # Regularization for any shared parameters between the policy and value networks
     # Recommended: 1e-4 - 1e-3, or set the same as the policy/value L2 regularization values
-    "value_pred_loss_coef": 1e-5,
+    "value_pred_loss_coef": 1e-6,
     # This coefficient balances the weight of the value prediction loss in the overall loss function
     # Recommended: 0.5
     # If the value function is underperforming, you can increase it to give more weight to value function learning 
