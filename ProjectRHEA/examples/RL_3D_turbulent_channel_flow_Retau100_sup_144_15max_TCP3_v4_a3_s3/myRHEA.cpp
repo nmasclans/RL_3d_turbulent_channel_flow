@@ -18,9 +18,14 @@ using namespace std;
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _RL_CONTROL_IS_SUPERVISED_ 1
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
-#define _WITNESS_XZ_SLICES_ 0                       /// TODO: implement this for TCP3 which leads to witness points at same y-coord 
+#define _WITNESS_XZ_SLICES_ 0
+#define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
+
+#if _WITNESS_XZ_SLICES_ && _WITNESS_XYZ_AVG_
+#error "Both _WITNESS_XZ_SLICES_ and _WITNESS_XYZ_AVG_ cannot be 1 at the same time."
+#endif
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
@@ -2573,6 +2578,9 @@ void myRHEA::updateState() {
 #if _WITNESS_XZ_SLICES_
     int j_index;
     int xz_slice_points_counter;
+#elif _WITNESS_XYZ_AVG_
+    double delta_x, delta_y, delta_z, delta_volume;
+    double total_volume = 0.0;
 #else
     int i_index, j_index, k_index;
 #endif  /// of _WITNESS_XZ_SLICES_
@@ -2595,9 +2603,31 @@ void myRHEA::updateState() {
                 }
             }
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / L_y;
 
-#else ///  _WITNESS_XZ_SLICES_ 0
+#elif _WITNESS_XYZ_AVG_
+            /// Calculate state value from averaging field values along local mesh of the TCP mpi process
+             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        /// Geometric stuff
+                        delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                        delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                        delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                        delta_volume =  delta_x * delta_y * delta_z;
+                        /// Spatial average
+                        state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        state_local[state_local_size2_counter+1] += std::pow(x_field[I1D(i,j,k)],     2.0) * delta_volume;
+                        state_local[state_local_size2_counter+2] += std::pow(y_field[I1D(i,j,k)],     2.0) * delta_volume;
+                        total_volume += delta_volume;
+                    }
+                }
+            }
+            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / total_volume );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / total_volume ) / L_x;
+            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / total_volume ) / L_y;
+
+#else ///  _WITNESS_XZ_SLICES_ 0 and _WITNESS_XYZ_AVG_ 0
             /// Get local indices i, j, k
             i_index = temporal_witness_probes[twp].getLocalIndexI(); 
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
@@ -2606,11 +2636,17 @@ void myRHEA::updateState() {
             state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
             state_local[state_local_size2_counter+1] = x_field[I1D(i_index,j_index,k_index)] / L_x;
             state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / L_y;
-#endif /// of _WITNESS_XZ_SLICES_
+#endif /// of _WITNESS_XZ_SLICES_ and _WITNESS_XYZ_AVG_
 
             /// Update local state counter
             state_local_size2_counter += state_dim;
         }
+    }
+
+    /// Check local state is updated correctly
+    if (state_local_size2_counter != state_local_size2) {
+        cerr << "Mismatch between state_local_size2_counter (" << state_local_size2_counter << ") != state_local_size2 (" << state_local_size2 << ")" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1 );
     }
 }   
 
