@@ -1005,7 +1005,8 @@ class ChannelVisualizer():
         plt.ylabel(reward_name, fontsize=16)
         plt.grid(axis="y")
         plt.title(f"RL step = {global_step}", fontsize=16)
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if (rl_n_envs < 15):
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         fig_plot = fig
         plt.close()
@@ -1036,7 +1037,8 @@ class ChannelVisualizer():
         plt.xlabel(reward_name, fontsize=16)
         plt.ylabel("PDF", fontsize=16)
         plt.title(f"RL step = {global_step}", fontsize=16)
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if (rl_n_envs < 15):
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
         fig_pdf = fig
         plt.close()
