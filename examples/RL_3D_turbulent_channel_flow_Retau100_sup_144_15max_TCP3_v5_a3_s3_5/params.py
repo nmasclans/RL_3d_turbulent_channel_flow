@@ -63,7 +63,7 @@ params = {
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file_3210000.h5", # 'random_choice' or filename as restart_data_file.h5
     "net": (128, 128),                              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 0.002,                                                            
+    "learning_rate": 0.005,                                                            
     # Recommended: 1e-4 - 1e-3
     "importance_ratio_clipping": 0.2,                                                   
     # Clipping parameter controls how much the new policy can deviate from the old policy
