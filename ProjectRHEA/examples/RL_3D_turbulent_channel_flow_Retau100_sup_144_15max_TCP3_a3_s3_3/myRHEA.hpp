@@ -171,13 +171,15 @@ class myRHEA : public FlowSolverRHEA {
 
         /// DeltaRij interpolation using temporal control probes (TCP) data
         void interpolateDeltaRij(vector<double> &tcp_position, vector<double> &tcp_DeltaRij);
-        void exchangeTcpData(vector<vector<double>> &tcp_data, const int &tcp_data_size, const int &num_tcp_neighbors, const int &central_tcp_index, const int &xi_step, const int &yi_step, const int &zi_step);
-        void validateExchangeTcpData(vector<vector<double>> &tcp_data, const int &central_tcp_index, const int &xi_step, const int &yi_step, const int &zi_step);
+        void exchangeTcpData(vector<vector<double>> &tcp_data, vector<bool> &valid_tcp_data, const int &tcp_data_size, const int &num_tcp_neighbors, const int &central_tcp_index, const int &xi_step, const int &yi_step, const int &zi_step);
+        void validateExchangeTcpData(const vector<vector<double>> &tcp_data, const vector<bool> &valid_tcp_data, const int &central_tcp_index, const int &xi_step, const int &yi_step, const int &zi_step);
 
         /// Helper functions
         double myDotProduct(const array<double,3> &v1, const array<double,3> &v2) {return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];}
         double myNorm(const array<double,3> &v){return std::sqrt(myDotProduct(v,v));}
         bool checkMatch(const double &var1, const double &var2);
+        double linearInterpolation(const double &x, const double &x0, const double &x1, const double &f0, const double &f1);
+        double bilinearInterpolation(const double &x, const double &y, const double &x0, const double &x1, const double &y0, const double &y1, const double &f00, const double &f10, const double &f01, const double &f11);
         double trilinearInterpolation(const double &x, const double &y, const double &z, const double &x0, const double &x1, const double &y0, const double &y1, const double &z0, const double &z1, const double &f000, const double &f100, const double &f010, const double &f110, const double &f001, const double &f101, const double &f011, const double &f111);
 
 };
