@@ -18,9 +18,14 @@ using namespace std;
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _RL_CONTROL_IS_SUPERVISED_ 1
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
-#define _WITNESS_XZ_SLICES_ 0                       /// TODO: implement this for TCP3 which leads to witness points at same y-coord 
+#define _WITNESS_XZ_SLICES_ 0
+#define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
+
+#if _WITNESS_XZ_SLICES_ && _WITNESS_XYZ_AVG_
+#error "Both _WITNESS_XZ_SLICES_ and _WITNESS_XYZ_AVG_ cannot be 1 at the same time."
+#endif
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
@@ -77,7 +82,7 @@ const double avg_u_bulk_min = 14.665 - 0.565;
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 int action_dim = 3;
-int state_dim  = 2;
+int state_dim  = 3;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -592,13 +597,13 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    /// Additional arguments, defined here /// TODO: include this in some configuration file
+    /// Additional arguments, defined here
 #if _WITNESS_XZ_SLICES_
-    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessXZSlices48.txt";
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessXZSlices" + to_string(np_x*np_y*np_z) + ".txt";
 #else
-    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints48.txt";
+    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints" + to_string(np_x*np_y*np_z) + ".txt";
 #endif
-    this->control_file = string(rl_case_path) + "/config_control_witness/controlPoints48.txt";
+    this->control_file = string(rl_case_path) + "/config_control_witness/controlPoints" + to_string(np_x*np_y*np_z) + ".txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
     this->state_key     = "ensemble_" + tag + ".state";
@@ -1030,6 +1035,7 @@ void myRHEA::calculateSourceTerms() {
                                 DeltaRyy = 0.0;
                                 DeltaRyz = 0.0;
                                 DeltaRzz = 0.0;
+                                tcp_DeltaRij = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
                             } else {
                                 /// -------- Perform Rij eigen-decomposition --------
                                 /// Anisotropy tensor (symmetric, trace-free)
@@ -1087,10 +1093,10 @@ void myRHEA::calculateSourceTerms() {
                                 DeltaRzz = RijPert[2][2] - favre_wffwff_field[I1D(i,j,k)];
                                 tcp_DeltaRij = {DeltaRxx, DeltaRxy, DeltaRxz, DeltaRyy, DeltaRyz, DeltaRzz};
 
-                                /// Debug control probe position & DeltaRij
-                                cout << "[calculateSourceTerms] [Rank " << my_rank << "] Control probe (" << tcp_position[0] << ", " << tcp_position[1] << ", " << tcp_position[2] << "): "
-                                     << "DeltaRij = (" << tcp_DeltaRij[0] << ", " << tcp_DeltaRij[1] << ", " << tcp_DeltaRij[2] << ", " << tcp_DeltaRij[3] << ", " << tcp_DeltaRij[4] << ", " << tcp_DeltaRij[5] << ")" << endl;
                             }
+                            /// Debug control probe position & DeltaRij
+                            cout << "[calculateSourceTerms] [Rank " << my_rank << "] Control probe (" << tcp_position[0] << ", " << tcp_position[1] << ", " << tcp_position[2] << "): "
+                                 << "DeltaRij = (" << tcp_DeltaRij[0] << ", " << tcp_DeltaRij[1] << ", " << tcp_DeltaRij[2] << ", " << tcp_DeltaRij[3] << ", " << tcp_DeltaRij[4] << ", " << tcp_DeltaRij[5] << ")" << endl;
                         }
                     }
 
@@ -1941,12 +1947,45 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
     // Fetch TCP data from neighboring MPI processes (unique TCP per MPI process)
     exchangeTcpData(tcp_data, TCP_DATA_SIZE, NUM_TCP_NEIGHBORS, CENTRAL_TCP_INDEX, XI_STEP, YI_STEP, ZI_STEP);   /// update tcp_data
     
+    /// Debugging /// TODO: remove cout below
+    cout << "[exchangeTcpData] [Rank " << my_rank << "] tcp_data = \n"
+         << tcp_data[0][0]  << " " << tcp_data[0][1]  << " " << tcp_data[0][2]  << " " << tcp_data[0][3]  << " " << tcp_data[0][4]  << " " << tcp_data[0][5]  << " " << tcp_data[0][6]  << " " << tcp_data[0][7]  << " " << tcp_data[0][8]  << "\n"
+         << tcp_data[1][0]  << " " << tcp_data[1][1]  << " " << tcp_data[1][2]  << " " << tcp_data[1][3]  << " " << tcp_data[1][4]  << " " << tcp_data[1][5]  << " " << tcp_data[1][6]  << " " << tcp_data[1][7]  << " " << tcp_data[1][8]  << "\n"
+         << tcp_data[2][0]  << " " << tcp_data[2][1]  << " " << tcp_data[2][2]  << " " << tcp_data[2][3]  << " " << tcp_data[2][4]  << " " << tcp_data[2][5]  << " " << tcp_data[2][6]  << " " << tcp_data[2][7]  << " " << tcp_data[2][8]  << "\n"
+         << tcp_data[3][0]  << " " << tcp_data[3][1]  << " " << tcp_data[3][2]  << " " << tcp_data[3][3]  << " " << tcp_data[3][4]  << " " << tcp_data[3][5]  << " " << tcp_data[3][6]  << " " << tcp_data[3][7]  << " " << tcp_data[3][8]  << "\n"
+         << tcp_data[4][0]  << " " << tcp_data[4][1]  << " " << tcp_data[4][2]  << " " << tcp_data[4][3]  << " " << tcp_data[4][4]  << " " << tcp_data[4][5]  << " " << tcp_data[4][6]  << " " << tcp_data[4][7]  << " " << tcp_data[4][8]  << "\n"
+         << tcp_data[5][0]  << " " << tcp_data[5][1]  << " " << tcp_data[5][2]  << " " << tcp_data[5][3]  << " " << tcp_data[5][4]  << " " << tcp_data[5][5]  << " " << tcp_data[5][6]  << " " << tcp_data[5][7]  << " " << tcp_data[5][8]  << "\n"
+         << tcp_data[6][0]  << " " << tcp_data[6][1]  << " " << tcp_data[6][2]  << " " << tcp_data[6][3]  << " " << tcp_data[6][4]  << " " << tcp_data[6][5]  << " " << tcp_data[6][6]  << " " << tcp_data[6][7]  << " " << tcp_data[6][8]  << "\n"
+         << tcp_data[7][0]  << " " << tcp_data[7][1]  << " " << tcp_data[7][2]  << " " << tcp_data[7][3]  << " " << tcp_data[7][4]  << " " << tcp_data[7][5]  << " " << tcp_data[7][6]  << " " << tcp_data[7][7]  << " " << tcp_data[7][8]  << "\n"
+         << tcp_data[8][0]  << " " << tcp_data[8][1]  << " " << tcp_data[8][2]  << " " << tcp_data[8][3]  << " " << tcp_data[8][4]  << " " << tcp_data[8][5]  << " " << tcp_data[8][6]  << " " << tcp_data[8][7]  << " " << tcp_data[8][8]  << "\n"
+         << tcp_data[9][0]  << " " << tcp_data[9][1]  << " " << tcp_data[9][2]  << " " << tcp_data[9][3]  << " " << tcp_data[9][4]  << " " << tcp_data[9][5]  << " " << tcp_data[9][6]  << " " << tcp_data[9][7]  << " " << tcp_data[9][8]  << "\n"
+         << tcp_data[10][0] << " " << tcp_data[10][1] << " " << tcp_data[10][2] << " " << tcp_data[10][3] << " " << tcp_data[10][4] << " " << tcp_data[10][5] << " " << tcp_data[10][6] << " " << tcp_data[10][7] << " " << tcp_data[10][8] << "\n"
+         << tcp_data[11][0] << " " << tcp_data[11][1] << " " << tcp_data[11][2] << " " << tcp_data[11][3] << " " << tcp_data[11][4] << " " << tcp_data[11][5] << " " << tcp_data[11][6] << " " << tcp_data[11][7] << " " << tcp_data[11][8] << "\n"
+         << tcp_data[12][0] << " " << tcp_data[12][1] << " " << tcp_data[12][2] << " " << tcp_data[12][3] << " " << tcp_data[12][4] << " " << tcp_data[12][5] << " " << tcp_data[12][6] << " " << tcp_data[12][7] << " " << tcp_data[12][8] << "\n"
+         << tcp_data[13][0] << " " << tcp_data[13][1] << " " << tcp_data[13][2] << " " << tcp_data[13][3] << " " << tcp_data[13][4] << " " << tcp_data[13][5] << " " << tcp_data[13][6] << " " << tcp_data[13][7] << " " << tcp_data[13][8] << "\n"
+         << tcp_data[14][0] << " " << tcp_data[14][1] << " " << tcp_data[14][2] << " " << tcp_data[14][3] << " " << tcp_data[14][4] << " " << tcp_data[14][5] << " " << tcp_data[14][6] << " " << tcp_data[14][7] << " " << tcp_data[14][8] << "\n"
+         << tcp_data[15][0] << " " << tcp_data[15][1] << " " << tcp_data[15][2] << " " << tcp_data[15][3] << " " << tcp_data[15][4] << " " << tcp_data[15][5] << " " << tcp_data[15][6] << " " << tcp_data[15][7] << " " << tcp_data[15][8] << "\n"
+         << tcp_data[16][0] << " " << tcp_data[16][1] << " " << tcp_data[16][2] << " " << tcp_data[16][3] << " " << tcp_data[16][4] << " " << tcp_data[16][5] << " " << tcp_data[16][6] << " " << tcp_data[16][7] << " " << tcp_data[16][8] << "\n"
+         << tcp_data[17][0] << " " << tcp_data[17][1] << " " << tcp_data[17][2] << " " << tcp_data[17][3] << " " << tcp_data[17][4] << " " << tcp_data[17][5] << " " << tcp_data[17][6] << " " << tcp_data[17][7] << " " << tcp_data[17][8] << "\n"
+         << tcp_data[18][0] << " " << tcp_data[18][1] << " " << tcp_data[18][2] << " " << tcp_data[18][3] << " " << tcp_data[18][4] << " " << tcp_data[18][5] << " " << tcp_data[18][6] << " " << tcp_data[18][7] << " " << tcp_data[18][8] << "\n"
+         << tcp_data[19][0] << " " << tcp_data[19][1] << " " << tcp_data[19][2] << " " << tcp_data[19][3] << " " << tcp_data[19][4] << " " << tcp_data[19][5] << " " << tcp_data[19][6] << " " << tcp_data[19][7] << " " << tcp_data[19][8] << "\n"
+         << tcp_data[20][0] << " " << tcp_data[20][1] << " " << tcp_data[20][2] << " " << tcp_data[20][3] << " " << tcp_data[20][4] << " " << tcp_data[20][5] << " " << tcp_data[20][6] << " " << tcp_data[20][7] << " " << tcp_data[20][8] << "\n"
+         << tcp_data[21][0] << " " << tcp_data[21][1] << " " << tcp_data[21][2] << " " << tcp_data[21][3] << " " << tcp_data[21][4] << " " << tcp_data[21][5] << " " << tcp_data[21][6] << " " << tcp_data[21][7] << " " << tcp_data[21][8] << "\n"
+         << tcp_data[22][0] << " " << tcp_data[22][1] << " " << tcp_data[22][2] << " " << tcp_data[22][3] << " " << tcp_data[22][4] << " " << tcp_data[22][5] << " " << tcp_data[22][6] << " " << tcp_data[22][7] << " " << tcp_data[22][8] << "\n"
+         << tcp_data[23][0] << " " << tcp_data[23][1] << " " << tcp_data[23][2] << " " << tcp_data[23][3] << " " << tcp_data[23][4] << " " << tcp_data[23][5] << " " << tcp_data[23][6] << " " << tcp_data[23][7] << " " << tcp_data[23][8] << "\n"
+         << tcp_data[24][0] << " " << tcp_data[24][1] << " " << tcp_data[24][2] << " " << tcp_data[24][3] << " " << tcp_data[24][4] << " " << tcp_data[24][5] << " " << tcp_data[24][6] << " " << tcp_data[24][7] << " " << tcp_data[24][8] << "\n"
+         << tcp_data[25][0] << " " << tcp_data[25][1] << " " << tcp_data[25][2] << " " << tcp_data[25][3] << " " << tcp_data[25][4] << " " << tcp_data[25][5] << " " << tcp_data[25][6] << " " << tcp_data[25][7] << " " << tcp_data[25][8] << "\n"
+         << tcp_data[26][0] << " " << tcp_data[26][1] << " " << tcp_data[26][2] << " " << tcp_data[26][3] << " " << tcp_data[26][4] << " " << tcp_data[26][5] << " " << tcp_data[26][6] << " " << tcp_data[26][7] << " " << tcp_data[26][8] << endl;
+
     /// Perform DeltaRij interpolation of mesh points from 8 TCP data (from 27 TCP available neighbours)
     int tcp_000_x_offset, tcp_000_y_offset, tcp_000_z_offset;
     int tcp_000;
     const double x_central = tcp_data[CENTRAL_TCP_INDEX][0];
     const double y_central = tcp_data[CENTRAL_TCP_INDEX][1];
     const double z_central = tcp_data[CENTRAL_TCP_INDEX][2];
+    /// Debugging /// TODO: remove variables
+    vector<int> offset_counter(8, 0);
+    int offset_aux = 0;
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -1965,10 +2004,18 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                 DeltaRyy_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][6], tcp_data[tcp_000+XI_STEP][6], tcp_data[tcp_000+YI_STEP][6], tcp_data[tcp_000+XI_STEP+YI_STEP][6], tcp_data[tcp_000+ZI_STEP][6], tcp_data[tcp_000+XI_STEP+ZI_STEP][6], tcp_data[tcp_000+YI_STEP+ZI_STEP][6], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][6]);
                 DeltaRyz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][7], tcp_data[tcp_000+XI_STEP][7], tcp_data[tcp_000+YI_STEP][7], tcp_data[tcp_000+XI_STEP+YI_STEP][7], tcp_data[tcp_000+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+ZI_STEP][7], tcp_data[tcp_000+YI_STEP+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][7]);
                 DeltaRzz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][8], tcp_data[tcp_000+XI_STEP][8], tcp_data[tcp_000+YI_STEP][8], tcp_data[tcp_000+XI_STEP+YI_STEP][8], tcp_data[tcp_000+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+ZI_STEP][8], tcp_data[tcp_000+YI_STEP+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][8]);
+                /// Debugging, TODO: remove lines below
+                offset_aux = - tcp_000_x_offset - 2 * tcp_000_y_offset - 4 * tcp_000_z_offset;
+                offset_counter[offset_aux] += 1;
             }
         }
     }
     if (my_rank == 0) cout << "[interpolateDeltaRij] DeltaRij interpolated successfully from TCP data" << endl;
+
+    /// Debugging
+    cout << "[interpolateDeltaRij] [Rank " << my_rank << "] (should have similar values) offset_counter = "
+         << offset_counter[0] << " " << offset_counter[1] << " " << offset_counter[2] << " " << offset_counter[3] << " "
+         << offset_counter[4] << " " << offset_counter[5] << " " << offset_counter[6] << " " << offset_counter[7] << endl; 
 
 };
 
@@ -2321,7 +2368,21 @@ bool myRHEA::checkMatch(const double &var1, const double &var2) {
 ///////////////////////////////////////////////////////////////////////////////
 /// Perform trilinear interpolation
 
-double myRHEA::trilinearInterpolation(const double &x, const double &y, const double &z, const double &x0, const double &x1, const double &y0, const double &y1, const double &z0, const double &z1, const double &f000, const double &f100, const double &f010, const double &f110, const double &f001, const double &f101, const double &f011, const double &f111) {
+double myRHEA::trilinearInterpolation(
+    const double &x, const double &y, const double &z, 
+    const double &x0, const double &x1, 
+    const double &y0, const double &y1, 
+    const double &z0, const double &z1, 
+    const double &f000, const double &f100, 
+    const double &f010, const double &f110, 
+    const double &f001, const double &f101, 
+    const double &f011, const double &f111) {
+
+    // Check coordinate values
+    if (std::abs(x1 - x0) < EPS || std::abs(y1 - y0) < EPS || std::abs(z1 - z0) < EPS) {
+        cerr << "[trilinearInterpolation] Invalid TCP positions: division by near-zero distance." << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
     // Calculate interpolation factors
     double tx = ( x - x0 )/( x1 - x0 );
@@ -2652,6 +2713,9 @@ void myRHEA::updateState() {
 #if _WITNESS_XZ_SLICES_
     int j_index;
     int xz_slice_points_counter;
+#elif _WITNESS_XYZ_AVG_
+    double delta_x, delta_y, delta_z, delta_volume;
+    double total_volume = 0.0;
 #else
     int i_index, j_index, k_index;
 #endif  /// of _WITNESS_XZ_SLICES_
@@ -2674,23 +2738,52 @@ void myRHEA::updateState() {
                 }
             }
             state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / L_y;
 
-#else ///  _WITNESS_XZ_SLICES_ 0
+#elif _WITNESS_XYZ_AVG_
+            /// Calculate state value from averaging field values along local mesh of the TCP mpi process
+             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+                for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
+                    for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
+                        /// Geometric stuff
+                        delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
+                        delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
+                        delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
+                        delta_volume =  delta_x * delta_y * delta_z;
+                        /// Spatial average
+                        state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        state_local[state_local_size2_counter+1] += std::pow(x_field[I1D(i,j,k)],     2.0) * delta_volume;
+                        state_local[state_local_size2_counter+2] += std::pow(y_field[I1D(i,j,k)],     2.0) * delta_volume;
+                        total_volume += delta_volume;
+                    }
+                }
+            }
+            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / total_volume );
+            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / total_volume ) / L_x;
+            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / total_volume ) / L_y;
+
+#else ///  _WITNESS_XZ_SLICES_ 0 and _WITNESS_XYZ_AVG_ 0
             /// Get local indices i, j, k
             i_index = temporal_witness_probes[twp].getLocalIndexI(); 
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
             /// Calculate state value/s
             state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+1] = y_field[I1D(i_index,j_index,k_index)] / L_y;
-#endif /// of _WITNESS_XZ_SLICES_
+            state_local[state_local_size2_counter+1] = x_field[I1D(i_index,j_index,k_index)] / L_x;
+            state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / L_y;
+#endif /// of _WITNESS_XZ_SLICES_ and _WITNESS_XYZ_AVG_
 
             /// Update local state counter
             state_local_size2_counter += state_dim;
         }
     }
-}   
+
+    /// Check local state is updated correctly
+    if (state_local_size2_counter != state_local_size2) {
+        cerr << "Mismatch between state_local_size2_counter (" << state_local_size2_counter << ") != state_local_size2 (" << state_local_size2 << ")" << endl;
+        MPI_Abort( MPI_COMM_WORLD, 1 );
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
