@@ -1948,36 +1948,6 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
     // Fetch TCP data from neighboring MPI processes (unique TCP per MPI process)
     exchangeTcpData(tcp_data, valid_tcp_data, TCP_DATA_SIZE, NUM_TCP_NEIGHBORS, CENTRAL_TCP_INDEX, XI_STEP, YI_STEP, ZI_STEP);   /// update tcp_data
     
-    /// Debugging /// TODO: remove cout below
-    cout << "[exchangeTcpData] [Rank " << my_rank << "] (valid_)tcp_data = \n"
-         << valid_tcp_data[0]  << " " << tcp_data[0][0]  << " " << tcp_data[0][1]  << " " << tcp_data[0][2]  << " " << tcp_data[0][3]  << " " << tcp_data[0][4]  << " " << tcp_data[0][5]  << " " << tcp_data[0][6]  << " " << tcp_data[0][7]  << " " << tcp_data[0][8]  << "\n"
-         << valid_tcp_data[1]  << " " << tcp_data[1][0]  << " " << tcp_data[1][1]  << " " << tcp_data[1][2]  << " " << tcp_data[1][3]  << " " << tcp_data[1][4]  << " " << tcp_data[1][5]  << " " << tcp_data[1][6]  << " " << tcp_data[1][7]  << " " << tcp_data[1][8]  << "\n"
-         << valid_tcp_data[2]  << " " << tcp_data[2][0]  << " " << tcp_data[2][1]  << " " << tcp_data[2][2]  << " " << tcp_data[2][3]  << " " << tcp_data[2][4]  << " " << tcp_data[2][5]  << " " << tcp_data[2][6]  << " " << tcp_data[2][7]  << " " << tcp_data[2][8]  << "\n"
-         << valid_tcp_data[3]  << " " << tcp_data[3][0]  << " " << tcp_data[3][1]  << " " << tcp_data[3][2]  << " " << tcp_data[3][3]  << " " << tcp_data[3][4]  << " " << tcp_data[3][5]  << " " << tcp_data[3][6]  << " " << tcp_data[3][7]  << " " << tcp_data[3][8]  << "\n"
-         << valid_tcp_data[4]  << " " << tcp_data[4][0]  << " " << tcp_data[4][1]  << " " << tcp_data[4][2]  << " " << tcp_data[4][3]  << " " << tcp_data[4][4]  << " " << tcp_data[4][5]  << " " << tcp_data[4][6]  << " " << tcp_data[4][7]  << " " << tcp_data[4][8]  << "\n"
-         << valid_tcp_data[5]  << " " << tcp_data[5][0]  << " " << tcp_data[5][1]  << " " << tcp_data[5][2]  << " " << tcp_data[5][3]  << " " << tcp_data[5][4]  << " " << tcp_data[5][5]  << " " << tcp_data[5][6]  << " " << tcp_data[5][7]  << " " << tcp_data[5][8]  << "\n"
-         << valid_tcp_data[6]  << " " << tcp_data[6][0]  << " " << tcp_data[6][1]  << " " << tcp_data[6][2]  << " " << tcp_data[6][3]  << " " << tcp_data[6][4]  << " " << tcp_data[6][5]  << " " << tcp_data[6][6]  << " " << tcp_data[6][7]  << " " << tcp_data[6][8]  << "\n"
-         << valid_tcp_data[7]  << " " << tcp_data[7][0]  << " " << tcp_data[7][1]  << " " << tcp_data[7][2]  << " " << tcp_data[7][3]  << " " << tcp_data[7][4]  << " " << tcp_data[7][5]  << " " << tcp_data[7][6]  << " " << tcp_data[7][7]  << " " << tcp_data[7][8]  << "\n"
-         << valid_tcp_data[8]  << " " << tcp_data[8][0]  << " " << tcp_data[8][1]  << " " << tcp_data[8][2]  << " " << tcp_data[8][3]  << " " << tcp_data[8][4]  << " " << tcp_data[8][5]  << " " << tcp_data[8][6]  << " " << tcp_data[8][7]  << " " << tcp_data[8][8]  << "\n"
-         << valid_tcp_data[9]  << " " << tcp_data[9][0]  << " " << tcp_data[9][1]  << " " << tcp_data[9][2]  << " " << tcp_data[9][3]  << " " << tcp_data[9][4]  << " " << tcp_data[9][5]  << " " << tcp_data[9][6]  << " " << tcp_data[9][7]  << " " << tcp_data[9][8]  << "\n"
-         << valid_tcp_data[10] << " " << tcp_data[10][0] << " " << tcp_data[10][1] << " " << tcp_data[10][2] << " " << tcp_data[10][3] << " " << tcp_data[10][4] << " " << tcp_data[10][5] << " " << tcp_data[10][6] << " " << tcp_data[10][7] << " " << tcp_data[10][8] << "\n"
-         << valid_tcp_data[11] << " " << tcp_data[11][0] << " " << tcp_data[11][1] << " " << tcp_data[11][2] << " " << tcp_data[11][3] << " " << tcp_data[11][4] << " " << tcp_data[11][5] << " " << tcp_data[11][6] << " " << tcp_data[11][7] << " " << tcp_data[11][8] << "\n"
-         << valid_tcp_data[12] << " " << tcp_data[12][0] << " " << tcp_data[12][1] << " " << tcp_data[12][2] << " " << tcp_data[12][3] << " " << tcp_data[12][4] << " " << tcp_data[12][5] << " " << tcp_data[12][6] << " " << tcp_data[12][7] << " " << tcp_data[12][8] << "\n"
-         << valid_tcp_data[13] << " " << tcp_data[13][0] << " " << tcp_data[13][1] << " " << tcp_data[13][2] << " " << tcp_data[13][3] << " " << tcp_data[13][4] << " " << tcp_data[13][5] << " " << tcp_data[13][6] << " " << tcp_data[13][7] << " " << tcp_data[13][8] << "\n"
-         << valid_tcp_data[14] << " " << tcp_data[14][0] << " " << tcp_data[14][1] << " " << tcp_data[14][2] << " " << tcp_data[14][3] << " " << tcp_data[14][4] << " " << tcp_data[14][5] << " " << tcp_data[14][6] << " " << tcp_data[14][7] << " " << tcp_data[14][8] << "\n"
-         << valid_tcp_data[15] << " " << tcp_data[15][0] << " " << tcp_data[15][1] << " " << tcp_data[15][2] << " " << tcp_data[15][3] << " " << tcp_data[15][4] << " " << tcp_data[15][5] << " " << tcp_data[15][6] << " " << tcp_data[15][7] << " " << tcp_data[15][8] << "\n"
-         << valid_tcp_data[16] << " " << tcp_data[16][0] << " " << tcp_data[16][1] << " " << tcp_data[16][2] << " " << tcp_data[16][3] << " " << tcp_data[16][4] << " " << tcp_data[16][5] << " " << tcp_data[16][6] << " " << tcp_data[16][7] << " " << tcp_data[16][8] << "\n"
-         << valid_tcp_data[17] << " " << tcp_data[17][0] << " " << tcp_data[17][1] << " " << tcp_data[17][2] << " " << tcp_data[17][3] << " " << tcp_data[17][4] << " " << tcp_data[17][5] << " " << tcp_data[17][6] << " " << tcp_data[17][7] << " " << tcp_data[17][8] << "\n"
-         << valid_tcp_data[18] << " " << tcp_data[18][0] << " " << tcp_data[18][1] << " " << tcp_data[18][2] << " " << tcp_data[18][3] << " " << tcp_data[18][4] << " " << tcp_data[18][5] << " " << tcp_data[18][6] << " " << tcp_data[18][7] << " " << tcp_data[18][8] << "\n"
-         << valid_tcp_data[19] << " " << tcp_data[19][0] << " " << tcp_data[19][1] << " " << tcp_data[19][2] << " " << tcp_data[19][3] << " " << tcp_data[19][4] << " " << tcp_data[19][5] << " " << tcp_data[19][6] << " " << tcp_data[19][7] << " " << tcp_data[19][8] << "\n"
-         << valid_tcp_data[20] << " " << tcp_data[20][0] << " " << tcp_data[20][1] << " " << tcp_data[20][2] << " " << tcp_data[20][3] << " " << tcp_data[20][4] << " " << tcp_data[20][5] << " " << tcp_data[20][6] << " " << tcp_data[20][7] << " " << tcp_data[20][8] << "\n"
-         << valid_tcp_data[21] << " " << tcp_data[21][0] << " " << tcp_data[21][1] << " " << tcp_data[21][2] << " " << tcp_data[21][3] << " " << tcp_data[21][4] << " " << tcp_data[21][5] << " " << tcp_data[21][6] << " " << tcp_data[21][7] << " " << tcp_data[21][8] << "\n"
-         << valid_tcp_data[22] << " " << tcp_data[22][0] << " " << tcp_data[22][1] << " " << tcp_data[22][2] << " " << tcp_data[22][3] << " " << tcp_data[22][4] << " " << tcp_data[22][5] << " " << tcp_data[22][6] << " " << tcp_data[22][7] << " " << tcp_data[22][8] << "\n"
-         << valid_tcp_data[23] << " " << tcp_data[23][0] << " " << tcp_data[23][1] << " " << tcp_data[23][2] << " " << tcp_data[23][3] << " " << tcp_data[23][4] << " " << tcp_data[23][5] << " " << tcp_data[23][6] << " " << tcp_data[23][7] << " " << tcp_data[23][8] << "\n"
-         << valid_tcp_data[24] << " " << tcp_data[24][0] << " " << tcp_data[24][1] << " " << tcp_data[24][2] << " " << tcp_data[24][3] << " " << tcp_data[24][4] << " " << tcp_data[24][5] << " " << tcp_data[24][6] << " " << tcp_data[24][7] << " " << tcp_data[24][8] << "\n"
-         << valid_tcp_data[25] << " " << tcp_data[25][0] << " " << tcp_data[25][1] << " " << tcp_data[25][2] << " " << tcp_data[25][3] << " " << tcp_data[25][4] << " " << tcp_data[25][5] << " " << tcp_data[25][6] << " " << tcp_data[25][7] << " " << tcp_data[25][8] << "\n"
-         << valid_tcp_data[26] << " " << tcp_data[26][0] << " " << tcp_data[26][1] << " " << tcp_data[26][2] << " " << tcp_data[26][3] << " " << tcp_data[26][4] << " " << tcp_data[26][5] << " " << tcp_data[26][6] << " " << tcp_data[26][7] << " " << tcp_data[26][8] << endl;
-
     /// Perform DeltaRij interpolation of mesh points from 8 TCP data (from 27 TCP available neighbours)
     int tcp_000_x_offset, tcp_000_y_offset, tcp_000_z_offset;
     int tcp_000;
@@ -1985,6 +1955,9 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
     const double x_central = tcp_data[CENTRAL_TCP_INDEX][0];
     const double y_central = tcp_data[CENTRAL_TCP_INDEX][1];
     const double z_central = tcp_data[CENTRAL_TCP_INDEX][2];
+    /// Debugging, TODO: remove lines!
+    int counter_x_st_central = 0, counter_x_gt_central = 0, counter_y_st_central = 0, counter_y_gt_central = 0, counter_z_st_central = 0, counter_z_gt_central = 0;
+    int counter_interp_xyz = 0, counter_interp_xy = 0, counter_interp_xz = 0, counter_interp_yz = 0, counter_interp_x = 0, counter_interp_y = 0, counter_interp_z = 0, counter_interp_ct = 0; 
     for(int i = topo->iter_common[_ALL_][_INIX_]; i <= topo->iter_common[_ALL_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_ALL_][_INIY_]; j <= topo->iter_common[_ALL_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_ALL_][_INIZ_]; k <= topo->iter_common[_ALL_][_ENDZ_]; k++) {
@@ -1995,12 +1968,22 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                 tcp_000_y_offset = (y_field[I1D(i,j,k)] < y_central) ? -1 : 0;
                 tcp_000_z_offset = (z_field[I1D(i,j,k)] < z_central) ? -1 : 0;
                 tcp_000 = CENTRAL_TCP_INDEX + (tcp_000_x_offset * XI_STEP) + (tcp_000_y_offset * YI_STEP) + (tcp_000_z_offset * ZI_STEP); 
+                
+                /// Debugging, TODO: remove lines!
+                counter_x_st_central += (tcp_000_x_offset==0);
+                counter_x_gt_central += (tcp_000_x_offset==-1);
+                counter_y_st_central += (tcp_000_y_offset==0);
+                counter_y_gt_central += (tcp_000_y_offset==-1);
+                counter_z_st_central += (tcp_000_z_offset==0);
+                counter_z_gt_central += (tcp_000_z_offset==-1);
+
                 /// Check valid TCP neighbors (unvalid when local TCP is x,y, and/or z boundary of TCP grid)
-                interp_x = valid_tcp_data[tcp_000] && valid_tcp_data[tcp_000+XI_STEP];
-                interp_y = valid_tcp_data[tcp_000] && valid_tcp_data[tcp_000+YI_STEP];
-                interp_z = valid_tcp_data[tcp_000] && valid_tcp_data[tcp_000+ZI_STEP];
+                interp_x = (valid_tcp_data[tcp_000] && valid_tcp_data[tcp_000+XI_STEP]) || (valid_tcp_data[tcp_000+YI_STEP] && valid_tcp_data[tcp_000+XI_STEP+YI_STEP]) || (valid_tcp_data[tcp_000+ZI_STEP] && valid_tcp_data[tcp_000+XI_STEP+ZI_STEP]) || (valid_tcp_data[tcp_000+YI_STEP+ZI_STEP] && valid_tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP]);
+                interp_y = (valid_tcp_data[tcp_000] && valid_tcp_data[tcp_000+YI_STEP]) || (valid_tcp_data[tcp_000+XI_STEP] && valid_tcp_data[tcp_000+XI_STEP+YI_STEP]) || (valid_tcp_data[tcp_000+ZI_STEP] && valid_tcp_data[tcp_000+YI_STEP+ZI_STEP]) || (valid_tcp_data[tcp_000+XI_STEP+ZI_STEP] && valid_tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP]);
+                interp_z = (valid_tcp_data[tcp_000] && valid_tcp_data[tcp_000+ZI_STEP]) || (valid_tcp_data[tcp_000+XI_STEP] && valid_tcp_data[tcp_000+XI_STEP+ZI_STEP]) || (valid_tcp_data[tcp_000+YI_STEP] && valid_tcp_data[tcp_000+YI_STEP+ZI_STEP]) || (valid_tcp_data[tcp_000+XI_STEP+YI_STEP] && valid_tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP]);
                 /// Perform interpolation
                 if (interp_x && interp_y && interp_z) {
+                    counter_interp_xyz++;    /// TODO: remove line!
                     /// ----------------------------------------- Trilinear interpolation -----------------------------------------
                     /// Trilinear interpolation in (x,y,z)-dir
                     /// c_interpolated         = trilinearInterpolation(const double &x,     const double &y,     const double &z,     const double &x0,     const double &x1,             const double &y0,     const double &y1,             const double &z0,     const double &z1,             const double &f000,   const double &f100,           const double &f010,           const double &f110,                   const double &f001,           const double &f101,                   const double &f011,                   const double &f111);
@@ -2011,6 +1994,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][7], tcp_data[tcp_000+XI_STEP][7], tcp_data[tcp_000+YI_STEP][7], tcp_data[tcp_000+XI_STEP+YI_STEP][7], tcp_data[tcp_000+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+ZI_STEP][7], tcp_data[tcp_000+YI_STEP+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = trilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][8], tcp_data[tcp_000+XI_STEP][8], tcp_data[tcp_000+YI_STEP][8], tcp_data[tcp_000+XI_STEP+YI_STEP][8], tcp_data[tcp_000+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+ZI_STEP][8], tcp_data[tcp_000+YI_STEP+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+YI_STEP+ZI_STEP][8]);
                 } else if (interp_x && interp_y && !interp_z) {
+                    counter_interp_xy++;    /// TODO: remove line!
                     /// ----------------------------------------- Bilinear interpolation -----------------------------------------
                     /// Bilinear interpolation in (x,y)-directions
                     /// Use TCP 000, 100, 010, 110 
@@ -2026,6 +2010,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = bilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][7], tcp_data[tcp_000+XI_STEP][7], tcp_data[tcp_000+YI_STEP][7], tcp_data[tcp_000+XI_STEP+YI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = bilinearInterpolation(x_field[I1D(i,j,k)], y_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][8], tcp_data[tcp_000+XI_STEP][8], tcp_data[tcp_000+YI_STEP][8], tcp_data[tcp_000+XI_STEP+YI_STEP][8]);
                 } else if (interp_x && !interp_y && interp_z) {
+                    counter_interp_xz++;    /// TODO: remove line!
                     /// Bilinear interpolation in (x,z)-directions
                     /// Use TCP 000, 100, 001, 101 
                     if (!valid_tcp_data[tcp_000]){
@@ -2039,6 +2024,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = bilinearInterpolation(x_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][7], tcp_data[tcp_000+XI_STEP][7], tcp_data[tcp_000+ZI_STEP][7], tcp_data[tcp_000+XI_STEP+ZI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = bilinearInterpolation(x_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][8], tcp_data[tcp_000+XI_STEP][8], tcp_data[tcp_000+ZI_STEP][8], tcp_data[tcp_000+XI_STEP+ZI_STEP][8]);
                 } else if (!interp_x && interp_y && interp_z) {
+                    counter_interp_yz++;    /// TODO: remove line!
                     /// Bilinear interpolation in (y,z)-directions
                     /// Use TCP 000, 010, 001, 011
                     if (!valid_tcp_data[tcp_000]){
@@ -2052,6 +2038,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = bilinearInterpolation(y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][7], tcp_data[tcp_000+YI_STEP][7], tcp_data[tcp_000+ZI_STEP][7], tcp_data[tcp_000+YI_STEP+ZI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = bilinearInterpolation(y_field[I1D(i,j,k)], z_field[I1D(i,j,k)], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][8], tcp_data[tcp_000+YI_STEP][8], tcp_data[tcp_000+ZI_STEP][8], tcp_data[tcp_000+YI_STEP+ZI_STEP][8]);
                 } else if (interp_x && !interp_y && !interp_z) {
+                    counter_interp_x++;    /// TODO: remove line!
                     /// ----------------------------------------- Linear interpolation -----------------------------------------
                     /// Linear interpolation in x-direction
                     /// Use TCP 000, 100
@@ -2076,6 +2063,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = linearInterpolation(x_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][7], tcp_data[tcp_000+XI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = linearInterpolation(x_field[I1D(i,j,k)], tcp_data[tcp_000][0], tcp_data[tcp_000+XI_STEP][0], tcp_data[tcp_000][8], tcp_data[tcp_000+XI_STEP][8]);
                 } else if (!interp_x && interp_y && !interp_z) {
+                    counter_interp_y++;    /// TODO: remove line!
                     /// Linear interpolation in y-direction
                     /// Use TCP 000, 010
                     if (!valid_tcp_data[tcp_000]) {
@@ -2098,6 +2086,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = linearInterpolation(y_field[I1D(i,j,k)], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][7], tcp_data[tcp_000+YI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = linearInterpolation(y_field[I1D(i,j,k)], tcp_data[tcp_000][1], tcp_data[tcp_000+YI_STEP][1], tcp_data[tcp_000][8], tcp_data[tcp_000+YI_STEP][8]);
                 } else if (!interp_x && !interp_y && interp_z) {
+                    counter_interp_z++;    /// TODO: remove line!
                     /// Linear interpolation in z-direction
                     /// Use TCP 000, 001
                     if (!valid_tcp_data[tcp_000]) {
@@ -2120,6 +2109,7 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
                     DeltaRyz_field[I1D(i,j,k)] = linearInterpolation(z_field[I1D(i,j,k)], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][7], tcp_data[tcp_000+ZI_STEP][7]);
                     DeltaRzz_field[I1D(i,j,k)] = linearInterpolation(z_field[I1D(i,j,k)], tcp_data[tcp_000][2], tcp_data[tcp_000+ZI_STEP][2], tcp_data[tcp_000][8], tcp_data[tcp_000+ZI_STEP][8]);
                 } else {    /// !interp_x && !interp_y && !interp_z
+                    counter_interp_ct++;    /// TODO: remove line!
                     /// No interpolation!, same value as local TCP 
                     DeltaRxx_field[I1D(i,j,k)] = tcp_data[CENTRAL_TCP_INDEX][3];
                     DeltaRxy_field[I1D(i,j,k)] = tcp_data[CENTRAL_TCP_INDEX][4];
@@ -2132,6 +2122,11 @@ void myRHEA::interpolateDeltaRij(vector<double> &tcp_position, vector<double> &t
         }
     }
     if (my_rank == 0) cout << "[interpolateDeltaRij] DeltaRij interpolated successfully from TCP data" << endl;
+
+    /// Debugging, TODO: REMOVE LINE!
+    cout << "[interpolateDeltaRij] [Rank " << my_rank << "] Counters interpolation type: " 
+         << counter_interp_xyz << " " << counter_interp_xy << " " << counter_interp_xz << " " << counter_interp_yz << " " << counter_interp_x << " " << counter_interp_y << " " << counter_interp_z << " " << counter_interp_ct << endl; 
+
 
 };
 
