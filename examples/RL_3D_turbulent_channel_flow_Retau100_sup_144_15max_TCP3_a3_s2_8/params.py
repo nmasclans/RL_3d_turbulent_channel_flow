@@ -2,12 +2,12 @@ import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.02         # action period
+t_action = 0.005        # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.5
 cfd_n_envs = 1          # num. cfd simulations run in parallel
-rl_n_envs = 8          # num. regions del domini en wall-normal direction -> gets the witness points
+rl_n_envs = 8           # num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
@@ -51,7 +51,7 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-    "num_episodes": 10000,
+    "num_episodes": 1000,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if run_mode == "train" else t_episode_eval,
@@ -69,21 +69,21 @@ params = {
     # Clipping parameter controls how much the new policy can deviate from the old policy
     # Recommended: 0.2 - 0.5, 0.2 used in most implementations
     # If updates are too volatile, you can decrease to 0.1
-    "entropy_regularization": 0.001,                       
+    "entropy_regularization": 0.01,                       
     # Adds and entropy term to the loss function to encourage policy exploration
     # Prevents early convergence to suboptimal policies
     # You want enough entropy to mantain exploration, but too much can slow convergence
     # Recommended: 0.01 - 0.05, or 0.01 - 0.02
-    "policy_l2_reg": 1e-6,
+    "policy_l2_reg": 1e-5,
     # Regularization coefficient for the policy network to prevent overfitting
     # Recommended: 1e-4 - 1e-3 -> small reg. effect without overly constraining the model
-    "value_function_l2_reg": 1e-6,
+    "value_function_l2_reg": 1e-5,
     # Regularization for the value network (critic) to prevent overfitting
     # Recommended: 1e-4 - 1e-3 -> small reg. effect without overly constraining the model
-    "shared_vars_l2_reg": 1e-6,
+    "shared_vars_l2_reg": 1e-5,
     # Regularization for any shared parameters between the policy and value networks
     # Recommended: 1e-4 - 1e-3, or set the same as the policy/value L2 regularization values
-    "value_pred_loss_coef": 1e-6,
+    "value_pred_loss_coef": 1e-5,
     # This coefficient balances the weight of the value prediction loss in the overall loss function
     # Recommended: 0.5
     # If the value function is underperforming, you can increase it to give more weight to value function learning 
