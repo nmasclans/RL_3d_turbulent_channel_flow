@@ -186,18 +186,18 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     DeltaRyy_field.setTopology(topo, "DeltaRyy");
     DeltaRyz_field.setTopology(topo, "DeltaRyz");
     DeltaRzz_field.setTopology(topo, "DeltaRzz");
-    d_DeltaRxx_x_field.setTopology(topo, "d_DeltaRxx_x_field"); 
-    d_DeltaRxy_x_field.setTopology(topo, "d_DeltaRxy_x_field"); 
-    d_DeltaRxz_x_field.setTopology(topo, "d_DeltaRxz_x_field"); 
-    d_DeltaRxy_y_field.setTopology(topo, "d_DeltaRxy_y_field"); 
-    d_DeltaRyy_y_field.setTopology(topo, "d_DeltaRyy_y_field"); 
-    d_DeltaRyz_y_field.setTopology(topo, "d_DeltaRyz_y_field"); 
-    d_DeltaRxz_z_field.setTopology(topo, "d_DeltaRxz_z_field"); 
-    d_DeltaRyz_z_field.setTopology(topo, "d_DeltaRyz_z_field"); 
-    d_DeltaRzz_z_field.setTopology(topo, "d_DeltaRzz_z_field"); 
-    d_DeltaRxj_j_field.setTopology(topo, "d_DeltaRxj_j_field");
-    d_DeltaRyj_j_field.setTopology(topo, "d_DeltaRyj_j_field");
-    d_DeltaRzj_j_field.setTopology(topo, "d_DeltaRzj_j_field");
+    d_DeltaRxx_x_field.setTopology(topo, "d_DeltaRxx_x"); 
+    d_DeltaRxy_x_field.setTopology(topo, "d_DeltaRxy_x"); 
+    d_DeltaRxz_x_field.setTopology(topo, "d_DeltaRxz_x"); 
+    d_DeltaRxy_y_field.setTopology(topo, "d_DeltaRxy_y"); 
+    d_DeltaRyy_y_field.setTopology(topo, "d_DeltaRyy_y"); 
+    d_DeltaRyz_y_field.setTopology(topo, "d_DeltaRyz_y"); 
+    d_DeltaRxz_z_field.setTopology(topo, "d_DeltaRxz_z"); 
+    d_DeltaRyz_z_field.setTopology(topo, "d_DeltaRyz_z"); 
+    d_DeltaRzz_z_field.setTopology(topo, "d_DeltaRzz_z"); 
+    d_DeltaRxj_j_field.setTopology(topo, "d_DeltaRxj_j");
+    d_DeltaRyj_j_field.setTopology(topo, "d_DeltaRyj_j");
+    d_DeltaRzj_j_field.setTopology(topo, "d_DeltaRzj_j");
     timers->createTimer( "rl_smartredis_communications" );
     timers->createTimer( "rl_update_DeltaRij" );
     timers->createTimer( "rl_update_control_term" );
@@ -214,6 +214,27 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
     ///rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
     ///rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
 #endif  /// of _RL_CONTROL_IS_SUPERVISED_
+
+    /// Add fields to write in .h5 and .xdmf files 
+    writer_reader->addField(&DeltaRxx_field);
+    writer_reader->addField(&DeltaRxy_field);
+    writer_reader->addField(&DeltaRxz_field);
+    writer_reader->addField(&DeltaRyy_field);
+    writer_reader->addField(&DeltaRyz_field);
+    writer_reader->addField(&DeltaRzz_field);
+    writer_reader->addField(&d_DeltaRxx_x_field);
+    writer_reader->addField(&d_DeltaRxy_x_field);
+    writer_reader->addField(&d_DeltaRxz_x_field);
+    writer_reader->addField(&d_DeltaRxy_y_field);
+    writer_reader->addField(&d_DeltaRyy_y_field);
+    writer_reader->addField(&d_DeltaRyz_y_field);
+    writer_reader->addField(&d_DeltaRxz_z_field);
+    writer_reader->addField(&d_DeltaRyz_z_field);
+    writer_reader->addField(&d_DeltaRzz_z_field);
+    writer_reader->addField(&d_DeltaRxj_j_field);
+    writer_reader->addField(&d_DeltaRyj_j_field);
+    writer_reader->addField(&d_DeltaRzj_j_field);
+
     initRLParams(tag, restart_data_file, t_action, t_episode, t_begin_control, db_clustered, global_step);
     initSmartRedis();
 #endif  /// of _ACTIVE_CONTROL_BODY_FORCE_
