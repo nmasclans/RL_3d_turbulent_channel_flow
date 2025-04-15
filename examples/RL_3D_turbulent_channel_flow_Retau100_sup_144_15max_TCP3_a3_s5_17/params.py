@@ -7,7 +7,7 @@ t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.5
 cfd_n_envs = 1          # num. cfd simulations run in parallel
-rl_n_envs = 160         # num. regions del domini en wall-normal direction -> gets the witness points
+rl_n_envs = 40          # num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
@@ -51,7 +51,7 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-    "num_episodes": 2000,
+    "num_episodes": 650,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if run_mode == "train" else t_episode_eval,
@@ -63,7 +63,7 @@ params = {
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file_3210000.h5", # 'random_choice' or filename as restart_data_file.h5
     "net": (128, 128),                              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
-    "learning_rate": 0.01,                                                            
+    "learning_rate": 0.001,                                                            
     # Recommended: 1e-4 - 1e-3
     "importance_ratio_clipping": 0.2,                                                   
     # Clipping parameter controls how much the new policy can deviate from the old policy
@@ -91,7 +91,7 @@ params = {
     #"actor_net_activation_fn": "relu", # TODO: remove if not used
     #"actor_net_l2_reg": 1e-4,          # TODO: remove if not used
     #"actor_net_std_init": 0.35,        # TODO: remove if not used
-    "normalize_rewards": True,
+    "normalize_rewards": False,
     "normalize_observations": True,
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval

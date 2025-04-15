@@ -51,7 +51,7 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-    "num_episodes": 2000,
+    "num_episodes": 2500,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if run_mode == "train" else t_episode_eval,
