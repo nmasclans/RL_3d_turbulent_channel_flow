@@ -2,7 +2,7 @@ import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.02         # action period
+t_action = 0.001        # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.5
@@ -62,7 +62,7 @@ params = {
     "reward_norm": 1.0,
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file_3210000.h5", # 'random_choice' or filename as restart_data_file.h5
-    "net": (16, 64, 16),                            # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
+    "net": (128, 128),                              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
     "learning_rate": 0.001,                                                            
     # Recommended: 1e-4 - 1e-3
     "importance_ratio_clipping": 0.2,                                                   
