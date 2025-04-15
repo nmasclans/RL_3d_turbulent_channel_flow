@@ -2,7 +2,7 @@ import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.005        # action period
+t_action = 0.0025        # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.5
@@ -91,7 +91,7 @@ params = {
     #"actor_net_activation_fn": "relu", # TODO: remove if not used
     #"actor_net_l2_reg": 1e-4,          # TODO: remove if not used
     #"actor_net_std_init": 0.35,        # TODO: remove if not used
-    "normalize_rewards": False,
+    "normalize_rewards": True,
     "normalize_observations": True,
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
     "log_interval": 1, # save model, policy, metrics, interval
