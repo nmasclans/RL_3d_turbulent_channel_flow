@@ -295,7 +295,7 @@ print("Rij decomposed successfully!")
 print("\nBuilding triangle barycentric map plots...")
 for i_RL in range(n_RL):
     visualizer.build_anisotropy_tensor_barycentric_xmap_triang(y_delta_RL,    xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_nonConv, f"anisotropy_tensor_barycentric_map_RL_{file_details_list[i_RL]}")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_nonRL, xmap1_nonRL,    xmap2_nonRL,    averaging_time_nonConv, f"anisotropy_tensor_barycentric_map_nonRL")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_nonRL, xmap1_nonRL,    xmap2_nonRL,    averaging_time_nonConv, f"anisotropy_tensor_barycentric_map_nonRL Framework")
 visualizer.build_anisotropy_tensor_barycentric_xmap_triang(    y_delta_ref,   xmap1_ref,      xmap2_ref,      averaging_time_ref,     f"anisotropy_tensor_barycentric_map_ref")
 print("Triangle barycentric map plotted successfully!")
 

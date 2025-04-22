@@ -100,8 +100,8 @@ plt.clf()
 
 # Read & Plot data
 plt.plot( y_plus_ref, u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = 'Moser et al., Re_tau = 180' )
-plt.scatter( avg_y_plus_RL,    avg_u_plus_RL,    marker = 'p', s = 50, color = 'firebrick', zorder = 1, label = 'RHEA RL' )
-plt.scatter( avg_y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue',      zorder = 1, label = 'RHEA non-RL' )
+plt.scatter( avg_y_plus_RL,    avg_u_plus_RL,    marker = 'p', s = 50, color = 'firebrick', zorder = 1, label = 'RHEA RL Framework' )
+plt.scatter( avg_y_plus_nonRL, avg_u_plus_nonRL, marker = 'v', s = 50, color = 'blue',      zorder = 1, label = 'RHEA Uncontrolled' )
 
 # Configure plot
 plt.xlim( 1.0e-1, 2.0e2 )

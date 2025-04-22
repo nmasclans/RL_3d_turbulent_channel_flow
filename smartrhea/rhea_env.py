@@ -521,7 +521,7 @@ class RheaEnv(py_environment.PyEnvironment):
 # TODO: remove if not used, and also remove only-used-here variables: self._state_running_mean, self._state_running_var, self._state_rl, self._state_running_counter
 #    def _standarize_state(self):
 #        """
-#        Standarize 'self._state_rl' data to have mean = 0 and standard deviation = 1
+#        Standarize 'self._state_RL Framework' data to have mean = 0 and standard deviation = 1
 #        
 #        Additional info: 
 #        self._state_rl shape: [self.n_envs, self.n_state_rl], where self.n_envs = cfd_n_envs * rl_n_envs, 

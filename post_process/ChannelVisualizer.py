@@ -592,8 +592,8 @@ class ChannelVisualizer():
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
         plt.semilogx(yplus_ref,   vel_avg_ref,   '-',  color="black",     lw=2, label=r"Reference")
-        plt.semilogx(yplus_nonRL, vel_avg_nonRL, '--', color="tab:blue",  lw=2, label=r"non-RL")
-        plt.semilogx(yplus_RL,    vel_avg_RL,    ':',  color="tab:green", lw=2, label=r"RL")
+        plt.semilogx(yplus_nonRL, vel_avg_nonRL, '--', color="tab:blue",  lw=2, label=r"Uncontrolled")
+        plt.semilogx(yplus_RL,    vel_avg_RL,    ':',  color="tab:green", lw=2, label=r"RL Framework")
         # plot parameters
         if ylim is not None:
             plt.ylim(ylim)
@@ -630,8 +630,8 @@ class ChannelVisualizer():
                 plt.vlines(x_actuator_boundaries[i], ymin, ymax, colors='gray', linestyle='--')
         # plot data
         plt.semilogx(yplus_ref,   vel_rmsf_ref, '-',    color='black',     label=r"Reference")
-        plt.semilogx(yplus_nonRL, vel_rmsf_nonRL, '--', color='tab:blue',  label=r"non-RL")
-        plt.semilogx(yplus_RL,    vel_rmsf_RL, ':',     color='tab:green', label=r"RL")
+        plt.semilogx(yplus_nonRL, vel_rmsf_nonRL, '--', color='tab:blue',  label=r"Uncontrolled")
+        plt.semilogx(yplus_RL,    vel_rmsf_RL, ':',     color='tab:green', label=r"RL Framework")
         if ylim is not None:
             plt.ylim(ylim)
         plt.xlabel(r"$y^{+}$")
@@ -737,8 +737,8 @@ class ChannelVisualizer():
 
         # Plot data into the barycentric map
         plt.scatter( xmap1_ref,   xmap2_ref,   c = ydelta_ref,   cmap = cmap, norm = norm, zorder = 3, marker = 'o', s = 85, edgecolor = 'black', linewidth = 0.8, label="Reference" )
-        plt.scatter( xmap1_nonRL, xmap2_nonRL, c = ydelta_nonRL, cmap = cmap, norm = norm, zorder = 3, marker = 's', s = 85, edgecolor = 'black', linewidth = 0.8, label="non-RL" )
-        plt.scatter( xmap1_RL,    xmap2_RL,    c = ydelta_RL,    cmap = cmap, norm = norm, zorder = 3, marker = '^', s = 85, edgecolor = 'black', linewidth = 0.8, label="RL" )
+        plt.scatter( xmap1_nonRL, xmap2_nonRL, c = ydelta_nonRL, cmap = cmap, norm = norm, zorder = 3, marker = 's', s = 85, edgecolor = 'black', linewidth = 0.8, label="Uncontrolled" )
+        plt.scatter( xmap1_RL,    xmap2_RL,    c = ydelta_RL,    cmap = cmap, norm = norm, zorder = 3, marker = '^', s = 85, edgecolor = 'black', linewidth = 0.8, label="RL Framework" )
 
         # Plot barycentric map lines
         plt.plot( [self.x1c[0], self.x2c[0]],[self.x1c[1], self.x2c[1]], zorder = 1, color = 'black', linestyle = '-', linewidth = 2 )
@@ -751,9 +751,9 @@ class ChannelVisualizer():
         plt.axis( 'off' )
         ax = plt.gca()
         ax.set_aspect('equal', adjustable='box')
-        plt.text( 1.0047, -0.025, r'$\textbf{x}_{1_{c}}$' )
-        plt.text( -0.037, -0.025, r'$\textbf{x}_{2_{c}}$' )
-        plt.text( 0.4850, 0.9000, r'$\textbf{x}_{3_{c}}$' )
+        plt.text( 1.02,   -0.05,  r'$\textbf{x}_{1_{c}}$' )
+        plt.text( -0.065, -0.05,  r'$\textbf{x}_{2_{c}}$' )
+        plt.text( 0.45,   0.9000, r'$\textbf{x}_{3_{c}}$' )
         cbar = plt.colorbar()
         cbar.set_label( r'$y/\delta$' )
         plt.title(rf"non-RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_nonRL:.2f}$\\ RL: $t_{{\textrm{{avg}}}}^{{+}} = {avg_time_RL:.2f}$, train step = {global_step}")
@@ -767,6 +767,10 @@ class ChannelVisualizer():
         fig.canvas.draw()
         img = Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
         frames.append(img)
+        dirname = os.path.join(self.postRlzDir, "anisotropy_tensor_barycentric_xmap_triang_frames")
+        os.makedirs(dirname, exist_ok=True)
+        filename = os.path.join(dirname, f"anisotropy_tensor_barycentric_xmap_triang_{avg_time_RL:.3f}_{avg_time_nonRL:.3f}_{global_step}.svg")
+        plt.savefig(filename)
         plt.close()
 
         return frames
@@ -778,8 +782,8 @@ class ChannelVisualizer():
                                                avg_time_RL, avg_time_nonRL, global_step):
         fig, ax = plt.subplots()
         plt.plot(ydelta_ref,   Rkk_ref,   '-',  color='black',     label=r"Reference")
-        plt.plot(ydelta_nonRL, Rkk_nonRL, '--', color='tab:blue',  label=r"non-RL")
-        plt.plot(ydelta_RL,    Rkk_RL,    ':',  color='tab:green', label=r"RL")
+        plt.plot(ydelta_nonRL, Rkk_nonRL, '--', color='tab:blue',  label=r"Uncontrolled")
+        plt.plot(ydelta_RL,    Rkk_RL,    ':',  color='tab:green', label=r"RL Framework")
         plt.xlim([0.0, 1.0])
         plt.xlabel(r"$y/\delta$")
         plt.ylabel(r"Reynolds Stress Trace $R_{kk}$")
@@ -1081,7 +1085,7 @@ class ChannelVisualizer():
         # Build figure
         fig, ax = plt.subplots()
         plt.hlines(avg_u_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2,  color='black', label=r"Reference")
-        plt.scatter(avg_time, avg_u_bulk_num,         marker = '^',   s = 2,        color=plt.cm.tab10(1), label=r"RL")
+        plt.scatter(avg_time, avg_u_bulk_num,         marker = '^',   s = 2,        color=plt.cm.tab10(1), label=r"RL Framework")
         plt.xlabel( r'Averaging time $t_{avg}^+$', fontsize=16)
         plt.ylabel( r'$\overline{u}^{+}_b$', fontsize=16)
         plt.xlim(xlim)
@@ -1236,7 +1240,7 @@ class ChannelVisualizer():
             ax[1].legend(loc='lower left', fontsize=12)
 
         ### # NRMSE variable vs. realization
-        ### ax[2].semilogy(rlzArr, um_NRMSE_RL, '-o', label="RL")
+        ### ax[2].semilogy(rlzArr, um_NRMSE_RL, '-o', label="RL Framework")
         ### ax[2].semilogy(rlzArr, um_NRMSE_nonRL * np.ones(nrlz), '--k', label=f"non-RL ({um_NRMSE_nonRL:.3e})")
         ### ax[2].set_xlabel('Rlz')
         ### ax[2].set_ylabel(r'NRMSE($\overline{u}^{+}$)')
@@ -1289,7 +1293,7 @@ class ChannelVisualizer():
             ax[1].legend(loc='lower left', fontsize=12)
 
         ### # NRMSE variable vs. realization
-        ### ax[2].semilogy(rlzArr, urmsf_NRMSE_RL, '-o', label="RL")
+        ### ax[2].semilogy(rlzArr, urmsf_NRMSE_RL, '-o', label="RL Framework")
         ### ax[2].semilogy(rlzArr, urmsf_NRMSE_nonRL * np.ones(nrlz), '--k', label=f"non-RL ({urmsf_NRMSE_nonRL:.3e})")
         ### ax[2].set_xlabel('Rlz')
         ### ax[2].set_ylabel(r"NRMSE $u^{+}_{\textrm{rms}}$")
@@ -1332,8 +1336,8 @@ class ChannelVisualizer():
                              / np.linalg.norm(var_baseline, 2)
         NRMSE_nonRL = np.linalg.norm(var_nonRL_nonConv - var_baseline, 2) \
                       / np.linalg.norm(var_baseline, 2)
-        ax[1].plot(rlzArr, NRMSE_RL, '-o', label="RL")
-        ax[1].plot(rlzArr, NRMSE_nonRL * np.ones(nrlz), '--k', label="non-RL")
+        ax[1].plot(rlzArr, NRMSE_RL, '-o', label="RL Framework")
+        ax[1].plot(rlzArr, NRMSE_nonRL * np.ones(nrlz), '--k', label="Uncontrolled")
         ax[1].set_xlabel("Rlz")
         ax[1].set_ylabel(f"NRMSE {ylabel}")
         ax[1].legend()
@@ -1757,9 +1761,9 @@ class ChannelVisualizer():
         fig, ax = plt.subplots(figsize=(12, 6))
         for y_coord in y_coord_name_list:
             plt.loglog(avg_k_plus_ref_dict[y_coord],    avg_Euu_plus_ref_dict[y_coord],   color=colors_dict[y_coord], linestyle='-',  lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, Reference")
-            plt.loglog(avg_k_plus_nonRL_dict[y_coord],  avg_Euu_plus_nonRL_dict[y_coord], color=colors_dict[y_coord], linestyle='--', lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, non-RL")
+            plt.loglog(avg_k_plus_nonRL_dict[y_coord],  avg_Euu_plus_nonRL_dict[y_coord], color=colors_dict[y_coord], linestyle='--', lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, Uncontrolled")
             if avg_k_plus_RL_dict is not None:
-                plt.loglog(avg_k_plus_RL_dict[y_coord], avg_Euu_plus_RL_dict[y_coord],    color=colors_dict[y_coord], linestyle=':',  lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, RL")
+                plt.loglog(avg_k_plus_RL_dict[y_coord], avg_Euu_plus_RL_dict[y_coord],    color=colors_dict[y_coord], linestyle=':',  lw=2, label=rf"$y^+={avg_y_plus_dict[y_coord]:.2f}$, RL Framework")
         # Theoretical decay: Euu decays as k^(-5/3) -> slope Euu/k decays ~ 1^(-5/3) -> slope log(Euu)/log(k) ~ (-5/3)
         k_plus_slope   = np.linspace(10**(-2.0), 10**(-1.0), 50)
         Euu_plus_slope = k_plus_slope**(-5.0/3.0) * (0.1 / k_plus_slope[0]**(-5.0/3.0))

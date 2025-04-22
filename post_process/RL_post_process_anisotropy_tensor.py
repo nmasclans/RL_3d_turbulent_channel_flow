@@ -307,7 +307,7 @@ with h5py.File( filename_ref, 'r' ) as data_file:
     favre_vffvff_data_ref = data_file['favre_vffvff'][1:-1,1:-1,1:-1]
     favre_vffwff_data_ref = data_file['favre_vffwff'][1:-1,1:-1,1:-1]
     favre_wffwff_data_ref = data_file['favre_wffwff'][1:-1,1:-1,1:-1]
-assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging times from non-converged RL & non-RL"
+assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging times from non-converged RL & Uncontrolled"
 print(f"Non-RL reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
 print("\nData imported successfully!")
 
@@ -449,7 +449,7 @@ print("\nBuilding triangle barycentric map plots...")
 #    visualizer.build_anisotropy_tensor_barycentric_xmap_triang(y_delta_RL,    xmap1_RL[i_RL], xmap2_RL[i_RL], averaging_time_RL, f"anisotropy_tensor_barycentric_map_RL_{file_details_list[i_RL]}")
 if run_mode == "eval":
     visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_RL, xmap1_RL[1],    xmap2_RL[1],    averaging_time_accum_RL[1], f"anisotropy_tensor_barycentric_map_RL_eval")
-visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL,  xmap1_nonRL[1], xmap2_nonRL[1], averaging_time_nonRL[1],    f"anisotropy_tensor_barycentric_map_nonRL")
+visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_nonRL,  xmap1_nonRL[1], xmap2_nonRL[1], averaging_time_nonRL[1],    f"anisotropy_tensor_barycentric_map_nonRL Framework")
 visualizer.build_anisotropy_tensor_barycentric_xmap_triang( y_delta_ref,    xmap1_ref,      xmap2_ref,      averaging_time_ref,          "anisotropy_tensor_barycentric_map_ref")
 print("Triangle barycentric map plotted successfully!")
 

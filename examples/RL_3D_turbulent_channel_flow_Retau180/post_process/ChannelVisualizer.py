@@ -583,7 +583,7 @@ class ChannelVisualizer():
         
         fig, ax = plt.subplots()
         plt.semilogx(yplus_ref, um_ref,               '-',  color="black",      lw=2, label=r"Reference $t^+=900$")
-        plt.semilogx(yplus_odt, um_odt,               '-.', color="tab:green",  lw=2, label=r"RL")
+        plt.semilogx(yplus_odt, um_odt,               '-.', color="tab:green",  lw=2, label=r"RL Framework")
 
         if ylim is not None:
             plt.ylim(ylim)
@@ -1021,7 +1021,7 @@ class ChannelVisualizer():
             ax[1].legend(loc='lower left', fontsize=12)
 
         ### # NRMSE variable vs. realization
-        ### ax[2].semilogy(rlzArr, um_NRMSE_RL, '-o', label="RL")
+        ### ax[2].semilogy(rlzArr, um_NRMSE_RL, '-o', label="RL Framework")
         ### ax[2].semilogy(rlzArr, um_NRMSE_nonRL * np.ones(nrlz), '--k', label=f"non-RL ({um_NRMSE_nonRL:.3e})")
         ### ax[2].set_xlabel('Rlz')
         ### ax[2].set_ylabel(r'NRMSE($\overline{u}^{+}$)')
@@ -1074,7 +1074,7 @@ class ChannelVisualizer():
             ax[1].legend(loc='lower left', fontsize=12)
 
         ### # NRMSE variable vs. realization
-        ### ax[2].semilogy(rlzArr, urmsf_NRMSE_RL, '-o', label="RL")
+        ### ax[2].semilogy(rlzArr, urmsf_NRMSE_RL, '-o', label="RL Framework")
         ### ax[2].semilogy(rlzArr, urmsf_NRMSE_nonRL * np.ones(nrlz), '--k', label=f"non-RL ({urmsf_NRMSE_nonRL:.3e})")
         ### ax[2].set_xlabel('Rlz')
         ### ax[2].set_ylabel(r"NRMSE $u^{+}_{\textrm{rms}}$")
@@ -1117,8 +1117,8 @@ class ChannelVisualizer():
                              / np.linalg.norm(var_baseline, 2)
         NRMSE_nonRL = np.linalg.norm(var_nonRL_nonConv - var_baseline, 2) \
                       / np.linalg.norm(var_baseline, 2)
-        ax[1].plot(rlzArr, NRMSE_RL, '-o', label="RL")
-        ax[1].plot(rlzArr, NRMSE_nonRL * np.ones(nrlz), '--k', label="non-RL")
+        ax[1].plot(rlzArr, NRMSE_RL, '-o', label="RL Framework")
+        ax[1].plot(rlzArr, NRMSE_nonRL * np.ones(nrlz), '--k', label="Uncontrolled")
         ax[1].set_xlabel("Rlz")
         ax[1].set_ylabel(f"NRMSE {ylabel}")
         ax[1].legend()

@@ -190,7 +190,7 @@ filename_nonRL_list = filename_nonRL_list_available
 n_RL = len(filename_RL_list); n_nonRL = n_RL
 print(f"Datasets RL and non-RL have now {n_RL} files each")
 
-# --- Get averaging time of 'Reference', 'non-RL' and 'RL' and build 'file_details' information ---
+# --- Get averaging time of 'Reference', 'Uncontrolled' and 'RL Framework' and build 'file_details' information ---
 # > Reference
 with h5py.File(filename_ref, 'r') as file:
     t_avg_ref = file.attrs['AveragingTime'][0]
