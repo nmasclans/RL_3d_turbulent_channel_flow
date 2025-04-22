@@ -90,6 +90,7 @@ class myRHEA : public FlowSolverRHEA {
 
         /// Reward calculation
         double l2_err_avg_u_previous;                  /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        double l2_err_rmsf_u_previous;                 /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         double l2_rl_f_previous;                       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
 
         /// Witness points
