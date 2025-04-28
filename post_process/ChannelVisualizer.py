@@ -19,9 +19,9 @@ from scipy import stats
 plt.rc( 'text',       usetex = True )
 plt.rc( 'font',       size = 18 )
 plt.rc( 'axes',       labelsize = 18)
-plt.rc( 'legend',     fontsize = 12, frameon = False)
+plt.rc( 'legend',     fontsize = 18, frameon = False)
 plt.rc( 'text.latex', preamble = r'\usepackage{amsmath} \usepackage{amssymb} \usepackage{color}')
-plt.rc( 'savefig',    format = "jpg", dpi = 600)
+#plt.rc( 'savefig',    format = "jpg", dpi = 600)
 
 um_target = 0.0075
 
@@ -41,9 +41,10 @@ tab_colors = [
 
 class ChannelVisualizer():
 
-    def __init__(self, postRlzDir):
+    def __init__(self, postRlzDir, figs_format='svg'):
 
         self.postRlzDir = postRlzDir
+        self.format = figs_format
 
         # --- Location of Barycentric map corners ---
         self.x1c = np.array( [ 1.0 , 0.0 ] )
@@ -721,9 +722,9 @@ class ChannelVisualizer():
         plt.tight_layout()
         
         # save figure
-        filepath = os.path.join(self.postRlzDir, f"{filename}")
+        filepath = os.path.join(self.postRlzDir, f"{filename}.{self.format}")
         print(f"\nMAKING PLOT OF BARYCENTRIC MAP OF ANISOTROPY TENSOR in {filepath}" )
-        plt.savefig(filepath)
+        plt.savefig(filepath, format=self.format)
 
 
     def build_anisotropy_tensor_barycentric_xmap_triang_frame(self, frames, ydelta_RL, ydelta_nonRL, ydelta_ref, xmap1_RL,  xmap1_nonRL,  xmap1_ref,  xmap2_RL, xmap2_nonRL, xmap2_ref, \
@@ -769,8 +770,8 @@ class ChannelVisualizer():
         frames.append(img)
         dirname = os.path.join(self.postRlzDir, "anisotropy_tensor_barycentric_xmap_triang_frames")
         os.makedirs(dirname, exist_ok=True)
-        filename = os.path.join(dirname, f"anisotropy_tensor_barycentric_xmap_triang_{avg_time_RL:.3f}_{avg_time_nonRL:.3f}_{global_step}.svg")
-        plt.savefig(filename)
+        filename = os.path.join(dirname, f"anisotropy_tensor_barycentric_xmap_triang_{avg_time_RL:.3f}_{avg_time_nonRL:.3f}_{global_step}.{self.format}")
+        plt.savefig(filename, format=self.format)
         plt.close()
 
         return frames
@@ -1128,7 +1129,7 @@ class ChannelVisualizer():
         plt.ylim(ylim); #plt.yticks(yticks); 
         plt.ylabel(ylabel)
 
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
@@ -1152,7 +1153,7 @@ class ChannelVisualizer():
         plt.ylim([0,1])
 
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
@@ -1191,7 +1192,7 @@ class ChannelVisualizer():
         ax.tick_params(axis = 'both', pad = 5) 	# add padding to both x and y axes, dist between axis ticks and label
 
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 # ------------------------------------ RL Convergence along ODT Realizations -------------------------------------------
@@ -1306,7 +1307,7 @@ class ChannelVisualizer():
 
     def RL_variable_convergence_along_ydelta(self, filename, ylabel, rlzArr, ydelta, var_RL_nonConv, var_nonRL_nonConv, var_baseline, time_nonConv, time_baseline):
         
-        filename = os.path.join(self.postRlzDir, filename)
+        filename = os.path.join(self.postRlzDir, f"{filename}.{self.format}")
         print(f"\nMAKING PLOT {filename}")
 
         fig, ax = plt.subplots(1, 2, figsize=(10,5))
@@ -1343,12 +1344,12 @@ class ChannelVisualizer():
         ax[1].legend()
 
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
     def RL_variable_convergence_along_time(self, filename, ylabel, rlzArr, timeArr, var_RL):
         
-        filename = os.path.join(self.postRlzDir, filename)
+        filename = os.path.join(self.postRlzDir, f"{filename}.{self.format}")
         print(f"\nMAKING PLOT {filename}")
 
         fig, ax = plt.subplots(1,3,figsize=(15,5))
@@ -1374,12 +1375,12 @@ class ChannelVisualizer():
         ax[2].set_ylabel(f"Terminal value {ylabel}")
         
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
     
     def RL_variable_convergence_along_time_and_pdf(self, filename, ylabel, rlzArr, timeArr, var_RL):
-        filename = os.path.join(self.postRlzDir, filename)
+        filename = os.path.join(self.postRlzDir, f"{filename}.{self.format}")
         print(f"\nMAKING PLOT {filename}")
         
         fig, ax = plt.subplots(1,3, figsize=(15,5))
@@ -1406,7 +1407,7 @@ class ChannelVisualizer():
         ax[2].set_ylabel(f'{ylabel} mean')
 
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
@@ -1433,7 +1434,7 @@ class ChannelVisualizer():
         - err_RL:    np.array, shape [n_realizations]
         - err_nonRL: np.array, shape [] (scalar)
         """
-        filename = os.path.join(self.postRlzDir, f"RL_error_{error_name}_convergence")
+        filename = os.path.join(self.postRlzDir, f"RL_error_{error_name}_convergence.{self.format}")
         print(f"\nMAKING PLOT of error {error_name} profile at tEndAvg for multiple realizations in {filename}")
 
         nrlz = len(rlzArr)
@@ -1449,13 +1450,13 @@ class ChannelVisualizer():
         if nrlz < 20:
             plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
     def RL_err_convergence_along_time(self, rlzArr, err_RL, err_ref, averaging_times_RL, averaging_times_ref, info, tEndAvgRef=200):
         
-        filename = os.path.join(self.postRlzDir, f"RL_error_{info['title']}_temporal_convergence")
+        filename = os.path.join(self.postRlzDir, f"RL_error_{info['title']}_temporal_convergence.{self.format}")
         print(f"\nMAKING PLOT of error {info['title']} profile for chosen times for multiple realizations in {filename}")
 
         plt.figure()
@@ -1505,7 +1506,7 @@ class ChannelVisualizer():
         if nrlz < 15:
             plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
@@ -1542,7 +1543,7 @@ class ChannelVisualizer():
             nax     = 4
         fig, ax = plt.subplots(1,nax,figsize=(5*nax,5))
 
-        filename = os.path.join(self.postRlzDir, "RL_rewards")
+        filename = os.path.join(self.postRlzDir, f"RL_rewards.{self.format}")
         print(f"\nMAKING PLOT {filename}")
 
         ax[0].plot(rewards_total)
@@ -1568,7 +1569,7 @@ class ChannelVisualizer():
             ax[i].grid()
 
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
@@ -1581,7 +1582,7 @@ class ChannelVisualizer():
             nax     = 5
         fig, ax = plt.subplots(1,nax,figsize=(5*nax,5))
 
-        filename = os.path.join(self.postRlzDir, "RL_rewards")
+        filename = os.path.join(self.postRlzDir, f"RL_rewards.{self.format}")
         print(f"\nMAKING PLOT {filename}")
 
         ax[0].plot(rewards_total)
@@ -1612,7 +1613,7 @@ class ChannelVisualizer():
             ax[i].grid()
 
         plt.tight_layout()
-        plt.savefig(filename)
+        plt.savefig(filename, format=self.format)
         plt.close()
 
 
@@ -1628,7 +1629,7 @@ class ChannelVisualizer():
 
         # plot each action degree of freedom
         for iActDof in range(nActDof):
-            filename = os.path.join(self.postRlzDir, f"RL_actions_convergence_{dofNames[iActDof]}")
+            filename = os.path.join(self.postRlzDir, f"RL_actions_convergence_{dofNames[iActDof]}.{self.format}")
             print(f"\nMAKING PLOT {filename}")
 
             fig, ax = plt.subplots(1,2,figsize=(10,5))
@@ -1645,7 +1646,7 @@ class ChannelVisualizer():
             ax[1].legend(loc='center right', fontsize=8)
 
             plt.tight_layout()
-            plt.savefig(filename)
+            plt.savefig(filename, format=self.format)
             plt.close()
 
 
@@ -1694,7 +1695,7 @@ class ChannelVisualizer():
         ### print(f"\nPlot kEuu+ vs. k: {fname}")
             
         # Plot Euu vs kplus
-        fname = os.path.join(self.postRlzDir, f"spectral_Euu+_vs_k+_{file_details}.jpg")
+        fname = os.path.join(self.postRlzDir, f"spectral_Euu+_vs_k+_{file_details}")
         plt.figure(figsize=(12, 6))
         for i_avg_probe in range(n_avg_probes):
             plt.loglog(avg_k_plus[i_avg_probe,:], avg_Euu_plus[i_avg_probe,:], lw=2, label=rf"$y^+={avg_y_plus[i_avg_probe]:.2f}$", color='k', linestyle=ls[i_avg_probe])
@@ -1713,7 +1714,7 @@ class ChannelVisualizer():
         title_str = r"$t_{avg}^+=$" + rf"${tavg0:.0f}$"
         plt.title(title_str)
         plt.tight_layout()
-        plt.savefig(fname)
+        plt.savefig(fname, format=self.format)
         print(f"\nPlot KEuu+ vs. k+: {fname}")
 
     
@@ -1964,3 +1965,271 @@ class ChannelVisualizer():
         frames.append(img)
         plt.close()
         return frames
+
+# ------------------------------------ Bulk and Wall values ------------------------------------
+
+    def plot_bulk_wall_values(self, averaging_time_nonRL, averaging_time_accum_RL, 
+                              u_b_ref, u_b_nonRL, u_b_RL,
+                              avg_u_b_ref, avg_u_b_nonRL, avg_u_b_RL,
+                              tau_w_num_ref, tau_w_num_nonRL, tau_w_num_RL,
+                              u_tau_num_ref, u_tau_num_nonRL, u_tau_num_RL):
+
+        print("\nBuiding plots of bulk and wall values...")
+
+        N_nonRL = len(averaging_time_nonRL)
+
+        # --- (inst) u_bulk plot ---
+        plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
+        plt.plot( averaging_time_nonRL,    u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
+        plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
+        plt.ylabel( r'Numerical $u^{+}_b$' )
+        #plt.ylim(14,14.8)
+        #plt.yticks(np.arange(14,14.8,0.1))
+        #plt.grid(which='major',axis='y')
+        plt.grid(which='both',axis='y')
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        filename = os.path.join(self.postRlzDir, f'numerical_u_bulk.{self.format}')
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        # --- avg_u_bulk plot ---
+        plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
+        plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
+        plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
+        plt.ylabel( r'Numerical $\overline{u}^{+}_b$' )
+        plt.ylim(14,14.8)
+        plt.yticks(np.arange(14,14.8,0.1))
+        plt.grid(which='major',axis='y')
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        filename = os.path.join(self.postRlzDir, f'numerical_avg_u_bulk.{self.format}')
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        # --- avg_u_bulk & (inst) u_bulk plot ---
+        plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                zorder = 1, linewidth = 1, color = "k",             label = r'$\overline{u}^{+}_b$ Reference' )
+        plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '-',  marker = 's', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}_b$ Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = '-',  marker = 'v', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(3), label = r'$\overline{u}^{+}_b$ RL Framework' )
+        plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL),     linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
+        plt.plot( averaging_time_nonRL,    u_b_nonRL,                      linestyle = '--', marker = 'o', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(0), label = r'${u}^{+}_b$ Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, u_b_RL,                         linestyle = '--', marker = '^', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(3), label = r'${u}^{+}_b$ RL Framework' )
+        plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
+        plt.ylabel( r'Numerical avg. $\overline{u}^{+}_b$ and inst. $\overline{u}^{+}_b$' )
+        plt.ylim(12,17)
+        plt.yticks(np.arange(12,17,1.0))
+        plt.grid(which='major',axis='y')
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        filename = os.path.join(self.postRlzDir, f'numerical_inst_avg_u_bulk.{self.format}')
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        # --- tau_w plot ---
+        plt.plot( averaging_time_nonRL,    tau_w_num_ref * np.ones(N_nonRL),  linestyle = '-',                            linewidth = 2, color = "k",             label = r'Reference' )
+        plt.plot( averaging_time_nonRL,    tau_w_num_nonRL,             linestyle = '--',   marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, tau_w_num_RL,                linestyle=':',      marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
+        plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
+        plt.ylabel( r'Numerical $\tau_w$' )
+        plt.ylim([0.0, 1.1])
+        plt.grid(which='both',axis='y')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f'numerical_tau_w.{self.format}')
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        # --- u_tau plot ---
+        plt.plot( averaging_time_nonRL,    u_tau_num_ref * np.ones(N_nonRL),  linestyle = '-',                           linewidth = 2, color = "k",             label = r'Reference' )
+        plt.plot( averaging_time_nonRL,    u_tau_num_nonRL,             linestyle = '--',  marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, u_tau_num_RL,                linestyle=':',     marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
+        plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
+        plt.ylabel( r'Numerical $u_\tau$' )
+        plt.ylim([0.0, 1.1])
+        plt.grid(which='both',axis='y')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f'numerical_u_tau.{self.format}')
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+# --------------------------------------- Velocity profiles vs y+ ---------------------------------------
+
+    def build_velocity_profiles(self, y_plus_ref, y_plus_nonRL, y_plus_RL,
+                                avg_u_plus_ref, avg_u_plus_nonRL, avg_u_plus_RL,
+                                rmsf_u_plus_rer, rmsf_u_plus_nonRL, rmsf_u_plus_RL,
+                                rmsf_v_plus_rer, rmsf_v_plus_nonRL, rmsf_v_plus_RL,
+                                rmsf_w_plus_rer, rmsf_w_plus_nonRL, rmsf_w_plus_RL,
+                                TKE_ref, TKE_nonRL, TKE_RL):
+
+        ### Plot u+ vs. y+
+        print("\nBuilding plots...")
+        # Clear plot
+        plt.clf()
+        # Read & Plot data
+        plt.plot( y_plus_ref, avg_u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+        for i_RL in range(n_RL):
+            if n_RL < 10:
+                plt.plot( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
+            else:
+                plt.plot( y_plus_RL[i_RL], avg_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+        plt.plot( y_plus_nonRL, avg_u_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
+        # Configure plot
+        plt.xlim( 1.0, 2.0e2 )
+        plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
+        plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+        plt.xscale( 'log' )
+        plt.xlabel( 'y+' )
+        plt.ylim( 0.0, 20.0 )
+        plt.yticks( np.arange( 0.0, 20.1, 5.0 ) )
+        plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+        #plt.yscale( 'log' )
+        plt.ylabel( 'u+')
+        legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f"u_plus_vs_y_plus_{iteration}.{self.format}")
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        ### Plot u-rmsf 
+        # Read & Plot data
+        plt.plot( y_plus_ref, rmsf_u_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label=f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+        for i_RL in range(n_RL):
+            if n_RL < 10:
+                plt.plot( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
+            else:
+                plt.plot( y_plus_RL[i_RL], rmsf_u_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+        plt.plot( y_plus_nonRL, rmsf_u_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s' )
+        # Configure plot
+        plt.xlim( 1.0, 2.0e2 )
+        plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
+        plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+        plt.xscale( 'log' )
+        plt.xlabel( 'y+' )
+        plt.ylim( 0.0, 3.0 )
+        plt.yticks( np.arange( 0.0, 3.1, 0.5 ) )
+        plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+        #plt.yscale( 'log' )
+        plt.ylabel( 'u_rms+' )
+        #legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.text( 1.05, 1.0, 'u_rms+' )
+        legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f"u_rmsf_plus_vs_y_plus_{iteration}.{self.format}")
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        ### Plot v-rmsf
+        # Read & Plot data
+        plt.plot( y_plus_ref, rmsf_v_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+        for i_RL in range(n_RL):
+            if n_RL < 10:
+                plt.plot( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
+            else:
+                plt.plot( y_plus_RL[i_RL], rmsf_v_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+        plt.plot( y_plus_nonRL, rmsf_v_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
+        # Configure plot
+        plt.xlim( 1.0, 2.0e2 )
+        plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
+        plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+        plt.xscale( 'log' )
+        plt.xlabel( 'y+' )
+        plt.ylim( 0.0, 3.0 )
+        plt.yticks( np.arange( 0.0, 3.1, 0.5 ) )
+        plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+        #plt.yscale( 'log' )
+        plt.ylabel( 'v_rms+' )
+        #legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.text( 17.5, 0.2, 'v_rms+' )
+        legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f"v_rmsf_plus_vs_y_plus_{iteration}.{self.format}")
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        ### Plot w-rmsf
+        # Read & Plot data
+        plt.plot( y_plus_ref, rmsf_w_plus_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+        for i_RL in range(n_RL):
+            if n_RL < 10:
+                plt.plot( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
+            else:
+                plt.plot( y_plus_RL[i_RL], rmsf_w_plus_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+        plt.plot( y_plus_nonRL, rmsf_w_plus_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
+        # Configure plot
+        plt.xlim( 1.0, 2.0e2 )
+        plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
+        plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+        plt.xscale( 'log' )
+        plt.xlabel( 'y+' )
+        plt.ylim( 0.0, 3.0 )
+        plt.yticks( np.arange( 0.0, 3.1, 0.5 ) )
+        plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+        #plt.yscale( 'log' )
+        plt.ylabel( 'w_rms+' )
+        #legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.text( 17.5, 0.2, 'w_rms+' )
+        legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f"w_rmsf_plus_vs_y_plus_{iteration}.{self.format}")
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+        ### Plot TKE
+        # Read & Plot data
+        plt.plot( y_plus_ref, TKE_ref, linestyle = '-', linewidth = 1, color = 'black', zorder = 0, label = f'RHEA non-RL Reference, Avg. time {averaging_time_ref:.2f}s' )
+        for i_RL in range(n_RL):
+            if n_RL < 10:
+                plt.plot( y_plus_RL[i_RL], TKE_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1, label = f'RHEA RL {file_details_list[i_RL]}, Avg. time {averaging_time_nonConv:.2f}s' )
+            else:
+                plt.plot( y_plus_RL[i_RL], TKE_RL[i_RL], linestyle='-', marker = '^', markersize = 2,  zorder = 1 )
+        plt.plot( y_plus_nonRL, TKE_nonRL, linestyle='-', marker = 'v', markersize = 2,  color = 'blue', zorder = 1, label = f'RHEA non-RL, Avg. time {averaging_time_nonConv:.2f}s'  )
+        # Configure plot
+        plt.xlim( 1.0, 2.0e2 )
+        plt.xticks( np.arange( 1.0, 2.01e2, 1.0 ) )
+        plt.tick_params( axis = 'x', bottom = True, top = True, labelbottom = 'True', labeltop = 'False', direction = 'in' )
+        plt.xscale( 'log' )
+        plt.xlabel( 'y+' )
+        plt.ylim( 0.0, 3.0 )
+        plt.yticks( np.arange( 0.0, 5.0, 1.0 ) )
+        plt.tick_params( axis = 'y', left = True, right = True, labelleft = 'True', labelright = 'False', direction = 'in' )
+        #plt.yscale( 'log' )
+        plt.ylabel( 'TKE+' )
+        #legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.text( 17.5, 0.2, 'TKE+' )
+        legend = plt.legend( shadow = False, fancybox = False, frameon = False, loc='upper left' )
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        filename = os.path.join(self.postRlzDir, f"tke_plus_vs_y_plus_{iteration}.{self.format}")
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.clf()
+        print(f"\nBuild plot: '{filename}'")
+
+# --------------------- Error plots of velocity components ------------------------
+
+    def build_velocity_error_plot(self, avg_time_nonRL, avg_time_RL, err_avg_nonRL, err_avg_RL, err_rmsf_nonRL, err_rmsf_RL, vel_component='u', error_num='2'):
+        plt.clf()
+        plt.semilogy( avg_time_nonRL, err_avg_nonRL,  linestyle = '-', marker = 's', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), zorder = 0, label = rf'$\overline{{{vel_component}}}^+$ Uncontrolled' )
+        plt.semilogy( avg_time_RL,    err_avg_RL,     linestyle = '-', marker = '^', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), zorder = 1, label = rf'$\overline{{{vel_component}}}^+$ RL Framework' )
+        plt.semilogy( avg_time_nonRL, err_rmsf_nonRL, linestyle = ':', marker = 'o', markersize = 2, linewidth = 1, color = plt.cm.tab10(0), zorder = 0, label = rf'${vel_component}_\textrm{{rms}}^+$ Uncontrolled' )
+        plt.semilogy( avg_time_RL,    err_rmsf_RL,    linestyle = ':', marker = 'v', markersize = 2, linewidth = 1, color = plt.cm.tab10(3), zorder = 1, label = rf'${vel_component}_\textrm{{rms}}^+$ RL Framework' )
+        plt.xlabel(r'Cummulative averaging time $t_{avg}^+$' )
+        plt.ylabel(rf'$L_{error_num}$ Error' )
+        plt.grid(which='both',axis='y')
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
+        plt.tick_params( axis = 'both', pad = 7.5 )
+        plt.tight_layout()
+        filename = os.path.join(self.postRlzDir, f'L{error_num}_error_{vel_component}.{self.format}')
+        plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
+        plt.close()
+        print(f"\nBuild plot: '{filename}'")

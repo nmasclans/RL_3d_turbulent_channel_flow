@@ -1,20 +1,10 @@
 import h5py
 import math
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import savgol_filter
-
-# Latex figures
-plt.rc( 'text',       usetex = True )
-plt.rc( 'font',       size = 18 )
-plt.rc( 'axes',       labelsize = 18)
-plt.rc( 'legend',     fontsize = 12, frameon = False)
-plt.rc( 'text.latex', preamble = r'\usepackage{amsmath} \usepackage{amssymb} \usepackage{color}')
-plt.rc( 'savefig',    format = "jpg", dpi = 600)
-
 
 #-----------------------------------------------------------------------------------------
 #           Anisotropy tensor, eigen-decomposition, mapping to barycentric map 

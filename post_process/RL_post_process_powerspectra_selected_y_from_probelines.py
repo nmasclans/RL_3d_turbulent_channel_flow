@@ -105,14 +105,16 @@ log_smooth       = False
 fontsize         = 18
 
 # Probelines csv parameters
-time_key   = "# t [s]"
-y_key      = " y[m]"
-rho_key    = " rho [kg/m3]"
-u_key      = " u [m/s]"
-v_key      = " v [m/s]"
-w_key      = " w [m/s]"
+time_key = "# t [s]"
+y_key    = " y [m]"
+y_key2   = " y[m]"
+rho_key  = " rho [kg/m3]"
+u_key    = " u [m/s]"
+v_key    = " v [m/s]"
+w_key    = " w [m/s]"
 #rmsf_u_key = " rmsf_u [m/s]"; avg_u_key  = " avg_u [m/s]"; avg_v_key  = " avg_v [m/s]"; avg_w_key  = " avg_w [m/s]"
-vars_keys  = [time_key, y_key, rho_key, u_key, v_key, w_key]
+vars_keys  = [time_key, y_key,  rho_key, u_key, v_key, w_key]
+vars_keys2 = [time_key, y_key2, rho_key, u_key, v_key, w_key]
 
 # Initialize visualizer
 visualizer = ChannelVisualizer(postDir)
@@ -217,9 +219,9 @@ vel_norm_dict_ref = {}
 for probe in probes_name:
     # Get data from csv file
     file = filename_dict_ref[probe]
-    data = pd.read_csv(file, usecols=vars_keys)
+    data = pd.read_csv(file, usecols=vars_keys2)
     time_data   = data[time_key].to_numpy()
-    y_data      = data[y_key].to_numpy()
+    y_data      = data[y_key2].to_numpy()
     rho_data    = data[rho_key].to_numpy()
     u_data      = data[u_key].to_numpy()
     v_data      = data[v_key].to_numpy()
@@ -289,7 +291,7 @@ del tavg_atEpStart_dict_RL, time_atEpStart_dict_RL
 # --- non-RL data ---
 # Get non-RL episodes
 file = filename_dict_nonRL[probes_name[0]]
-data = pd.read_csv(file, usecols=vars_keys)
+data = pd.read_csv(file, usecols=vars_keys2)
 time_data   = data[time_key].to_numpy()
 episodes_id_data_nonRL = np.floor((time_data-time_atEpStart_RL)/t_episode_train).astype(int)
 episodes_id_set_nonRL  = sorted(set(episodes_id_data_nonRL))
@@ -312,10 +314,10 @@ for probe_idx in range(n_probes):
     print(f"{probe_idx / n_probes * 100:.0f}%")
     # Get data from csv file
     file = filename_dict_nonRL[probe]
-    data = pd.read_csv(file, usecols=vars_keys)
+    data = pd.read_csv(file, usecols=vars_keys2)
     time_data   = data[time_key].to_numpy()
     tavg_data   = time_data - tavg0_nonRL
-    y_data      = data[y_key].to_numpy()
+    y_data      = data[y_key2].to_numpy()
     rho_data    = data[rho_key].to_numpy()
     u_data      = data[u_key].to_numpy()
     v_data      = data[v_key].to_numpy()

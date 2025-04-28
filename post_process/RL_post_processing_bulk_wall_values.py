@@ -5,14 +5,7 @@ import os
 import glob
 import numpy as np
 import h5py    
-import matplotlib.pyplot as plt
-from matplotlib import rc, rcParams
-
-#np.set_printoptions(threshold=sys.maxsize)
-#plt.rc( 'text', usetex = True )
-#rc('font', family='sanserif')
-#plt.rc( 'font', size = 20 )
-#plt.rcParams['text.latex.preamble'] = [ r'\usepackage{amsmath}', r'\usepackage{amssymb}', r'\usepackage{color}' ]
+from ChannelVisualizer import ChannelVisualizer
 
 #--------------------------------------------------------------------------------------------
 
@@ -83,6 +76,10 @@ print("\nRL parameters: \n- Simulation time per train step:", simulation_time_pe
       "\n- Iteration restart data file (init train step):", iteration_restart_data_file,
       "\n- Iteration end train step:", iteration_end_train_step,
 ) 
+
+# --- Visualizer ---
+
+visualizer = ChannelVisualizer(postDir)
 
 # ----------- Build data h5 filenames ------------
 
@@ -348,84 +345,10 @@ print("non-RL Numerical u_tau:", u_tau_num_nonRL)
 
 # -------------- Build plots --------------
 
-# --- (inst) u_bulk plot ---
-plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL,    u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
-plt.plot( averaging_time_accum_RL, u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( r'Numerical $u^{+}_b$' )
-#plt.ylim(14,14.8)
-#plt.yticks(np.arange(14,14.8,0.1))
-#plt.grid(which='major',axis='y')
-plt.grid(which='both',axis='y')
-plt.tick_params( axis = 'both', pad = 7.5 )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-filename = f'{postDir}/numerical_u_bulk_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"\nBuild plot: '{filename}'")
-
-# --- avg_u_bulk plot ---
-plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
-plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( r'Numerical $\overline{u}^{+}_b$' )
-plt.ylim(14,14.8)
-plt.yticks(np.arange(14,14.8,0.1))
-plt.grid(which='major',axis='y')
-plt.tick_params( axis = 'both', pad = 7.5 )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-filename = f'{postDir}/numerical_avg_u_bulk_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"\nBuild plot: '{filename}'")
-
-# --- avg_u_bulk & (inst) u_bulk plot ---
-plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                zorder = 1, linewidth = 1, color = "k",             label = r'$\overline{u}^{+}_b$ Reference' )
-plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '-',  marker = 's', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}_b$ Uncontrolled' )
-plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = '-',  marker = 'v', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(3), label = r'$\overline{u}^{+}_b$ RL Framework' )
-plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL),     linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
-plt.plot( averaging_time_nonRL,    u_b_nonRL,                      linestyle = '--', marker = 'o', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(0), label = r'${u}^{+}_b$ Uncontrolled' )
-plt.plot( averaging_time_accum_RL, u_b_RL,                         linestyle = '--', marker = '^', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(3), label = r'${u}^{+}_b$ RL Framework' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( r'Numerical avg. $\overline{u}^{+}_b$ and inst. $\overline{u}^{+}_b$' )
-plt.ylim(12,17)
-plt.yticks(np.arange(12,17,1.0))
-plt.grid(which='major',axis='y')
-plt.tick_params( axis = 'both', pad = 7.5 )
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-filename = f'{postDir}/numerical_inst_avg_u_bulk_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"\nBuild plot: '{filename}'")
-
-# --- tau_w plot ---
-plt.plot( averaging_time_nonRL,    tau_w_num_ref * np.ones(N_nonRL),  linestyle = '-',                            linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL,    tau_w_num_nonRL,             linestyle = '--',   marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
-plt.plot( averaging_time_accum_RL, tau_w_num_RL,                linestyle=':',      marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( r'Numerical $\tau_w$' )
-plt.ylim([0.0, 1.1])
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/numerical_tau_w_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"\nBuild plot: '{filename}'")
-
-# --- u_tau plot ---
-plt.plot( averaging_time_nonRL,    u_tau_num_ref * np.ones(N_nonRL),  linestyle = '-',                           linewidth = 2, color = "k",             label = r'Reference' )
-plt.plot( averaging_time_nonRL,    u_tau_num_nonRL,             linestyle = '--',  marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
-plt.plot( averaging_time_accum_RL, u_tau_num_RL,                linestyle=':',     marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
-plt.xlabel( r'Accumulated averaging time $t_{avg}^+$' )
-plt.ylabel( r'Numerical $u_\tau$' )
-plt.ylim([0.0, 1.1])
-plt.grid(which='both',axis='y')
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tick_params( axis = 'both', pad = 7.5 )
-filename = f'{postDir}/numerical_u_tau_ensemble{ensemble}.jpg'
-plt.savefig( filename, format = 'jpg', dpi=600, bbox_inches = 'tight' )
-plt.clf()
-print(f"\nBuild plot: '{filename}'")
+visualizer.plot_bulk_wall_values(
+    averaging_time_nonRL, averaging_time_accum_RL, 
+    u_b_ref, u_b_nonRL, u_b_RL,
+    avg_u_b_ref, avg_u_b_nonRL, avg_u_b_RL,
+    tau_w_num_ref, tau_w_num_nonRL, tau_w_num_RL,
+    u_tau_num_ref, u_tau_num_nonRL, u_tau_num_RL,
+)
