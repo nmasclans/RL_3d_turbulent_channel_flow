@@ -52,8 +52,8 @@ def extract_error_data(file_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarr
 if __name__ == "__main__":
 
     file_name       = "errors_velocity_statistics.txt"
-    case_name_list  = [f"RL_3D_turbulent_channel_flow_Retau100_sup_144_15max_TCP3_a3_s5_{CASE_NAME}_{rep}" for rep in [2,3,4,5]]
-    train_name_list = ["train_2025-04-27--02-48-46--75b2", "train_2025-04-27--11-58-41--821e", "train_2025-04-27--21-57-29--0e87", "train_2025-04-30--12-32-00--9f7d"]
+    case_name_list  = [f"RL_3D_turbulent_channel_flow_Retau100_sup_144_15max_TCP3_a3_s5_{CASE_NAME}_{rep}" for rep in [2,3,4]]
+    train_name_list = ["train_2025-04-27--02-48-46--75b2", "train_2025-04-27--11-58-41--821e", "train_2025-04-27--21-57-29--0e87"]
     num_cases       = len(case_name_list)
     averaging_time_rl     = {key: None for key in case_name_list}
     l2_error_avg_u_rl     = {key: None for key in case_name_list}
@@ -116,15 +116,15 @@ if __name__ == "__main__":
     err_avg_u_nonRL = l2_error_avg_u_nonrl[case_name_list[0]][idx];         err_rmsf_u_nonRL = l2_error_rmsf_u_nonrl[case_name_list[0]][idx];         
 
     # Plot avg_u error
-    plt.figure(figsize=(10, 6))
-    plt.semilogy(all_times, mean_err_avg_u,                                 color = plt.cm.tab10(3), label=r'$\mathbb{E}[\varepsilon]$')
-    plt.semilogy(all_times, mean_err_avg_u + std_err_avg_u, linestyle='-.', color = plt.cm.tab10(3), label=r'$\pm \mathbb{V}^{1/2}[\varepsilon]$')
+    plt.figure()
+    plt.semilogy(avg_times_nonRL, err_avg_u_nonRL,          linestyle='-',  color = plt.cm.tab10(0), label=r'Uncontrolled $\varepsilon$')
+    plt.semilogy(all_times, mean_err_avg_u,                                 color = plt.cm.tab10(3), label=r'RL Framework $\mathbb{E}[\varepsilon]$')
+    plt.semilogy(all_times, mean_err_avg_u + std_err_avg_u, linestyle='-.', color = plt.cm.tab10(3), label=r'RL Framework $\pm \mathbb{V}^{1/2}[\varepsilon]$')
     plt.semilogy(all_times, mean_err_avg_u - std_err_avg_u, linestyle='-.', color = plt.cm.tab10(3))
-    plt.fill_between(all_times, min_err_avg_u, max_err_avg_u, alpha=0.3,    color='gray',            label=r'$\{\varepsilon\}$')
-    plt.semilogy(avg_times_nonRL, err_avg_u_nonRL,          linestyle='-',  color = plt.cm.tab10(0), label='Uncontrolled')
-    plt.xlabel(r'Cummulative averaging time $t_{avg}^+$' )
-    plt.ylabel(r"$\varepsilon=|| \overline{u} - \overline{u}_C ||_2$")
-    plt.legend()
+    plt.fill_between(all_times, min_err_avg_u, max_err_avg_u, alpha=0.3,    color='gray',            label=r'RL Framework $\{\varepsilon\}$')
+    plt.xlabel(r'$t_{avg}^+$' )
+    plt.ylabel(r"$\varepsilon=\left\| \overline{u}^{+} - \overline{u}_{\textrm{C}}^{+} \right\|_2$")
+    plt.legend(loc='upper right', frameon=True)
     plt.grid(which='both',axis='y')
     plt.tight_layout()
     plt.savefig(f"results_ensemble_average/{CASE_NAME}_l2_err_avg_u.svg")
@@ -132,15 +132,15 @@ if __name__ == "__main__":
     plt.close()
 
     # Plot avg_u error
-    plt.figure(figsize=(10, 6))
-    plt.semilogy(all_times, mean_err_rmsf_u,                                  color = plt.cm.tab10(3), label=r'$\mathbb{E}[\varepsilon]$')
-    plt.semilogy(all_times, mean_err_rmsf_u + std_err_rmsf_u, linestyle='-.', color = plt.cm.tab10(3), label=r'$\pm \mathbb{V}^{1/2}[\varepsilon]$')
+    plt.figure()
+    plt.semilogy(avg_times_nonRL, err_rmsf_u_nonRL,           linestyle='-',  color = plt.cm.tab10(0), label=r'Uncontrolled $\varepsilon$')
+    plt.semilogy(all_times, mean_err_rmsf_u,                                  color = plt.cm.tab10(3), label=r'RL Framework $\mathbb{E}[\varepsilon]$')
+    plt.semilogy(all_times, mean_err_rmsf_u + std_err_rmsf_u, linestyle='-.', color = plt.cm.tab10(3), label=r'RL Framework $\pm \mathbb{V}^{1/2}[\varepsilon]$')
     plt.semilogy(all_times, mean_err_rmsf_u - std_err_rmsf_u, linestyle='-.', color = plt.cm.tab10(3))
-    plt.fill_between(all_times, min_err_rmsf_u, max_err_rmsf_u, alpha=0.3,    color='gray',            label=r'$\{\varepsilon\}$')
-    plt.semilogy(avg_times_nonRL, err_rmsf_u_nonRL,           linestyle='-',  color = plt.cm.tab10(0), label='Uncontrolled')
-    plt.xlabel(r'Cummulative averaging time $t_{avg}^+$' )
-    plt.ylabel(r"$\varepsilon=|| \overline{u} - \overline{u}_C ||_2$")
-    plt.legend()
+    plt.fill_between(all_times, min_err_rmsf_u, max_err_rmsf_u, alpha=0.3,    color='gray',            label=r'RL Framework $\{\varepsilon\}$')
+    plt.xlabel(r'$t_{avg}^+$' )
+    plt.ylabel(r"$\varepsilon=\left\| u_{\textrm{rms}}^{+} - u^{+}_{\textrm{rms,C}} \right\|_2$")
+    plt.legend(loc='upper right', frameon=True)
     plt.grid(which='both',axis='y')
     plt.tight_layout()
     plt.savefig(f"results_ensemble_average/{CASE_NAME}_l2_err_rmsf_u.svg")
