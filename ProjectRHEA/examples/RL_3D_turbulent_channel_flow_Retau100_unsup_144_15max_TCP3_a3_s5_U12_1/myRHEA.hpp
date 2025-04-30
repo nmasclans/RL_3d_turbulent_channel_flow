@@ -142,6 +142,7 @@ class myRHEA : public FlowSolverRHEA {
         void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void updateState();
         void calculateReward();
+        void updatePreviousActuationVariables();
 
     private:
 

@@ -837,6 +837,8 @@ void myRHEA::calculateSourceTerms() {
                 updateState();
                 calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised)
                                                     /// initializing 'l2_err_avg_u_previous' and 'l2_rl_f_previous' (if supervised)        
+                updatePreviousActuationVariables(); /// update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next state & reward calculation
+
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
                     cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised) or 'l2_err_avg_u_previous', 'l2_rl_f_previous' (if supervised)" << endl;
@@ -868,6 +870,7 @@ void myRHEA::calculateSourceTerms() {
                     /// This is considered a previous step necessary before activating perturbations
                     updateState();
                     calculateReward();
+                    updatePreviousActuationVariables();
                     first_actuation_period_done = true;
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
@@ -912,11 +915,13 @@ void myRHEA::calculateSourceTerms() {
                         if (tag == "0") this->outputCurrentStateDataRL(); /// Save state before episode termination
                     }
                     updateState();
+                    calculateReward();
+                    updatePreviousActuationVariables();
+                    /// Write state, reward, and time
                     manager->writeState(state_local, state_key);
-                    calculateReward();                              /// update 'reward_local' attribute
                     manager->writeReward(reward_local, reward_key);
                     manager->writeTime(current_time, time_key);
-                    // Reading new action...
+                    // Read new action
                     manager->readAction(action_key);
                     action_global = manager->getActionGlobal();     /// action_global: vector<double> of size action_global_size2 = action_dim * n_rl_envs (currently only 1 action variable per rl env.)
                     /// action_local  = manager->getActionLocal();  /// action_local not used
@@ -2587,8 +2592,8 @@ void myRHEA::updateState() {
                         delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                         delta_volume =  delta_x * delta_y * delta_z;
                         /// Spatial average
-                        state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                        state_local[state_local_size2_counter+1] += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
+                        state_local[state_local_size2_counter+1] += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                         state_local[state_local_size2_counter+2] += std::pow(x_field[I1D(i,j,k)],     2.0)  * delta_volume;
                         state_local[state_local_size2_counter+3] += std::pow(y_field[I1D(i,j,k)],     2.0)  * delta_volume;
                         state_local[state_local_size2_counter+4] += std::pow(z_field[I1D(i,j,k)],     2.0)  * delta_volume;
@@ -2747,7 +2752,17 @@ void myRHEA::calculateReward() {
          << c7 * l2_rl_f << endl
          << "reward scaler dt_RL: " << std::pow(current_time - begin_actuation_time, d_param) << endl;
     
-    /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
+#endif
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void myRHEA::updatePreviousActuationVariables() {
+
+#if _RL_CONTROL_IS_SUPERVISED_ 
+    /// Do nothing
+#else
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
