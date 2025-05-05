@@ -242,6 +242,8 @@ class RheaEnv(py_environment.PyEnvironment):
         # State: witness points information (to obtain dimensions of state arrays)
         witness_filepath = os.path.join(self.rl_case_path, self.config_dir, self.witness_filename)
         control_filepath = os.path.join(os.path.join(self.rl_case_path, self.config_dir, self.control_filename))
+        logger.debug(f"Witness points filepath: {witness_filepath}")
+        logger.debug(f"Control points filepath: {control_filepath}")
         self.witness_xyz   = get_points_xyz(witness_filepath)
         num_witness_points = n_points(witness_filepath)
         assert np.prod(self.witness_xyz) == num_witness_points
