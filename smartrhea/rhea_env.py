@@ -671,7 +671,7 @@ class RheaEnv(py_environment.PyEnvironment):
         logger.debug(f"[RheaEnv] action shape: {action.shape}")
         logger.debug(f"[RheaEnv] self._action shape: {self._action.shape}")
         action_aux = np.zeros([self.cfd_n_envs, self.rl_n_envs, self.action_dim])
-        action = action * self.action_bounds[1] if self.mode == "collect" else action # TODO: check! shouldn't actions be always scaled, ALSO in testing/training?
+        action = action * self.action_bounds[1]
         action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
         logger.debug(f"[RheEnv] action: \n{action}")
         for i in range(self.cfd_n_envs):
