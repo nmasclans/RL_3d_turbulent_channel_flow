@@ -18,14 +18,10 @@ using namespace std;
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
 #define _RL_CONTROL_IS_SUPERVISED_ 0
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
-#define _WITNESS_XZ_SLICES_ 0
 #define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
 
-#if _WITNESS_XZ_SLICES_ && _WITNESS_XYZ_AVG_
-#error "Both _WITNESS_XZ_SLICES_ and _WITNESS_XYZ_AVG_ cannot be 1 at the same time."
-#endif
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
@@ -69,8 +65,8 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const double u_bulk_reference = 14.665;
 #endif
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
-const double avg_u_bulk_max = 14.665 + 0.005;
-const double avg_u_bulk_min = 14.665 - 0.565;
+const double avg_u_bulk_max = 14.665 + 0.5;
+const double avg_u_bulk_min = 14.665 - 0.5;
 #endif
 
 
@@ -82,7 +78,7 @@ const double avg_u_bulk_min = 14.665 - 0.565;
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 int action_dim = 3;
-int state_dim  = 5;
+int state_dim  = 7;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -208,6 +204,8 @@ myRHEA::myRHEA(const string name_configuration_file, const string tag, const str
 #else
     avg_u_previous_field.setTopology(topo,  "avg_u_previous_field");
     rmsf_u_previous_field.setTopology(topo, "rmsf_u_previous_field");
+    rmsf_v_previous_field.setTopology(topo, "rmsf_v_previous_field");
+    rmsf_w_previous_field.setTopology(topo, "rmsf_w_previous_field");
 #endif  /// of _RL_CONTROL_IS_SUPERVISED_
 
     /// Add fields to write in .h5 and .xdmf files 
@@ -584,11 +582,7 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     }
 
     /// Additional arguments, defined here
-#if _WITNESS_XZ_SLICES_
-    this->witness_file = string(rl_case_path) + "/config_control_witness/witnessXZSlices" + to_string(np_x*np_y*np_z) + ".txt";
-#else
     this->witness_file = string(rl_case_path) + "/config_control_witness/witnessPoints" + to_string(np_x*np_y*np_z) + ".txt";
-#endif
     this->control_file = string(rl_case_path) + "/config_control_witness/controlPoints" + to_string(np_x*np_y*np_z) + ".txt";
     this->time_key      = "ensemble_" + tag + ".time";
     this->step_type_key = "ensemble_" + tag + ".step_type";
@@ -612,10 +606,9 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     std::fill(action_global.begin(), action_global.end(), 0.0);
     std::fill(state_local.begin(), state_local.end(), 0.0);
 
-    /// Auxiliary variables for reward calculation
+    /// Reward auxiliary variables and fields
 #if _RL_CONTROL_IS_SUPERVISED_
     /// -------------- Build rmsf_u,v,w_reference_field --------------
-    
     /// Accessing the global domain decomposition data
     int global_startY, global_j;
     int globalNy    = topo->getMesh()->getGNy();    // Total number of y-cells in the global domain
@@ -630,12 +623,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     } else {
         global_startY = rank_in_y * localNy + divy; // Regular distribution for remaining ranks
     }
-    
-    /// Debugging
-    /// cout << "[Rank " << my_rank << "] npx=" << np_x << ", npy=" << np_y 
-    ///      << ", localNy=" << localNy << ", divy=" << divy 
-    ///      << ", globalNy=" << globalNy << ", rank_in_y=" << rank_in_y 
-    ///      << ", global_startY=" << global_startY << endl;
     /// Fill global profile data into local field data
     for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
         global_j = global_startY + (j - topo->iter_common[_INNER_][_INIY_]);
@@ -655,10 +642,17 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
         ///      << ", rmsf_w: " << rmsf_w_reference_profile[global_j] 
         ///      << endl;
     }
-    /// Reward calculation auxiliary variables
-    l2_err_avg_u_previous = 0.0;
-    l2_rl_f_previous      = 0.0;
-#endif
+#else   /// _RL_CONTROL_IS_SUPERVISED_ 0
+    avg_u_previous_field   = 0.0;   /// DistributedArray, 0.0 everywhere
+    rmsf_u_previous_field  = 0.0;
+    rmsf_v_previous_field  = 0.0;
+    rmsf_w_previous_field  = 0.0;
+#endif  /// _RL_CONTROL_IS_SUPERVISED_
+    l2_d_avg_u_previous    = 0.0;   /// double
+    l2_d_rmsf_u_previous   = 0.0;
+    l2_d_rmsf_v_previous   = 0.0;
+    l2_d_rmsf_w_previous   = 0.0;
+    l2_rl_f_previous       = 0.0;
 
     /// Initialize additional attribute members
 #if _RL_CONTROL_IS_SUPERVISED_
@@ -988,12 +982,10 @@ void myRHEA::calculateSourceTerms() {
         if (current_time > begin_actuation_time) {
 
             if ( !first_actuation_time_done ) {     /// executed just once
-                updateState();
-                calculateReward();                  /// initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised)
-                                                    /// initializing 'l2_err_avg_u_previous' and 'l2_rl_f_previous' (if supervised)        
+                this->calculateStateAndReward();
                 first_actuation_time_done = true;
                 if (my_rank == 0) {
-                    cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing 'rmsf_u_field_local_previous', 'rmsf_v_field_local_previous', 'rmsf_w_field_local_previous' (if unsupervised) or 'l2_err_avg_u_previous', 'l2_rl_f_previous' (if supervised)" << endl;
+                    cout << endl << endl << "[myRHEA::calculateSourceTerms] Initializing auxiliary variables for state and reward calculations" << endl;
                 }
             } 
 
@@ -1020,8 +1012,7 @@ void myRHEA::calculateSourceTerms() {
                     
                     /// At the begining of the first actuation step, reward and state are updated to collect previous fields values, but no action is applied,
                     /// This is considered a previous step necessary before activating perturbations
-                    updateState();
-                    calculateReward();
+                    this->calculateStateAndReward();
                     first_actuation_period_done = true;
                     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
@@ -1065,9 +1056,8 @@ void myRHEA::calculateSourceTerms() {
                         if (my_rank == 0) cout << "[myRHEA::calculateSourceTerms] Last smart redis communication at time: " << current_time << ", iteration: " << current_time_iter << endl;
                         if (tag == "0") this->outputCurrentStateDataRL(); /// Save state before episode termination
                     }
-                    updateState();
+                    this->calculateStateAndReward();
                     manager->writeState(state_local, state_key);
-                    calculateReward();                              /// update 'reward_local' attribute
                     manager->writeReward(reward_local, reward_key);
                     manager->writeTime(current_time, time_key);
                     // Reading new action...
@@ -2664,48 +2654,50 @@ void myRHEA::preproceControlPoints() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// Calculate State and Reward for each agent, and update auxiliary variables
+void myRHEA::calculateStateAndReward() {
+    this->calculateState();
+    this->calculateReward();
+    this->updatePreviousActuationFields();
+} 
+
+///////////////////////////////////////////////////////////////////////////////
 /// Calculate local state values (local to single mpi process, which corresponds to RL environment)
 /// -> updates attributes: state_local
 /// -> state values: turbulent kinetic energy
-void myRHEA::updateState() {
+void myRHEA::calculateState() {
+
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     int state_local_size2_counter = 0;
     state_local.resize(state_local_size2);
     std::fill(state_local.begin(), state_local.end(), 0.0);
-#if _WITNESS_XZ_SLICES_
-    int j_index;
-    int xz_slice_points_counter;
-#elif _WITNESS_XYZ_AVG_
-    double delta_x, delta_y, delta_z, delta_volume;
-    double total_volume = 0.0;
+    
+    /// Initialize auxiliary variables
+#if _WITNESS_XYZ_AVG_
+    double delta_x, delta_y, delta_z, delta_volume, total_volume_local;
+    double l2_x, l2_y, l2_z;
+    double l2_avg_u, l2_rmsf_u, l2_rmsf_v, l2_rmsf_w;
+    double l2_avg_u_comp, l2_rmsf_u_comp, l2_rmsf_v_comp, l2_rmsf_w_comp;
+    double l2_d_avg_u, l2_d_rmsf_u, l2_d_rmsf_v, l2_d_rmsf_w;
 #else
     int i_index, j_index, k_index;
-#endif  /// of _WITNESS_XZ_SLICES_
+#endif  /// of _WITNESS_XYZ_AVG_
 
+    /// Calculate state for each witness prove
     for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Owner rank writes to file
         if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
 
-#if _WITNESS_XZ_SLICES_
-            /// Get local index j
-            j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
-            /// Calculate state value
-            /// > Average state value (l2 error of rmsf_u_field) over regular grid xz-slice
-            xz_slice_points_counter = 0;
-            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-                for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                    state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j_index,k)], 2.0);
-                    state_local[state_local_size2_counter+1] += std::pow(y_field[I1D(i,j_index,k)],     2.0);
-                    xz_slice_points_counter += 1;
-                }
-            }
-            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / xz_slice_points_counter );
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / xz_slice_points_counter ) / L_y;
-
-#elif _WITNESS_XYZ_AVG_
+#if _WITNESS_XYZ_AVG_
+            /// Reset auxiliary variables
+            total_volume_local = 0.0;
+            l2_x = 0.0; l2_y = 0.0; l2_z = 0.0;
+            l2_avg_u      = 0.0; l2_rmsf_u      = 0.0; l2_rmsf_v      = 0.0; l2_rmsf_w      = 0.0;
+            l2_avg_u_comp = 0.0; l2_rmsf_u_comp = 0.0; l2_rmsf_v_comp = 0.0; l2_rmsf_w_comp = 0.0;
+            l2_d_avg_u    = 0.0; l2_d_rmsf_u    = 0.0; l2_d_rmsf_v    = 0.0; l2_d_rmsf_w    = 0.0;
             /// Calculate state value from averaging field values along local mesh of the TCP mpi process
-             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
+            for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
                     for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                         /// Geometric stuff
@@ -2713,32 +2705,83 @@ void myRHEA::updateState() {
                         delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
                         delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                         delta_volume =  delta_x * delta_y * delta_z;
+                        total_volume_local += delta_volume;
                         /// Spatial average
-                        state_local[state_local_size2_counter]   += std::pow(avg_u_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                        state_local[state_local_size2_counter+1] += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        state_local[state_local_size2_counter+2] += std::pow(x_field[I1D(i,j,k)],     2.0)  * delta_volume;
-                        state_local[state_local_size2_counter+3] += std::pow(y_field[I1D(i,j,k)],     2.0)  * delta_volume;
-                        state_local[state_local_size2_counter+4] += std::pow(z_field[I1D(i,j,k)],     2.0)  * delta_volume;
-                        total_volume += delta_volume;
+                        l2_x           += std::pow(x_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_y           += std::pow(y_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_z           += std::pow(z_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_avg_u       += std::pow(avg_u_field[I1D(i,j,k)],  2.0) * delta_volume;
+                        l2_rmsf_u      += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_rmsf_v      += std::pow(rmsf_v_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_rmsf_w      += std::pow(rmsf_w_field[I1D(i,j,k)], 2.0) * delta_volume;
+#if _RL_CONTROL_IS_SUPERVISED_
+                        l2_avg_u_comp  += std::pow(avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_volume;
+                        l2_rmsf_u_comp += std::pow(rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_rmsf_v_comp += std::pow(rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_rmsf_w_comp += std::pow(rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_d_avg_u     += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_volume;
+                        l2_d_rmsf_u    += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_d_rmsf_v    += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_d_rmsf_w    += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+#else   /// _RL_CONTROL_IS_SUPERVISED_ 0
+                        l2_avg_u_comp  += std::pow(avg_u_previous_field[I1D(i,j,k)],  2.0) * delta_volume;
+                        l2_rmsf_u_comp += std::pow(rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_rmsf_v_comp += std::pow(rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_rmsf_w_comp += std::pow(rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_d_avg_u     += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)],  2.0) * delta_volume;
+                        l2_d_rmsf_u    += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_d_rmsf_v    += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_d_rmsf_w    += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+#endif  /// _RL_CONTROL_IS_SUPERVISED_
                     }
                 }
             }
-            state_local[state_local_size2_counter]   = std::sqrt( state_local[state_local_size2_counter]   / total_volume );
-            state_local[state_local_size2_counter+1] = std::sqrt( state_local[state_local_size2_counter+1] / total_volume );
-            state_local[state_local_size2_counter+2] = std::sqrt( state_local[state_local_size2_counter+2] / total_volume ) / L_x;
-            state_local[state_local_size2_counter+3] = std::sqrt( state_local[state_local_size2_counter+3] / total_volume ) / L_y;
-            state_local[state_local_size2_counter+4] = std::sqrt( state_local[state_local_size2_counter+4] / total_volume ) / L_z;
+            l2_x           = std::sqrt( l2_x / total_volume_local);
+            l2_y           = std::sqrt( l2_y / total_volume_local);
+            l2_z           = std::sqrt( l2_z / total_volume_local);
+            l2_avg_u       = std::sqrt( l2_avg_u  / total_volume_local);
+            l2_rmsf_u      = std::sqrt( l2_rmsf_u / total_volume_local);
+            l2_rmsf_v      = std::sqrt( l2_rmsf_v / total_volume_local);
+            l2_rmsf_w      = std::sqrt( l2_rmsf_w / total_volume_local);
+            l2_avg_u_comp  = std::sqrt( l2_avg_u_comp  / total_volume_local);
+            l2_rmsf_u_comp = std::sqrt( l2_rmsf_u_comp / total_volume_local);
+            l2_rmsf_v_comp = std::sqrt( l2_rmsf_v_comp / total_volume_local);
+            l2_rmsf_w_comp = std::sqrt( l2_rmsf_w_comp / total_volume_local);
+            l2_d_avg_u     = std::sqrt( l2_d_avg_u / total_volume_local);
+            l2_d_rmsf_u    = std::sqrt( l2_d_rmsf_u / total_volume_local);
+            l2_d_rmsf_v    = std::sqrt( l2_d_rmsf_v / total_volume_local);
+            l2_d_rmsf_w    = std::sqrt( l2_d_rmsf_w / total_volume_local);
+            /// Update state
+            state_local[state_local_size2_counter]   = ( l2_d_avg_u  / l2_avg_u )  * std::copysign(1.0, l2_avg_u  - l2_avg_u_comp);     /// std::copysign(1.0, l2_avg_u - l2_avg_u_comp) = +1.0 if l2_avg_u >= l2_avg_u_comp, -1.0 otherwise
+            state_local[state_local_size2_counter+1] = ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
+            state_local[state_local_size2_counter+2] = ( l2_d_rmsf_v / l2_rmsf_v ) * std::copysign(1.0, l2_rmsf_v - l2_rmsf_v_comp);
+            state_local[state_local_size2_counter+3] = ( l2_d_rmsf_w / l2_rmsf_w ) * std::copysign(1.0, l2_rmsf_w - l2_rmsf_w_comp);
+            state_local[state_local_size2_counter+4] = 2.0 * ( l2_x / L_x ) - 1.0;  /// range (-1,1)
+            state_local[state_local_size2_counter+5] = 2.0 * ( l2_y / L_y ) - 1.0;
+            state_local[state_local_size2_counter+6] = 2.0 * ( l2_z / L_z ) - 1.0;
 
-#else ///  _WITNESS_XZ_SLICES_ 0 and _WITNESS_XYZ_AVG_ 0
+#else /// _WITNESS_XYZ_AVG_ 0
             /// Get local indices i, j, k
             i_index = temporal_witness_probes[twp].getLocalIndexI(); 
             j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
             k_index = temporal_witness_probes[twp].getLocalIndexK();
-            /// Calculate state value/s
-            state_local[state_local_size2_counter]   = avg_u_field[I1D(i_index,j_index,k_index)];
-            state_local[state_local_size2_counter+1] = x_field[I1D(i_index,j_index,k_index)] / L_x;
-            state_local[state_local_size2_counter+2] = y_field[I1D(i_index,j_index,k_index)] / L_y;
-#endif /// of _WITNESS_XZ_SLICES_ and _WITNESS_XYZ_AVG_
+            /// Calculate state values
+#if _RL_CONTROL_IS_SUPERVISED_
+            state_local[state_local_size2_counter]   = ( avg_u_field[I1D(i_index,j_index,k_index)]  - avg_u_reference_field[I1D(i_index,j_index,k_index)] )  / ( avg_u_field[I1D(i_index,j_index,k_index)] );
+            state_local[state_local_size2_counter+1] = ( rmsf_u_field[I1D(i_index,j_index,k_index)] - rmsf_u_reference_field[I1D(i_index,j_index,k_index)] ) / ( rmsf_u_field[I1D(i_index,j_index,k_index)] );
+            state_local[state_local_size2_counter+2] = ( rmsf_v_field[I1D(i_index,j_index,k_index)] - rmsf_v_reference_field[I1D(i_index,j_index,k_index)] ) / ( rmsf_v_field[I1D(i_index,j_index,k_index)] );
+            state_local[state_local_size2_counter+3] = ( rmsf_w_field[I1D(i_index,j_index,k_index)] - rmsf_w_reference_field[I1D(i_index,j_index,k_index)] ) / ( rmsf_w_field[I1D(i_index,j_index,k_index)] );
+#else   /// _RL_CONTROL_IS_SUPERVISED_ 0
+            state_local[state_local_size2_counter]   = ( avg_u_field[I1D(i_index,j_index,k_index)]  - avg_u_previous_field[I1D(i_index,j_index,k_index)] )   / ( avg_u_field[I1D(i_index,j_index,k_index)] );
+            state_local[state_local_size2_counter+1] = ( rmsf_u_field[I1D(i_index,j_index,k_index)] - rmsf_u_previous_field[I1D(i_index,j_index,k_index)] )  / ( rmsf_u_field[I1D(i_index,j_index,k_index)] );
+            state_local[state_local_size2_counter+2] = ( rmsf_v_field[I1D(i_index,j_index,k_index)] - rmsf_v_previous_field[I1D(i_index,j_index,k_index)] )  / ( rmsf_v_field[I1D(i_index,j_index,k_index)] );
+            state_local[state_local_size2_counter+3] = ( rmsf_w_field[I1D(i_index,j_index,k_index)] - rmsf_w_previous_field[I1D(i_index,j_index,k_index)] )  / ( rmsf_w_field[I1D(i_index,j_index,k_index)] );
+#endif  /// _RL_CONTROL_IS_SUPERVISED_
+            state_local[state_local_size2_counter+4] = 2.0 * ( x_field[I1D(i_index,j_index,k_index)] / L_x ) - 1.0;
+            state_local[state_local_size2_counter+5] = 2.0 * ( y_field[I1D(i_index,j_index,k_index)] / L_y ) - 1.0;
+            state_local[state_local_size2_counter+6] = 2.0 * ( z_field[I1D(i_index,j_index,k_index)] / L_y ) - 1.0;
+
+#endif /// _WITNESS_XYZ_AVG_
 
             /// Update local state counter
             state_local_size2_counter += state_dim;
@@ -2753,86 +2796,31 @@ void myRHEA::updateState() {
 }   
 
 ///////////////////////////////////////////////////////////////////////////////
-
 /// Calculate reward local value (local to single mpi process, which corresponds to RL environment)
-/// If _RL_CONTROL_IS_SUPERVISED_ 1:
-/// -> updates attributes: reward_local
-/// else _RL_CONTROL_IS_SUPERVISED_ 0:
-/// -> updates attributes: reward_local, 
-//                         avg_u_previous_field, rmsf_u_previous_field (if unsupervised),
-//                         l2_err_avg_u_previous, l2_rl_f_previous (if supervised)
+/// updates attribute 'reward_local'
+/// and auxiliary local variables 'l2_d_avg_u_previous', 'l2_d_rmsf_u_previous', 'l2_d_rmsf_v_previous', 'l2_d_rmsf_w_previous', 'l2_rl_f_previous'
 void myRHEA::calculateReward() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Reward weight coefficients
-    double b_param = 1.0;
-    double d_param = 0.0;
     double c1 = 10.0 / actuation_period;
     double c2 = 1.0  / actuation_period;
-    double c3 = 0.0;
-    double c4 = 0.0;
-    double c5 = 0.0;
-    double c6 = 0.0;
-    double c7 = 0.0;    // used in supervised! action penalization coefficient
+    double c3 = 1.0  / actuation_period;
+    double c4 = 1.0  / actuation_period;
+    double c5 = 0.0;    // used in supervised! action penalization coefficient
 
-#if _RL_CONTROL_IS_SUPERVISED_  /// Supervised Reward
-    double l2_err_avg_u  = 0.0;
-    double l2_err_rmsf_u = 0.0;
-    double l2_avg_u_reference  = 0.0;
-    double l2_rmsf_u_reference = 0.0;
-    double l2_rl_f_rhou = 0.0, l2_rl_f_rhov = 0.0, l2_rl_f_rhow = 0.0, l2_rl_f = 0.0;
-    double length_y = 0.0, delta_y  = 0.0;
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                delta_y             = 0.5 * ( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] );
-                l2_err_avg_u        += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
-                l2_avg_u_reference  += std::pow(avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
-                l2_err_rmsf_u       += std::pow(rmsf_u_field[I1D(i,j,k)]  - rmsf_u_reference_field[I1D(i,j,k)],  2.0) * delta_y;
-                l2_rmsf_u_reference += std::pow(rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_y;
-                l2_rl_f_rhou        += std::pow(rl_f_rhou_field[I1D(i,j,k)],        2.0) * delta_y;
-                l2_rl_f_rhov        += std::pow(rl_f_rhov_field[I1D(i,j,k)],        2.0) * delta_y;
-                l2_rl_f_rhow        += std::pow(rl_f_rhow_field[I1D(i,j,k)],        2.0) * delta_y;
-                length_y            += delta_y; 
-            }
-        }
-    }
-    l2_err_avg_u        = std::sqrt( l2_err_avg_u  / length_y );
-    l2_avg_u_reference  = std::sqrt( l2_avg_u_reference  / length_y );
-    l2_err_rmsf_u       = std::sqrt( l2_err_rmsf_u  / length_y );
-    l2_rmsf_u_reference = std::sqrt( l2_rmsf_u_reference  / length_y );
-    l2_rl_f_rhou        = std::sqrt( l2_rl_f_rhou / length_y );
-    l2_rl_f_rhov        = std::sqrt( l2_rl_f_rhov / length_y );
-    l2_rl_f_rhow        = std::sqrt( l2_rl_f_rhow / length_y );
-    l2_rl_f             = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local        =   c1 * ( ( l2_err_avg_u_previous  - l2_err_avg_u )  / l2_err_avg_u ) \
-                          + c2 * ( ( l2_err_rmsf_u_previous - l2_err_rmsf_u ) / l2_err_rmsf_u ) \
-                          + c7 * ( l2_rl_f_previous - l2_rl_f );
-    /// Debugging
-    cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: "  << reward_local << ", with reward terms: "
-         <<   c1 * l2_err_avg_u_previous / l2_err_avg_u << " " 
-	     << - c1 * l2_err_avg_u          / l2_err_avg_u << " "
-         <<   c2 * l2_err_rmsf_u_previous / l2_err_rmsf_u << " " 
-	     << - c2 * l2_err_rmsf_u          / l2_err_rmsf_u << " "
-	     <<   c7 *  l2_rl_f_previous << " "
-	     << - c7 *  l2_rl_f << endl;
-    
-    /// Store current l2 norms for next reward calculation
-    l2_err_avg_u_previous  = l2_err_avg_u;
-    l2_err_rmsf_u_previous = l2_err_rmsf_u;
-    l2_rl_f_previous       = l2_rl_f;
-
-#else                           /// Unsupervised Reward
     /// Initialize variables
-    double l2_d_avg_u = 0.0;
-    double l2_d_rmsf_u = 0.0;
-    double l2_avg_u_previous  = 0.0;
-    double l2_rmsf_u_previous = 0.0; 
-    double l2_rl_f_rhou = 0.0, l2_rl_f_rhov = 0.0, l2_rl_f_rhow = 0.0, l2_rl_f = 0.0;
+    double l2_d_avg_u    = 0.0;
+    double l2_d_rmsf_u   = 0.0;
+    double l2_d_rmsf_v   = 0.0;
+    double l2_d_rmsf_w   = 0.0;
+    double l2_rl_f_rhou  = 0.0;
+    double l2_rl_f_rhov  = 0.0;
+    double l2_rl_f_rhow  = 0.0;
+    double l2_rl_f       = 0.0;
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
-
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
@@ -2841,50 +2829,73 @@ void myRHEA::calculateReward() {
                 delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
                 delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
                 delta_volume =  delta_x * delta_y * delta_z;
-                /// Calculate volume-averaged l2_d_avg_u & l2_d_rmsf_u
+                total_volume_local += delta_volume;
+#if _RL_CONTROL_IS_SUPERVISED_
+                /// Supervised error
+                l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)], 2.0)  * delta_volume;
+                l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
+#else   /// _RL_CONTROL_IS_SUPERVISED_ 0
+                /// Unsupervised error
                 l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
                 l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_avg_u_previous  += std::pow(avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_rmsf_u_previous += std::pow(rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
+#endif
+                /// Norm of RL perturbation load 
                 l2_rl_f_rhou       += std::pow(rl_f_rhou_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rl_f_rhov       += std::pow(rl_f_rhov_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rl_f_rhow       += std::pow(rl_f_rhow_field[I1D(i,j,k)], 2.0) * delta_volume;
-                total_volume_local += delta_volume;
             }
         }
     }
-    l2_d_avg_u         = std::sqrt( l2_d_avg_u  / total_volume_local);
-    l2_d_rmsf_u        = std::sqrt( l2_d_rmsf_u / total_volume_local);
-    l2_avg_u_previous  = std::sqrt( l2_avg_u_previous  / total_volume_local);
-    l2_rmsf_u_previous = std::sqrt( l2_rmsf_u_previous / total_volume_local);
-    l2_rl_f_rhou       = std::sqrt( l2_rl_f_rhou / total_volume_local );
-    l2_rl_f_rhov       = std::sqrt( l2_rl_f_rhov / total_volume_local );
-    l2_rl_f_rhow       = std::sqrt( l2_rl_f_rhow / total_volume_local );
-    l2_rl_f            = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local       = ( b_param - (   ( c1 * l2_d_avg_u / l2_avg_u_previous ) \
-                                       + ( c2 * l2_d_rmsf_u / l2_rmsf_u_previous ) \
-                                       + ( c7 * l2_rl_f ) ) ) * std::pow(current_time - begin_actuation_time, d_param);
-
+    l2_d_avg_u   = std::sqrt( l2_d_avg_u   / total_volume_local);
+    l2_d_rmsf_u  = std::sqrt( l2_d_rmsf_u  / total_volume_local);
+    l2_d_rmsf_v  = std::sqrt( l2_d_rmsf_v  / total_volume_local);
+    l2_d_rmsf_w  = std::sqrt( l2_d_rmsf_w  / total_volume_local);
+    l2_rl_f_rhou = std::sqrt( l2_rl_f_rhou / total_volume_local );
+    l2_rl_f_rhov = std::sqrt( l2_rl_f_rhov / total_volume_local );
+    l2_rl_f_rhow = std::sqrt( l2_rl_f_rhow / total_volume_local );
+    l2_rl_f      = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
+    reward_local =   c1 * ( ( l2_d_avg_u_previous  - l2_d_avg_u )  / l2_d_avg_u ) \
+                   + c2 * ( ( l2_d_rmsf_u_previous - l2_d_rmsf_u ) / l2_d_rmsf_u ) \
+                   + c3 * ( ( l2_d_rmsf_v_previous - l2_d_rmsf_v ) / l2_d_rmsf_v ) \
+                   + c4 * ( ( l2_d_rmsf_w_previous - l2_d_rmsf_w ) / l2_d_rmsf_w ) \
+                   + c5 * ( ( l2_rl_f_previous     - l2_rl_f )     / l2_rl_f );
     /// Debugging
-    cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Reward calculation:" << endl
-         << "local reward: "  << reward_local << endl
-         << "reward terms: " 
-         << c1 * l2_d_avg_u / l2_avg_u_previous << " " 
-         << c2 * l2_d_rmsf_u / l2_rmsf_u_previous << " "
-         << c7 * l2_rl_f << endl
-         << "reward scaler dt_RL: " << std::pow(current_time - begin_actuation_time, d_param) << endl;
-    
-    /// Update avg_u,v,w_previous_field & rmsf_u,v,w_previous_field for next reward calculation
+    cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: " << reward_local << ", with reward terms: "
+         << c1 * ( ( l2_d_avg_u_previous  - l2_d_avg_u )  / l2_d_avg_u )  << " " 
+	     << c2 * ( ( l2_d_rmsf_u_previous - l2_d_rmsf_u ) / l2_d_rmsf_u ) << " "
+	     << c3 * ( ( l2_d_rmsf_v_previous - l2_d_rmsf_v ) / l2_d_rmsf_v ) << " "
+         << c4 * ( ( l2_d_rmsf_w_previous - l2_d_rmsf_w ) / l2_d_rmsf_w ) << " " 
+	     << c5 * ( ( l2_rl_f_previous     - l2_rl_f )     / l2_rl_f )     << endl;
+    /// Update l2_d_avg_u,v,w_previous and l2_d_rmsf_u,v,w_previous for next reward calculation
+    l2_d_avg_u_previous  = l2_d_avg_u;
+    l2_d_rmsf_u_previous = l2_d_rmsf_u;
+    l2_d_rmsf_v_previous = l2_d_rmsf_v;
+    l2_d_rmsf_w_previous = l2_d_rmsf_w;
+    l2_rl_f_previous     = l2_rl_f;
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// (if _RL_CONTROL_IS_SUPERVISED_ 0) Update avg_u_previous_field, rmsf_u_previous_field, rmsf_v_previous_field, rmsf_w_previous_field used in calculateState and calculateReward
+void myRHEA::updatePreviousActuationFields() {
+#if _RL_CONTROL_IS_SUPERVISED_
+    /// do nothing
+#else
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
         for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
                 avg_u_previous_field[I1D(i,j,k)]  = avg_u_field[I1D(i,j,k)];
                 rmsf_u_previous_field[I1D(i,j,k)] = rmsf_u_field[I1D(i,j,k)];
+                rmsf_v_previous_field[I1D(i,j,k)] = rmsf_v_field[I1D(i,j,k)];
+                rmsf_w_previous_field[I1D(i,j,k)] = rmsf_w_field[I1D(i,j,k)];
             }
         }
     } 
 #endif
-
 }
 
 ///////////////////////////////////////////////////////////////////////////////
