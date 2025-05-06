@@ -34,6 +34,9 @@ class myRHEA : public FlowSolverRHEA {
         /// Set initial conditions: u, v, w, P and T ... needs to be modified/overwritten according to the problem under consideration
         void setInitialConditions() override;
 
+        /// Initialize from restart file: x, y, z, rho, u, v, w, E, P, T, sos, mu and kappa
+        void initializeFromRestart() override;
+
         /// Calculate rhou, rhov, rhow and rhoE source terms ... needs to be modified/overwritten according to the problem under consideration
         void calculateSourceTerms() override;
 
@@ -139,7 +142,6 @@ class myRHEA : public FlowSolverRHEA {
         void preproceWitnessPoints();
         void readControlPoints();
         void preproceControlPoints();
-        void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
         void updateState();
         void calculateReward();
 

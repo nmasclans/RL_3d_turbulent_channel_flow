@@ -262,10 +262,10 @@ void myRHEA::execute() {
             /// Calculate alpha value of artificial compressibility method
             alpha_acm = this->calculateAlphaArtificialCompressibilityMethod();
 
-	    /// Calculate artificially modified thermodynamics
+	        /// Calculate artificially modified thermodynamics
             this->calculateArtificiallyModifiedThermodynamics();
 
-	    /// Calculate artificially modified transport coefficients
+	        /// Calculate artificially modified transport coefficients
             this->calculateArtificiallyModifiedTransportCoefficients();
 
 	    }
@@ -725,6 +725,160 @@ void myRHEA::setInitialConditions() {
     T_field.update();
 
 };
+
+
+void myRHEA::initializeFromRestart() {
+    
+    // --------  Main code, adapted from parent class FlowSolverRHEA to initialize averaging fields using instantaneous data -------- 
+
+    /// Read from file to restart solver: data, time and time iteration
+    char char_restart_data_file[ restart_data_file.length() + 1 ]; 
+    strcpy( char_restart_data_file, restart_data_file.c_str() );
+    writer_reader->read( char_restart_data_file );
+    current_time      = writer_reader->getAttributeDouble( "Time" );
+    current_time_iter = writer_reader->getAttributeInt( "Iteration" );
+    averaging_time    = writer_reader->getAttributeDouble( "AveragingTime" );
+    
+    if( reset_time_averaging ) {
+
+	    /// Reset time averaging
+        averaging_time = 0.0;
+
+	    /// Initialize avg fields with instantaneous data
+        for(int i = topo->iter_common[_ALL_][_INIX_]; i <= topo->iter_common[_ALL_][_ENDX_]; i++) {
+            for(int j = topo->iter_common[_ALL_][_INIY_]; j <= topo->iter_common[_ALL_][_ENDY_]; j++) {
+                for(int k = topo->iter_common[_ALL_][_INIZ_]; k <= topo->iter_common[_ALL_][_ENDZ_]; k++) {
+                    avg_rho_field[I1D(i,j,k)]   = rho_field[I1D(i,j,k)];
+                    avg_rhou_field[I1D(i,j,k)]  = rhou_field[I1D(i,j,k)];
+                    avg_rhov_field[I1D(i,j,k)]  = rhov_field[I1D(i,j,k)];
+                    avg_rhow_field[I1D(i,j,k)]  = rhow_field[I1D(i,j,k)];
+                    avg_rhoE_field[I1D(i,j,k)]  = rhoE_field[I1D(i,j,k)];
+                    avg_rhoP_field[I1D(i,j,k)]  = rho_field[I1D(i,j,k)]*P_field[I1D(i,j,k)];
+                    avg_rhoT_field[I1D(i,j,k)]  = rho_field[I1D(i,j,k)]*T_field[I1D(i,j,k)];
+                    avg_u_field[I1D(i,j,k)]     = u_field[I1D(i,j,k)];
+                    avg_v_field[I1D(i,j,k)]     = v_field[I1D(i,j,k)];
+                    avg_w_field[I1D(i,j,k)]     = w_field[I1D(i,j,k)];
+                    avg_E_field[I1D(i,j,k)]     = E_field[I1D(i,j,k)];
+                    avg_P_field[I1D(i,j,k)]     = P_field[I1D(i,j,k)];
+                    avg_T_field[I1D(i,j,k)]     = T_field[I1D(i,j,k)];
+                    avg_sos_field[I1D(i,j,k)]   = sos_field[I1D(i,j,k)];
+                    avg_mu_field[I1D(i,j,k)]    = mu_field[I1D(i,j,k)];
+                    avg_kappa_field[I1D(i,j,k)] = kappa_field[I1D(i,j,k)];
+                    avg_c_v_field[I1D(i,j,k)]   = c_v_field[I1D(i,j,k)];
+                    avg_c_p_field[I1D(i,j,k)]   = c_p_field[I1D(i,j,k)];
+                }
+            }
+        }
+
+        /// Reset fluctuating fields
+        rmsf_rho_field     = 0.0;
+        rmsf_rhou_field    = 0.0;
+        rmsf_rhov_field    = 0.0;
+        rmsf_rhow_field    = 0.0;
+        rmsf_rhoE_field    = 0.0;
+        rmsf_u_field       = 0.0;
+        rmsf_v_field       = 0.0;
+        rmsf_w_field       = 0.0;
+        rmsf_E_field       = 0.0;
+        rmsf_P_field       = 0.0;
+        rmsf_T_field       = 0.0;
+        rmsf_sos_field     = 0.0;
+        rmsf_mu_field      = 0.0;
+        rmsf_kappa_field   = 0.0;
+        rmsf_c_v_field     = 0.0;
+        rmsf_c_p_field     = 0.0;
+        favre_uffuff_field = 0.0;
+        favre_uffvff_field = 0.0;
+        favre_uffwff_field = 0.0;
+        favre_vffvff_field = 0.0;
+        favre_vffwff_field = 0.0;
+        favre_wffwff_field = 0.0;
+        favre_uffEff_field = 0.0;
+        favre_vffEff_field = 0.0;
+        favre_wffEff_field = 0.0;
+
+    }
+
+    /// Update halo values
+    rho_field.update();
+    u_field.update();
+    v_field.update();
+    w_field.update();
+    E_field.update();
+    P_field.update();
+    T_field.update();
+    sos_field.update();
+    mu_field.update();
+    kappa_field.update();
+    c_v_field.update();
+    c_p_field.update();
+    avg_rho_field.update();
+    avg_rhou_field.update();
+    avg_rhov_field.update();
+    avg_rhow_field.update();
+    avg_rhoE_field.update();
+    avg_rhoP_field.update();
+    avg_rhoT_field.update();
+    avg_u_field.update();
+    avg_v_field.update();
+    avg_w_field.update();
+    avg_E_field.update();
+    avg_P_field.update();
+    avg_T_field.update();
+    avg_sos_field.update();
+    avg_mu_field.update();
+    avg_kappa_field.update();
+    avg_c_v_field.update();
+    avg_c_p_field.update();
+    rmsf_rho_field.update();
+    rmsf_rhou_field.update();
+    rmsf_rhov_field.update();
+    rmsf_rhow_field.update();
+    rmsf_rhoE_field.update();
+    rmsf_u_field.update();
+    rmsf_v_field.update();
+    rmsf_w_field.update();
+    rmsf_E_field.update();
+    rmsf_P_field.update();
+    rmsf_T_field.update();
+    rmsf_sos_field.update();
+    rmsf_mu_field.update();
+    rmsf_kappa_field.update();
+    rmsf_c_v_field.update();
+    rmsf_c_p_field.update();
+    favre_uffuff_field.update();
+    favre_uffvff_field.update();
+    favre_uffwff_field.update();
+    favre_vffvff_field.update();
+    favre_vffwff_field.update();
+    favre_wffwff_field.update();
+    favre_uffEff_field.update();
+    favre_vffEff_field.update();
+    favre_wffEff_field.update();
+
+    /// Fill mesh x, y, z, delta_x, delta_y, delta_z fields
+    this->fillMeshCoordinatesSizesFields();
+
+#if _ACTIVE_CONTROL_BODY_FORCE_
+    // -------- Add additional functionality -------- 
+    begin_actuation_time    += current_time;
+    previous_actuation_time += current_time;
+    final_time              += current_time;
+
+    // Logging
+    int my_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    if (my_rank == 0) {
+        cout << fixed << setprecision(cout_precision);
+        cout << "[myRHEA::initializeFromRestart] From restart current_time = " << scientific << current_time 
+            << ", updated begin_actuation_time = " << scientific << begin_actuation_time
+            << ", previous_actuation_time = " << scientific << previous_actuation_time
+            << ", final_time = " << scientific << final_time << endl;
+    }
+#endif
+
+}
+
 
 void myRHEA::calculateSourceTerms() {
 
@@ -2506,33 +2660,6 @@ void myRHEA::preproceControlPoints() {
 
     cout.flush();
     MPI_Barrier(MPI_COMM_WORLD);
-
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void myRHEA::initializeFromRestart() {
-    
-    // Call the parent class method
-    FlowSolverRHEA::initializeFromRestart();
-
-    // Add additional functionality
-#if _ACTIVE_CONTROL_BODY_FORCE_
-    begin_actuation_time    += current_time;
-    previous_actuation_time += current_time;
-    final_time              += current_time;
-
-    // Logging
-    int my_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    if (my_rank == 0) {
-        cout << fixed << setprecision(cout_precision);
-        cout << "[myRHEA::initializeFromRestart] From restart current_time = " << scientific << current_time 
-            << ", updated begin_actuation_time = " << scientific << begin_actuation_time
-            << ", previous_actuation_time = " << scientific << previous_actuation_time
-            << ", final_time = " << scientific << final_time << endl;
-    }
-#endif
 
 }
 
