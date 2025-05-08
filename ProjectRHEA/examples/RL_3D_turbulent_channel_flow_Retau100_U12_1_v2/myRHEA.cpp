@@ -2818,10 +2818,6 @@ void myRHEA::calculateReward() {
     double l2_d_rmsf_u   = 0.0;
     double l2_d_rmsf_v   = 0.0;
     double l2_d_rmsf_w   = 0.0;
-    double l2_rl_f_rhou  = 0.0;
-    double l2_rl_f_rhov  = 0.0;
-    double l2_rl_f_rhow  = 0.0;
-    double l2_rl_f       = 0.0;
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -2850,10 +2846,6 @@ void myRHEA::calculateReward() {
                 l2_rmsf_u          += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rmsf_v          += std::pow(rmsf_v_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rmsf_w          += std::pow(rmsf_w_field[I1D(i,j,k)], 2.0) * delta_volume;
-                /// Norm of RL perturbation load 
-                l2_rl_f_rhou       += std::pow(rl_f_rhou_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_rl_f_rhov       += std::pow(rl_f_rhov_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_rl_f_rhow       += std::pow(rl_f_rhow_field[I1D(i,j,k)], 2.0) * delta_volume;
             }
         }
     }
@@ -2865,10 +2857,6 @@ void myRHEA::calculateReward() {
     l2_d_rmsf_u  = std::sqrt( l2_d_rmsf_u  / total_volume_local);
     l2_d_rmsf_v  = std::sqrt( l2_d_rmsf_v  / total_volume_local);
     l2_d_rmsf_w  = std::sqrt( l2_d_rmsf_w  / total_volume_local);
-    l2_rl_f_rhou = std::sqrt( l2_rl_f_rhou / total_volume_local );
-    l2_rl_f_rhov = std::sqrt( l2_rl_f_rhov / total_volume_local );
-    l2_rl_f_rhow = std::sqrt( l2_rl_f_rhow / total_volume_local );
-    l2_rl_f      = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
     reward_local = b_param - (   c1 * ( ( l2_d_avg_u )  / l2_avg_u ) \
                                + c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) \
                                + c3 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) \
