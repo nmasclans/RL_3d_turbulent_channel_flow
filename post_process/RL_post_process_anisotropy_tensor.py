@@ -89,7 +89,7 @@ simulation_time_per_train_step   = t_episode_train                    # total cf
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
 if run_mode == "train":
-    iteration_restart_data_file  = 3210000
+    iteration_restart_data_file  = 3190000
 else:   # run_mode == "eval"
     iteration_restart_data_file  = 2840000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
