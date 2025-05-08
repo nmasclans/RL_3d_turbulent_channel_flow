@@ -2673,6 +2673,11 @@ void myRHEA::calculateState() {
     state_local.resize(state_local_size2);
     std::fill(state_local.begin(), state_local.end(), 0.0);
     
+    double c1 = 10.0 / actuation_period;
+    double c2 = 1.0  / actuation_period;
+    double c3 = 1.0  / actuation_period;
+    double c4 = 1.0  / actuation_period;
+
     /// Initialize auxiliary variables
 #if _WITNESS_XYZ_AVG_
     double delta_x, delta_y, delta_z, delta_volume, total_volume_local;
@@ -2752,10 +2757,10 @@ void myRHEA::calculateState() {
             l2_d_rmsf_v    = std::sqrt( l2_d_rmsf_v / total_volume_local);
             l2_d_rmsf_w    = std::sqrt( l2_d_rmsf_w / total_volume_local);
             /// Update state
-            state_local[state_local_size2_counter]   = ( l2_d_avg_u  / l2_avg_u )  * std::copysign(1.0, l2_avg_u  - l2_avg_u_comp);     /// std::copysign(1.0, l2_avg_u - l2_avg_u_comp) = +1.0 if l2_avg_u >= l2_avg_u_comp, -1.0 otherwise
-            state_local[state_local_size2_counter+1] = ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
-            state_local[state_local_size2_counter+2] = ( l2_d_rmsf_v / l2_rmsf_v ) * std::copysign(1.0, l2_rmsf_v - l2_rmsf_v_comp);
-            state_local[state_local_size2_counter+3] = ( l2_d_rmsf_w / l2_rmsf_w ) * std::copysign(1.0, l2_rmsf_w - l2_rmsf_w_comp);
+            state_local[state_local_size2_counter]   = c1 * ( l2_d_avg_u  / l2_avg_u )  * std::copysign(1.0, l2_avg_u  - l2_avg_u_comp);     /// std::copysign(1.0, l2_avg_u - l2_avg_u_comp) = +1.0 if l2_avg_u >= l2_avg_u_comp, -1.0 otherwise
+            state_local[state_local_size2_counter+1] = c2 * ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
+            state_local[state_local_size2_counter+2] = c3 * ( l2_d_rmsf_v / l2_rmsf_v ) * std::copysign(1.0, l2_rmsf_v - l2_rmsf_v_comp);
+            state_local[state_local_size2_counter+3] = c4 * ( l2_d_rmsf_w / l2_rmsf_w ) * std::copysign(1.0, l2_rmsf_w - l2_rmsf_w_comp);
             state_local[state_local_size2_counter+4] = 2.0 * ( l2_x / L_x ) - 1.0;  /// range (-1,1)
             state_local[state_local_size2_counter+5] = 2.0 * ( l2_y / L_y ) - 1.0;
             state_local[state_local_size2_counter+6] = 2.0 * ( l2_z / L_z ) - 1.0;
