@@ -648,11 +648,6 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     rmsf_v_previous_field  = 0.0;
     rmsf_w_previous_field  = 0.0;
 #endif  /// _RL_CONTROL_IS_SUPERVISED_
-    l2_d_avg_u_previous    = 0.0;   /// double
-    l2_d_rmsf_u_previous   = 0.0;
-    l2_d_rmsf_v_previous   = 0.0;
-    l2_d_rmsf_w_previous   = 0.0;
-    l2_rl_f_previous       = 0.0;
 
     /// Initialize additional attribute members
 #if _RL_CONTROL_IS_SUPERVISED_
@@ -2803,19 +2798,22 @@ void myRHEA::calculateState() {
 ///////////////////////////////////////////////////////////////////////////////
 /// Calculate reward local value (local to single mpi process, which corresponds to RL environment)
 /// updates attribute 'reward_local'
-/// and auxiliary local variables 'l2_d_avg_u_previous', 'l2_d_rmsf_u_previous', 'l2_d_rmsf_v_previous', 'l2_d_rmsf_w_previous', 'l2_rl_f_previous'
 void myRHEA::calculateReward() {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Reward weight coefficients
+    double b_param = 1.0;
     double c1 = 10.0 / actuation_period;
     double c2 = 1.0  / actuation_period;
     double c3 = 1.0  / actuation_period;
     double c4 = 1.0  / actuation_period;
-    double c5 = 0.0;    // used in supervised! action penalization coefficient
 
     /// Initialize variables
+    double l2_avg_u      = 0.0;
+    double l2_rmsf_u     = 0.0;
+    double l2_rmsf_v     = 0.0;
+    double l2_rmsf_w     = 0.0;
     double l2_d_avg_u    = 0.0;
     double l2_d_rmsf_u   = 0.0;
     double l2_d_rmsf_v   = 0.0;
@@ -2848,6 +2846,10 @@ void myRHEA::calculateReward() {
                 l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
 #endif
+                l2_avg_u           += std::pow(avg_u_field[I1D(i,j,k)],  2.0) * delta_volume;
+                l2_rmsf_u          += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_rmsf_v          += std::pow(rmsf_v_field[I1D(i,j,k)], 2.0) * delta_volume;
+                l2_rmsf_w          += std::pow(rmsf_w_field[I1D(i,j,k)], 2.0) * delta_volume;
                 /// Norm of RL perturbation load 
                 l2_rl_f_rhou       += std::pow(rl_f_rhou_field[I1D(i,j,k)], 2.0) * delta_volume;
                 l2_rl_f_rhov       += std::pow(rl_f_rhov_field[I1D(i,j,k)], 2.0) * delta_volume;
@@ -2855,6 +2857,10 @@ void myRHEA::calculateReward() {
             }
         }
     }
+    l2_avg_u     = std::sqrt( l2_avg_u     / total_volume_local);
+    l2_rmsf_u    = std::sqrt( l2_rmsf_u    / total_volume_local);
+    l2_rmsf_v    = std::sqrt( l2_rmsf_v    / total_volume_local);
+    l2_rmsf_w    = std::sqrt( l2_rmsf_w    / total_volume_local);    
     l2_d_avg_u   = std::sqrt( l2_d_avg_u   / total_volume_local);
     l2_d_rmsf_u  = std::sqrt( l2_d_rmsf_u  / total_volume_local);
     l2_d_rmsf_v  = std::sqrt( l2_d_rmsf_v  / total_volume_local);
@@ -2863,24 +2869,16 @@ void myRHEA::calculateReward() {
     l2_rl_f_rhov = std::sqrt( l2_rl_f_rhov / total_volume_local );
     l2_rl_f_rhow = std::sqrt( l2_rl_f_rhow / total_volume_local );
     l2_rl_f      = std::sqrt( std::pow(l2_rl_f_rhou, 2.0) + std::pow(l2_rl_f_rhov, 2.0) + std::pow(l2_rl_f_rhow, 2.0) );
-    reward_local =   c1 * ( ( l2_d_avg_u_previous  - l2_d_avg_u )  / l2_d_avg_u ) \
-                   + c2 * ( ( l2_d_rmsf_u_previous - l2_d_rmsf_u ) / l2_d_rmsf_u ) \
-                   + c3 * ( ( l2_d_rmsf_v_previous - l2_d_rmsf_v ) / l2_d_rmsf_v ) \
-                   + c4 * ( ( l2_d_rmsf_w_previous - l2_d_rmsf_w ) / l2_d_rmsf_w ) \
-                   + c5 * ( ( l2_rl_f_previous     - l2_rl_f )     / l2_rl_f );
+    reward_local = b_param - (   c1 * ( ( l2_d_avg_u )  / l2_avg_u ) \
+                               + c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) \
+                               + c3 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) \
+                               + c4 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) );
     /// Debugging
     cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: " << reward_local << ", with reward terms: "
-         << c1 * ( ( l2_d_avg_u_previous  - l2_d_avg_u )  / l2_d_avg_u )  << " " 
-	     << c2 * ( ( l2_d_rmsf_u_previous - l2_d_rmsf_u ) / l2_d_rmsf_u ) << " "
-	     << c3 * ( ( l2_d_rmsf_v_previous - l2_d_rmsf_v ) / l2_d_rmsf_v ) << " "
-         << c4 * ( ( l2_d_rmsf_w_previous - l2_d_rmsf_w ) / l2_d_rmsf_w ) << " " 
-	     << c5 * ( ( l2_rl_f_previous     - l2_rl_f )     / l2_rl_f )     << endl;
-    /// Update l2_d_avg_u,v,w_previous and l2_d_rmsf_u,v,w_previous for next reward calculation
-    l2_d_avg_u_previous  = l2_d_avg_u;
-    l2_d_rmsf_u_previous = l2_d_rmsf_u;
-    l2_d_rmsf_v_previous = l2_d_rmsf_v;
-    l2_d_rmsf_w_previous = l2_d_rmsf_w;
-    l2_rl_f_previous     = l2_rl_f;
+         << c1 * ( ( l2_d_avg_u )  / l2_avg_u )  << " " 
+	     << c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) << " "
+	     << c3 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) << " "
+         << c4 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) << endl;
 
 }
 
