@@ -2,7 +2,7 @@ import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.001        # action period
+t_action = 0.005        # action period
 t_begin_control = 0.0   # controls begin after this value
 t_episode_train = round(1.5 + t_action + dt_phys, 8)
 t_episode_eval = 1.5
