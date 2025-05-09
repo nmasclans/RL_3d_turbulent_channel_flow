@@ -91,13 +91,6 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rmsf_v_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
         DistributedArray rmsf_w_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
 
-        /// Reward calculation
-        double l2_d_avg_u_previous;
-        double l2_d_rmsf_u_previous;
-        double l2_d_rmsf_v_previous;
-        double l2_d_rmsf_w_previous;
-        double l2_rl_f_previous;
-
         /// Witness points
         std::string witness_file;
         std::vector<TemporalPointProbe> temporal_witness_probes;
