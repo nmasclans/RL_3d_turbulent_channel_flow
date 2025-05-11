@@ -2803,11 +2803,11 @@ void myRHEA::calculateReward() {
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     
     // Reward weight coefficients
-    double b_param = 1.0;
-    double c1 = 10.0 / actuation_period;
-    double c2 = 1.0  / actuation_period;
-    double c3 = 1.0  / actuation_period;
-    double c4 = 1.0  / actuation_period;
+    double b_param = 10.0;
+    double c1 = 1.0 / actuation_period;
+    double c2 = 0.1 / actuation_period;
+    double c3 = 0.1 / actuation_period;
+    double c4 = 0.1 / actuation_period;
 
     /// Initialize variables
     double l2_avg_u      = 0.0;
