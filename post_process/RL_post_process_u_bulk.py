@@ -44,10 +44,10 @@ else:
 
 # --- Simulation parameters ---
 
-restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
-restart_data_file_averaging_time = 2.0  # restart_data_file attribute 'AveragingTime'
+restart_data_file_time = 318.99999999   # restart_data_file attribute 'Time'
+restart_data_file_averaging_time = 0.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0        = restart_data_file_time - restart_data_file_averaging_time 
-avg_u_bulk_ref = 14.665
+avg_u_bulk_ref = 14.647
 
 # --- Post-processing parameters ---
 
