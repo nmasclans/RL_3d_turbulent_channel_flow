@@ -42,8 +42,8 @@ else:
     raise ValueError(f"Unrecognized input argument run_mode = `{run_mode}`")
 
 # --- Simulation parameters ---
-restart_data_file_time = 320.999999999  # restart_data_file attribute 'Time'
-restart_data_file_averaging_time = 2.0  # restart_data_file attribute 'AveragingTime'
+restart_data_file_time = 321.999999999  # restart_data_file attribute 'Time'
+restart_data_file_averaging_time = 0.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0    = restart_data_file_time - restart_data_file_averaging_time 
 
 # --- Post-processing parameters ---
@@ -191,8 +191,10 @@ print("\nBuilding local_reward and reward gif frames...")
 # Allocate frames dictionary: empty list per each action dimension 
 frames_plot_local_reward = []
 frames_plot_reward       = []
+frames_plot_reward_zoom  = []
 frames_pdf_local_reward  = []
 frames_pdf_reward        = []
+frames_pdf_reward_zoom   = []
 # Generate frames
 for i_RL in range(n_RL):
     # log progress
@@ -201,10 +203,12 @@ for i_RL in range(n_RL):
     # Build frames
     frames_plot_local_reward, frames_pdf_local_reward = visualizer.build_rewards_frames(frames_plot_local_reward, frames_pdf_local_reward, avg_time_dict[i_RL], local_reward_dict[i_RL], avg_time_lim, local_reward_lim, global_step_list[i_RL], "Local Reward")
     frames_plot_reward,       frames_pdf_reward       = visualizer.build_rewards_frames(frames_plot_reward,       frames_pdf_reward,       avg_time_dict[i_RL], reward_dict[i_RL],       avg_time_lim, reward_lim,       global_step_list[i_RL], "Reward")
+    frames_plot_reward_zoom,  frames_pdf_reward_zoom  = visualizer.build_rewards_frames(frames_plot_reward_zoom,  frames_pdf_reward_zoom,  avg_time_dict[i_RL], reward_dict[i_RL],       avg_time_lim, [-1,1],           global_step_list[i_RL], "Reward")
 
 print("\nBuilding gifs from frames...")
 visualizer.build_rewards_gifs_from_frames(frames_plot_local_reward, frames_pdf_local_reward, "reward_local")
 visualizer.build_rewards_gifs_from_frames(frames_plot_reward,       frames_pdf_reward,       "reward")
+visualizer.build_rewards_gifs_from_frames(frames_plot_reward_zoom,  frames_pdf_reward_zoom,  "reward_zoom")
 print("Gifs plotted successfully!")
 
 
