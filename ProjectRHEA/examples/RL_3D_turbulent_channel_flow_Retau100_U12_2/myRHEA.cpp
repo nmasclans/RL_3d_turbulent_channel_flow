@@ -2804,10 +2804,10 @@ void myRHEA::calculateReward() {
     
     // Reward weight coefficients
     double b_param = 1.0;
-    double c1 = 10.0 / actuation_period;
-    double c2 = 1.0  / actuation_period;
-    double c3 = 1.0  / actuation_period;
-    double c4 = 1.0  / actuation_period;
+    double c1 = 1.0 / actuation_period;
+    double c2 = 0.01  / actuation_period;
+    double c3 = 0.01  / actuation_period;
+    double c4 = 0.01  / actuation_period;
 
     /// Initialize variables
     double l2_avg_u      = 0.0;
