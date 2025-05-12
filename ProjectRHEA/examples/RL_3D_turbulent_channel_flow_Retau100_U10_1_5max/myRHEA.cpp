@@ -65,7 +65,7 @@ double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
 const double u_bulk_reference = 14.665;
 #endif
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
-const double avg_u_bulk_max = 14.647 + 0.005;
+const double avg_u_bulk_max = 14.647 + 0.353;
 const double avg_u_bulk_min = 14.647 - 0.565;
 #endif
 
@@ -2804,10 +2804,10 @@ void myRHEA::calculateReward() {
     
     // Reward weight coefficients
     double b_param = 1.0;
-    double c1 = 1.0 / actuation_period;
-    double c2 = 0.01  / actuation_period;
-    double c3 = 0.01  / actuation_period;
-    double c4 = 0.01  / actuation_period;
+    double c1 = 10.0 / actuation_period;
+    double c2 = 0.1  / actuation_period;
+    double c3 = 0.1  / actuation_period;
+    double c4 = 0.1  / actuation_period;
 
     /// Initialize variables
     double l2_avg_u      = 0.0;
