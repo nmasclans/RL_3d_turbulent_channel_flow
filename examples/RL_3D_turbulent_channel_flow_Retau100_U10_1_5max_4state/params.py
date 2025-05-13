@@ -58,7 +58,7 @@ params = {
     "t_begin_control": t_begin_control,
     "action_bounds": (-1.0, 1.0),
     "action_dim": 3,
-    "state_dim": 7,
+    "state_dim": 4,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file_3220000.h5", # 'random_choice' or filename as restart_data_file.h5

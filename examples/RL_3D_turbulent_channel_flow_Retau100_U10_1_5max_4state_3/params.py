@@ -51,14 +51,14 @@ params = {
 ###    "verbosity": "debug", # quiet, debug, info
 
     # RL params
-    "num_episodes": 8000,
+    "num_episodes": 200000,
     "num_epochs": cfd_n_envs * rl_n_envs,   # number of epochs to perform policy (optimizer) update per episode sampled. Rule of thumb: n_envs.
     "t_action": t_action,
     "t_episode": t_episode_train if run_mode == "train" else t_episode_eval,
     "t_begin_control": t_begin_control,
     "action_bounds": (-1.0, 1.0),
     "action_dim": 3,
-    "state_dim": 7,
+    "state_dim": 4,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
     "restart_file": "restart_data_file_3220000.h5", # 'random_choice' or filename as restart_data_file.h5
