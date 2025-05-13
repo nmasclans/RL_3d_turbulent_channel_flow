@@ -932,7 +932,6 @@ class ChannelVisualizer():
         avg_time: np.array([num_time_steps])
         actions:  np.array([num_time_steps, action_dim, rl_n_envs])
         """
-        import seaborn as sns
         action_dict = {0: r"$\Delta Rkk$", 1:r"$\Delta \theta_z$", 2:r"$\Delta \theta_y$", 3:r"$\Delta \theta_x$", 4:r"$\Delta x_1$", 5:r"$\Delta x_2$" }
         action_dim = actions.shape[1]
         rl_n_envs  = actions.shape[2]
@@ -998,6 +997,142 @@ class ChannelVisualizer():
 
 # ------------------------------------------------------------------------
 
+    def build_states_plot(self, avg_time, states, avg_time_lim, states_lim, global_step):
+        """
+        avg_time: np.array([num_time_steps])
+        states:  np.array([num_time_steps, state_dim, rl_n_envs])
+        """
+        state_dict = {0: r"$\Delta \overline{u}$", 1:r"$\Delta u_{\textrm{rms}}$", 2:r"$\Delta v_{\textrm{rms}}$", 3:r"$\Delta w_{\textrm{rms}}$", 4:r"$x/L_x$", 5:r"$y/L_y$", 6:r"$z/L_z$"}
+        state_dim  = states.shape[1]
+        rl_n_envs  = states.shape[2]
+        figs_dict  = {}
+        for i_state in range(state_dim):
+            fig, ax = plt.subplots()
+            for i_env in range(rl_n_envs):
+                plt.plot(avg_time, states[:,i_state,i_env], linewidth=2, label=rf"RL env {i_env}")
+            plt.xlim(avg_time_lim)
+            plt.ylim(states_lim)
+            plt.xlabel("Averaging time", fontsize=16)
+            plt.ylabel("State " + state_dict[i_state], fontsize=16)
+            plt.grid(axis="y")
+            plt.title(f"RL step = {global_step}", fontsize=16)
+            if (rl_n_envs < 15):
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.tight_layout()
+            figs_dict[i_state] = fig
+            plt.close()
+        return figs_dict
+    
+    def build_states_pdf(self, states, states_lim, global_step):
+        """
+        avg_time: np.array([num_time_steps])
+        states:  np.array([num_time_steps, state_dim, rl_n_envs])
+        """
+        state_dict = {0: r"$\Delta \overline{u}$", 1:r"$\Delta u_{\textrm{rms}}$", 2:r"$\Delta v_{\textrm{rms}}$", 3:r"$\Delta w_{\textrm{rms}}$", 4:r"$x/L_x$", 5:r"$y/L_y$", 6:r"$z/L_z$"}
+        state_dim  = states.shape[1]
+        rl_n_envs  = states.shape[2]
+        figs_dict  = {}
+        for i_state in range(state_dim):
+            fig, ax = plt.subplots()
+            for i_env in range(rl_n_envs):
+                act = states[:, i_state, i_env]
+                mean = np.mean(act)
+                std_dev = np.std(act)
+                sns.kdeplot(
+                    act, 
+                    ax=ax, 
+                    fill=True, 
+                    common_norm=False,  # Each env's KDE is independently normalized
+                    bw_adjust=1.0,
+                    label=rf"RL env {i_env}: $\mu$={mean:.2f}, $\sigma$={std_dev:.2f}"
+                )
+            plt.xlim(states_lim)
+            #plt.ylim([0,1])
+            plt.xlabel("State " + state_dict[i_state], fontsize=16)
+            plt.ylabel("PDF", fontsize=16)
+            plt.title(f"RL step = {global_step}", fontsize=16)
+            if (rl_n_envs < 15):
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.tight_layout()
+            figs_dict[i_state] = fig
+            plt.close()
+        return figs_dict 
+
+    def build_states_ensemble_average(self, avg_time, states, avg_time_lim, states_lim, global_step):
+        state_dict = {0: r"$\Delta \overline{u}$", 1:r"$\Delta u_{\textrm{rms}}$", 2:r"$\Delta v_{\textrm{rms}}$", 3:r"$\Delta w_{\textrm{rms}}$", 4:r"$x/L_x$", 5:r"$y/L_y$", 6:r"$z/L_z$"}
+        state_dim  = states.shape[1]
+        rl_n_envs  = states.shape[2]
+        figs_dict  = {}
+        for i_state in range(state_dim):
+            fig = plt.figure()
+            state = states[:, i_state, :]
+            # Calculate mean, standard deviation, min, max values across all agents
+            mean_state = np.mean(state, axis=1)
+            std_state  = np.std(state, axis=1)
+            min_state  = np.min(state, axis=1)
+            max_state  = np.max(state, axis=1)
+            # Build plot
+            plt.plot(avg_time, mean_state,                             color = plt.cm.tab10(3), label=r'$\mathbb{E}[s]$')
+            plt.plot(avg_time, mean_state + std_state, linestyle='-.', color = plt.cm.tab10(3), label=r'$\pm \mathbb{V}^{1/2}[s]$')
+            plt.plot(avg_time, mean_state - std_state, linestyle='-.', color = plt.cm.tab10(3))
+            plt.fill_between(avg_time, min_state, max_state, alpha=0.3,    color='gray',        label=r'$\{s\}$')
+            plt.xlabel(r'$t_{avg}^+$' )
+            plt.ylabel(rf"State $s=${state_dict[i_state]}")
+            plt.xlim(avg_time_lim)
+            plt.ylim(states_lim)
+            plt.title(f"RL step = {global_step}", fontsize=16)
+            plt.legend(loc='upper right', frameon=True)
+            plt.grid(which='both',axis='y')
+            plt.tight_layout()
+            figs_dict[i_state] = fig
+            plt.close()
+        return figs_dict
+
+    def build_states_frames(self, frames_dict_plot, frames_dict_pdf, frames_dict_ensavg, avg_time, states, avg_time_lim, states_lim, global_step):
+        """
+        frames_dict_plot, frames_dict_pdf, frames_dict_ensavg: dictionaries with keys 0, 1, ..., state_dim-1
+        avg_time: np.array([num_time_steps])
+        states:  np.array([num_time_steps, state_dim, rl_n_envs])
+        """
+        figs_dict_plot   = self.build_states_plot(avg_time, states, avg_time_lim, states_lim, global_step)
+        figs_dict_pdf    = self.build_states_pdf(states, states_lim, global_step)
+        figs_dict_ensavg = self.build_states_ensemble_average(avg_time, states, avg_time_lim, states_lim, global_step)
+        state_dim = states.shape[1]
+        for i_state in range(state_dim):
+            # Plot frame
+            fig_plot = figs_dict_plot[i_state]
+            fig_plot.canvas.draw()
+            img_plot = Image.frombytes("RGB", fig_plot.canvas.get_width_height(), fig_plot.canvas.tostring_rgb())
+            frames_dict_plot[i_state].append(img_plot)
+            # Pdf frame
+            fig_pdf = figs_dict_pdf[i_state]
+            fig_pdf.canvas.draw()
+            img_pdf = Image.frombytes("RGB", fig_pdf.canvas.get_width_height(), fig_pdf.canvas.tostring_rgb())
+            frames_dict_pdf[i_state].append(img_pdf)
+            # Ensemble average frame
+            fig_ensavg  = figs_dict_ensavg[i_state]
+            fig_ensavg.canvas.draw()
+            img_ensavg = Image.frombytes("RGB", fig_ensavg.canvas.get_width_height(), fig_ensavg.canvas.tostring_rgb())
+            frames_dict_ensavg[i_state].append(img_ensavg)
+        return frames_dict_plot, frames_dict_pdf, frames_dict_ensavg
+    
+    def build_state_gifs_from_frames(self, frames_dict_plot, frames_dict_pdf, frames_dict_ensavg, state_dim):
+        for i_state in range(state_dim):
+            # Plot gif
+            filename = os.path.join(self.postRlzDir, f"state{i_state}_plot_vs_global_steps.gif")
+            print(f"\nMAKING GIF SCATTER state {i_state} along RL GLOBAL STEPS in {filename}" )
+            frames_dict_plot[i_state][0].save(filename, save_all=True, append_images=frames_dict_plot[i_state][1:], duration=1000, loop=0)    
+            # Pdf gif
+            filename = os.path.join(self.postRlzDir, f"state{i_state}_pdf_vs_global_steps.gif")
+            print(f"\nMAKING GIF PDF state {i_state} along RL GLOBAL STEPS in {filename}" )
+            frames_dict_pdf[i_state][0].save(filename, save_all=True, append_images=frames_dict_pdf[i_state][1:], duration=1000, loop=0)   
+            # Ensemble average gif
+            filename = os.path.join(self.postRlzDir, f"state{i_state}_ensavg_vs_global_steps.gif")
+            print(f"\nMAKING GIF ENSEMBLE AVERAGE state {i_state} along RL GLOBAL STEPS in {filename}" )
+            frames_dict_ensavg[i_state][0].save(filename, save_all=True, append_images=frames_dict_ensavg[i_state][1:], duration=1000, loop=0)   
+
+# ------------------------------------------------------------------------
+
     def build_rewards_plot(self, avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name):
         """
         avg_time: np.array([num_time_steps])
@@ -1052,14 +1187,38 @@ class ChannelVisualizer():
         plt.close()
         return fig_pdf
 
-    def build_rewards_frames(self, frames_plot, frames_pdf, avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name = 'Local Reward'):
+    def build_rewards_ensemble_average(self, avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name):
+        # Calculate mean, standard deviation, min, max values across all agents
+        mean_rew = np.mean(rewards, axis=1)
+        std_rew  = np.std(rewards, axis=1)
+        min_rew  = np.min(rewards, axis=1)
+        max_rew  = np.max(rewards, axis=1)
+        # Build plot
+        fig_ensavg = plt.figure()
+        plt.plot(avg_time, mean_rew,                           color = plt.cm.tab10(3), label=r'$\mathbb{E}[r]$')
+        plt.plot(avg_time, mean_rew + std_rew, linestyle='-.', color = plt.cm.tab10(3), label=r'$\pm \mathbb{V}^{1/2}[r]$')
+        plt.plot(avg_time, mean_rew - std_rew, linestyle='-.', color = plt.cm.tab10(3))
+        plt.fill_between(avg_time, min_rew, max_rew, alpha=0.3,    color='gray',        label=r'$\{r\}$')
+        plt.xlabel(r'$t_{avg}^+$' )
+        plt.ylabel(r"Reward $r$")
+        plt.xlim(avg_time_lim)
+        plt.ylim(rewards_lim)
+        plt.title(f"RL step = {global_step}", fontsize=16)
+        plt.legend(loc='upper right', frameon=True)
+        plt.grid(which='both',axis='y')
+        plt.tight_layout()
+        plt.close()
+        return fig_ensavg
+
+    def build_rewards_frames(self, frames_plot, frames_pdf, frames_ensavg, avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name = 'Local Reward'):
         """
         frames_plot, frames_pdf: lists of frames of different plots
         avg_time: np.array([num_time_steps])
         rewards:  np.array([num_time_steps, rl_n_envs])
         """
-        fig_plot = self.build_rewards_plot(avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name)
-        fig_pdf  = self.build_rewards_pdf(rewards, rewards_lim, global_step, reward_name)
+        fig_plot   = self.build_rewards_plot(avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name)
+        fig_pdf    = self.build_rewards_pdf(rewards, rewards_lim, global_step, reward_name)
+        fig_ensavg = self.build_rewards_ensemble_average(avg_time, rewards, avg_time_lim, rewards_lim, global_step, reward_name)
         # Plot frame
         fig_plot.canvas.draw()
         img_plot = Image.frombytes("RGB", fig_plot.canvas.get_width_height(), fig_plot.canvas.tostring_rgb())
@@ -1068,9 +1227,15 @@ class ChannelVisualizer():
         fig_pdf.canvas.draw()
         img_pdf = Image.frombytes("RGB", fig_pdf.canvas.get_width_height(), fig_pdf.canvas.tostring_rgb())
         frames_pdf.append(img_pdf)
-        return frames_plot, frames_pdf
+        # Ensemble average frame
+        fig_ensavg.canvas.draw()
+        img_ensavg = Image.frombytes("RGB", fig_ensavg.canvas.get_width_height(), fig_ensavg.canvas.tostring_rgb())
+        frames_ensavg.append(img_ensavg)
+        return frames_plot, frames_pdf, frames_ensavg
 
-    def build_rewards_gifs_from_frames(self, frames_plot, frames_pdf, reward_name = "local_reward"):
+
+
+    def build_rewards_gifs_from_frames(self, frames_plot, frames_pdf, frames_ensavg, reward_name = "local_reward"):
         # plot gif
         filename = os.path.join(self.postRlzDir, f"{reward_name}_plot_vs_global_steps.gif")
         print(f"\nMAKING GIF PLOT {reward_name} along RL GLOBAL STEPS in {filename}" )
@@ -1079,14 +1244,18 @@ class ChannelVisualizer():
         filename = os.path.join(self.postRlzDir, f"{reward_name}_pdf_vs_global_steps.gif")
         print(f"\nMAKING GIF PDF {reward_name} along RL GLOBAL STEPS in {filename}" )
         frames_pdf[0].save(filename, save_all=True, append_images=frames_pdf[1:], duration=1000, loop=0)    
+        # ensemble average gif
+        filename = os.path.join(self.postRlzDir, f"{reward_name}_ensavg_vs_global_steps.gif")
+        print(f"\nMAKING GIF ENSEMBLE AVERAGE {reward_name} along RL GLOBAL STEPS in {filename}" )
+        frames_ensavg[0].save(filename, save_all=True, append_images=frames_ensavg[1:], duration=1000, loop=0)    
 
 # ------------------------------------------------------------------------
 
     def build_avg_u_bulk_frames(self, frames_plot, avg_time, avg_u_bulk_num, avg_u_bulk_ref, global_step, xlim, ylim):
         # Build figure
         fig, ax = plt.subplots()
-        plt.hlines(avg_u_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2,  color='black', label=r"Reference")
-        plt.scatter(avg_time, avg_u_bulk_num,         marker = '^',   s = 2,        color=plt.cm.tab10(1), label=r"RL Framework")
+        plt.hlines(avg_u_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2, color='black', label=r"Reference")
+        plt.plot(avg_time, avg_u_bulk_num,           linestyle = '-', linewidth=2, color=plt.cm.tab10(1), label=r"RL Framework")
         plt.xlabel( r'Averaging time $t_{avg}^+$', fontsize=16)
         plt.ylabel( r'$\overline{u}^{+}_b$', fontsize=16)
         plt.xlim(xlim)

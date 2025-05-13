@@ -59,7 +59,7 @@ if not os.path.exists(postDir):
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
-    iteration_max_nonRL = 4190000
+    iteration_max_nonRL = 3400000
 else:   # run_mode == "eval"
     iteration_max_nonRL = 3860000
 max_length_legend_RL = 10
@@ -71,7 +71,7 @@ simulation_time_per_train_step   = t_episode_train                    # total cf
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
 if run_mode == "train":
-    iteration_restart_data_file  = 3190000
+    iteration_restart_data_file  = 3220000
 else:   # run_mode == "eval"
     iteration_restart_data_file  = 2840000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
