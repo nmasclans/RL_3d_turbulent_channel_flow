@@ -11,9 +11,9 @@ for i in {10..12}; do
 
         cd "$CASE_DIR_AUX" || { echo "Failed to enter $CASE_DIR_AUX"; exit 1; }
 
-        bash ./run_train_triton.sh > "train_case_U${i}_${j}.out" 2>&1
+        bash ./run_train_triton.sh > "nohup.out" 2>&1
 
-        echo "Finished Case U${i}_${j}."
+        echo "Finished Case U${i}_1_${j}max."
     done
 done
 
