@@ -78,7 +78,7 @@ if not os.path.exists(postDir):
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
-    iteration_max_nonRL = 4190000
+    iteration_max_nonRL = 4550000
 else:   # run_mode == "eval"
     iteration_max_nonRL = 3860000
 

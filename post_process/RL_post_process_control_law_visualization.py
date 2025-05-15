@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.manifold import MDS
 
-scatter_step = 20
-
 def cluster_control_analysis(X, U, n_clusters=10, random_state=42):
     # Step 1: Flatten input for clustering
     n_steps, n_agents, state_dim = X.shape
@@ -127,7 +125,8 @@ if __name__ == '__main__':
     run_mode   = "train"
     train_name = "train_2025-05-14--10-14-13--c1d6"
     rl_n_envs  = 160
-    step       = "007040"
+    step       = "027040"
+    scatter_step = 20
     
     time_data_dir   = f"{case_dir}/{run_mode}/{train_name}/time/"
     state_data_dir  = f"{case_dir}/{run_mode}/{train_name}/state/"

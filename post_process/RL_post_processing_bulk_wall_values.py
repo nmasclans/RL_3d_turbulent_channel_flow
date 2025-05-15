@@ -53,7 +53,7 @@ if not os.path.exists(postDir):
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
-    iteration_max_nonRL = 4990000
+    iteration_max_nonRL = 4550000
 else:   # run_mode == "eval"
     iteration_max_nonRL = 3860000
 max_length_legend_RL = 10
@@ -243,11 +243,13 @@ z_data = z_data_ref
 
 # --- Calculate U_bulk ---
 
+print("\nCalculating averaged & instantaneous u_bulk...")
 sum_avg_u_volume_RL    = np.zeros(N_RL);    sum_u_volume_RL    = np.zeros(N_RL)
 sum_avg_u_volume_nonRL = np.zeros(N_nonRL); sum_u_volume_nonRL = np.zeros(N_nonRL)
 sum_avg_u_volume_ref   = 0.0;               sum_u_volume_ref   = 0.0
 sum_volume = 0.0
 for i in range( 1, num_points_x-1 ):
+    print(f"{i/num_points_x*100:.0f}%")
     for j in range( 1, num_points_y-1 ):
         for k in range( 1, num_points_z-1 ):
             # Geometric stuff
@@ -269,13 +271,9 @@ for i in range( 1, num_points_x-1 ):
             sum_u_volume_ref     += u_data_ref[k,j,i] * delta_volume
             sum_avg_u_volume_ref += avg_u_data_ref[k,j,i] * delta_volume
 
-avg_u_b_RL    = sum_avg_u_volume_RL    / sum_volume;            u_b_RL    = sum_u_volume_RL    / sum_volume
-avg_u_b_nonRL = sum_avg_u_volume_nonRL / sum_volume;            u_b_nonRL = sum_u_volume_nonRL / sum_volume
-avg_u_b_ref   = sum_avg_u_volume_ref   / sum_volume;            u_b_ref   = sum_u_volume_ref   / sum_volume
-print("\n----------------------------------------------------------------------------------------------------")
-print( "\nREFERENCE Numerical avg_u_bulk:", avg_u_b_ref );      print( "\nREFERENCE Numerical instantaneous u_bulk:", u_b_ref )    
-print( "\nRL Numerical avg_u_bulk:",        avg_u_b_RL );       print( "\nRL Numerical instantaneous u_bulk:",        u_b_RL )    
-print( "\nnon-RL Numerical avg_u_bulk:",    avg_u_b_nonRL );    print( "\nnon-RL Numerical instantaneous u_bulk:",    u_b_nonRL )        
+avg_u_b_RL    = sum_avg_u_volume_RL    / sum_volume;  u_b_RL    = sum_u_volume_RL    / sum_volume
+avg_u_b_nonRL = sum_avg_u_volume_nonRL / sum_volume;  u_b_nonRL = sum_u_volume_nonRL / sum_volume
+avg_u_b_ref   = sum_avg_u_volume_ref   / sum_volume;  u_b_ref   = sum_u_volume_ref   / sum_volume
 
 # --- Calculate \tau_wall ---
 
@@ -333,13 +331,34 @@ tau_w_num_ref   = mu_ref * (avg_u_inner_ref   - avg_u_boundary_ref)   / (y_data[
 u_tau_num_RL    = np.sqrt(tau_w_num_RL    / rho_0) 
 u_tau_num_nonRL = np.sqrt(tau_w_num_nonRL / rho_0) 
 u_tau_num_ref   = np.sqrt(tau_w_num_ref   / rho_0) 
-print("\n----------------------------------------------------------------------------------------------------")
-print("\nREFERENCE Numerical tau_w:", tau_w_num_ref)
-print("REFERENCE Numerical u_tau:", u_tau_num_ref)
-print("\nRL Numerical tau_w:", tau_w_num_RL)
-print("RL Numerical u_tau:", u_tau_num_RL)
-print("\nnon-RL Numerical tau_w:", tau_w_num_nonRL)
-print("non-RL Numerical u_tau:", u_tau_num_nonRL)
+
+#--------------------------------------------------------------------------------------------
+
+# Store quantities in file
+bulk_wall_values_filename = f"{postDir}/bulk_wall_values.txt"
+print(f"\nWriting bulk & wall values in file '{bulk_wall_values_filename}'")
+with open(bulk_wall_values_filename, "w") as file:
+    file.write("\n\n------------------------------------------------")
+    file.write("avg_u_bulk:")
+    file.write(f"\nReference, Converged Numerical avg_u_bulk: {avg_u_b_ref}" )
+    file.write(f"\nRL Numerical avg_u_bulk: {avg_u_b_RL}" )
+    file.write(f"\nnon-RL Numerical avg_u_bulk: {avg_u_b_nonRL}" )
+    file.write("\n\n------------------------------------------------")
+    file.write("u_bulk:")
+    file.write(f"\nReference, Converged Numerical instantaneous u_bulk: {u_b_ref}" )
+    file.write(f"\nRL Numerical instantaneous u_bulk: {u_b_RL}" )
+    file.write(f"\nnon-RL Numerical instantaneous u_bulk: {u_b_nonRL}" )
+    file.write("\n\n------------------------------------------------")
+    file.write("\ntau_w:")
+    file.write(f"\nReference, Converged Numerical tau_w: {tau_w_num_ref}")
+    file.write(f"\nRL Numerical tau_w: {tau_w_num_RL}")
+    file.write(f"\nnon-RL Numerical tau_w: {tau_w_num_nonRL}")
+    file.write("\n\n------------------------------------------------")
+    file.write("\nu_tau:")
+    file.write(f"\nReference, Converged Numerical u_tau: {u_tau_num_ref}")
+    file.write(f"\nRL Numerical u_tau: {u_tau_num_RL}")
+    file.write(f"\nnon-RL Numerical u_tau: {u_tau_num_nonRL}")
+print("Bulk & wall values written successfully!")
 
 #--------------------------------------------------------------------------------------------
 

@@ -88,9 +88,9 @@ if matching_files:
         global_step_list.append(global_step)
         # Logging
         print(f"\nMpi output filename: {filename}")
-        print(f"\nMpi output filepath: {filepath}")
-        print(f"\nFile details: {file_details}")
-        print(f"\nGlobal step: {global_step}")
+        print(f"Mpi output filepath: {filepath}")
+        print(f"File details: {file_details}")
+        print(f"Global step: {global_step}")
 else:
     print(f"No files found matching the pattern: {pattern}")
 
