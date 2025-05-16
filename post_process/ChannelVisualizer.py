@@ -1251,11 +1251,11 @@ class ChannelVisualizer():
 
     def build_rewards_terms_plot(self, avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
         fig, ax = plt.subplots()
-        plt.semilogy(avg_time, local_reward, linewidth=2, label=r"Reward total")
-        plt.semilogy(avg_time, avg_u_reward, linewidth=2, label=r"Reward term $\overline{u}$")
-        plt.semilogy(avg_time, rms_u_reward, linewidth=2, label=r"Reward term $u_{\textrm{rms}}$")
-        plt.semilogy(avg_time, rms_v_reward, linewidth=2, label=r"Reward term $v_{\textrm{rms}}$")
-        plt.semilogy(avg_time, rms_w_reward, linewidth=2, label=r"Reward term $w_{\textrm{rms}}$")
+        plt.plot(avg_time, local_reward, linewidth=2, label=r"Reward total")
+        plt.plot(avg_time, avg_u_reward, linewidth=2, label=r"Reward term $\overline{u}$")
+        plt.plot(avg_time, rms_u_reward, linewidth=2, label=r"Reward term $u_{\textrm{rms}}$")
+        plt.plot(avg_time, rms_v_reward, linewidth=2, label=r"Reward term $v_{\textrm{rms}}$")
+        plt.plot(avg_time, rms_w_reward, linewidth=2, label=r"Reward term $w_{\textrm{rms}}$")
         plt.xlim(avg_time_lim)
         plt.ylim(rewards_lim)
         plt.xlabel("Averaging time", fontsize=16)
