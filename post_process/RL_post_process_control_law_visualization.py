@@ -3,12 +3,22 @@ import os
 os.environ["OPENBLAS_NUM_THREADS"] = "64"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
-
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.cluster import KMeans
 from sklearn.manifold import MDS
+
+# Latex figures
+plt.rc( 'text',       usetex = True )
+plt.rc( 'font',       size = 18 )
+plt.rc( 'axes',       labelsize = 18)
+plt.rc( 'legend',     fontsize = 12, frameon = False)
+plt.rc( 'text.latex', preamble = r'\usepackage{amsmath} \usepackage{amssymb} \usepackage{color}')
+#plt.rc( 'savefig',    format = "jpg", dpi = 600)
+
+# -------------------------------------------------------------------------------------------------
 
 def cluster_control_analysis(X, U, n_clusters=10, random_state=42):
     # Step 1: Flatten input for clustering
@@ -45,24 +55,47 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42):
         std_u[i] = np.std( U_flat[cluster_indices], axis=0)
         min_u[i] = np.min( U_flat[cluster_indices], axis=0)
         max_u[i] = np.max( U_flat[cluster_indices], axis=0)
-    with open(f"control_law_visualization/control_action_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
+    with open(f"control_law_visualization/data_control_action_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Cluster", "ActionDim", "Mean", "Std", "Min", "Max"])
         for i in range(n_clusters):
             for d in range(action_dim):
                 writer.writerow([i, d, avg_u[i, d], std_u[i, d], min_u[i, d], max_u[i, d]])
 
+    # Step 4.2: Average State per Cluster
+    avg_x = np.zeros((n_clusters, state_dim))
+    std_x = np.zeros((n_clusters, state_dim))
+    min_x = np.zeros((n_clusters, state_dim))
+    max_x = np.zeros((n_clusters, state_dim))
+    for i in range(n_clusters):
+        cluster_indices = np.where(labels == i)[0]
+        avg_x[i] = np.mean(X_flat[cluster_indices], axis=0)
+        std_x[i] = np.std( X_flat[cluster_indices], axis=0)
+        min_x[i] = np.min( X_flat[cluster_indices], axis=0)
+        max_x[i] = np.max( X_flat[cluster_indices], axis=0)
+    with open(f"control_law_visualization/data_control_state_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Cluster", "ActionDim", "Mean", "Std", "Min", "Max"])
+        for i in range(n_clusters):
+            for d in range(state_dim):
+                writer.writerow([i, d, avg_x[i, d], std_x[i, d], min_x[i, d], max_x[i, d]])
+
+    # Step 4.3: plot data from steps 4 & 4.2
+    plot_cluster_statistics(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, max_u, n_clusters)
+    plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, max_u, n_clusters)
+
     # Step 5: MDS Projection
     mds = MDS(n_components=2, dissimilarity='euclidean', random_state=random_state)
     centroids_2d = mds.fit_transform(centroids)
     X_proj       = mds.fit_transform(X_flat[::scatter_step])
+    labels_proj  = labels[::scatter_step]
 
     # Step 6: Plotting 3-subplot figure
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
     # Left: Proximity Map (MDS + Clusters)
     axes[0].scatter(
-            X_proj[:, 0], X_proj[:, 1], c=labels[::scatter_step], cmap='tab10', s=10, alpha=0.6, label='Data Points'
+            X_proj[:, 0], X_proj[:, 1], c=labels_proj, cmap='tab10', s=10, alpha=0.6, label='Data Points'
     )
     scatter = axes[0].scatter(
         centroids_2d[:, 0], centroids_2d[:, 1], c=np.arange(n_clusters), cmap='tab10', s=300, edgecolors='k'
@@ -112,21 +145,103 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42):
     fig.colorbar(scatter2, ax=axes[2], label='Avg Actuation Norm per Cluster')
 
     plt.tight_layout()
-    plt.savefig(f"control_law_visualization/control_law_visualization_{n_clusters}clusters.png", dpi=600)
+    plt.savefig(f"control_law_visualization/fig_control_law_visualization_{n_clusters}clusters.png", dpi=600)
     plt.close()
 
     return labels, centroids, P, avg_u, centroids_2d
 
+# -------------------------------------------------------------------------------------------------
+
+def plot_cluster_statistics(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, max_u, n_clusters):
+    stats = {
+        "Mean":  (avg_x,  avg_u),
+        "Std":   (std_x,  std_u),
+        "Min":   (min_x,  min_u),
+        "Max":   (max_x,  max_u)
+    }
+
+    fig, axes = plt.subplots(4, 2, figsize=(14, 16))
+    stat_names = list(stats.keys())
+
+    for row, stat in enumerate(stat_names):
+        x_stat, u_stat = stats[stat]
+
+        sns.heatmap(x_stat.T, ax=axes[row][0], cmap="viridis", cbar=True)
+        axes[row][0].set_title(f"State {stat} per Cluster")
+        axes[row][0].set_xlabel("Cluster")
+        axes[row][0].set_ylabel("State Dimension")
+
+        sns.heatmap(u_stat.T, ax=axes[row][1], cmap="viridis", cbar=True)
+        axes[row][1].set_title(f"Action {stat} per Cluster")
+        axes[row][1].set_xlabel("Cluster")
+        axes[row][1].set_ylabel("Action Dimension")
+
+    plt.tight_layout()
+    plt.savefig(f"control_law_visualization/fig_statistics_summary_{n_clusters}clusters.png", dpi=300)
+    plt.close()
+
+def plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, max_u, n_clusters):
+    state_dim = avg_x.shape[1]
+    action_dim = avg_u.shape[1]
+    width_d = 0.75
+    width_c = 0.60 * width_d / n_clusters
+    
+    fig, ax = plt.subplots()
+    for d in range(state_dim):
+        for i in range(n_clusters):
+            x = d + (i * width_d / (n_clusters)) - width_d / (2*n_clusters)
+            # Min-Max gray bar
+            ax.add_patch(plt.Rectangle((x - 0.5 * width_c, min_x[i, d]), width_c, max_x[i, d] - min_x[i, d], color='gray', alpha=0.3))
+            # Std dev black bar
+            ax.plot([x, x], [avg_x[i, d] - std_x[i, d], avg_x[i, d] + std_x[i, d]], color='black', linewidth=2)
+            ax.plot([x - 0.5 * width_c, x + 0.5 * width_c], [avg_x[i, d] - std_x[i, d], avg_x[i, d] - std_x[i, d]], color='black', linewidth=2)
+            ax.plot([x - 0.5 * width_c, x + 0.5 * width_c], [avg_x[i, d] + std_x[i, d], avg_x[i, d] + std_x[i, d]], color='black', linewidth=2)
+            # Mean red line
+            ax.plot([x - 0.5 * width_c, x + 0.5 * width_c], [avg_x[i, d], avg_x[i, d]], color='red', linewidth=2)
+    ax.set_title("State Statistics per Cluster")
+    ax.set_xlabel("State Dimension")
+    ax.set_ylabel("Value")
+    ax.grid(axis='y')
+    ax.set_xticks(np.arange(state_dim))
+    ax.set_xlim(-0.5, state_dim - 0.5)
+    plt.tight_layout()
+    plt.savefig(f"control_law_visualization/fig_statistics_profiles_state_{n_clusters}clusters.png", dpi=300)
+    plt.close()
+
+    # Plot ACTION statistics as pseudo-violin style per dimension
+    fig, ax = plt.subplots()
+    for d in range(action_dim):
+        for i in range(n_clusters):
+            x = d + (i * width_d / (n_clusters)) - width_d / (2*n_clusters)
+            # Min-Max gray bar
+            ax.add_patch(plt.Rectangle((x - 0.5 * width_c, min_u[i, d]), width_c, max_u[i, d] - min_u[i, d], color='gray', alpha=0.3))
+            # Std dev black bar
+            ax.plot([x, x], [avg_u[i, d] - std_u[i, d], avg_u[i, d] + std_u[i, d]], color='black', linewidth=2)
+            ax.plot([x - 0.5 * width_c, x + 0.5 * width_c], [avg_u[i, d] - std_u[i, d], avg_u[i, d] - std_u[i, d]], color='black', linewidth=2)
+            ax.plot([x - 0.5 * width_c, x + 0.5 * width_c], [avg_u[i, d] + std_u[i, d], avg_u[i, d] + std_u[i, d]], color='black', linewidth=2)
+            # Mean red line
+            ax.plot([x - 0.5 * width_c, x + 0.5 * width_c], [avg_u[i, d], avg_u[i, d]], color='red', linewidth=2)
+    ax.set_title("Action Statistics per Cluster")
+    ax.set_xlabel("Action Dimension")
+    ax.set_ylabel("Value")
+    ax.grid(axis='y')
+    ax.set_xticks(np.arange(action_dim))
+    ax.set_xlim(-0.5, action_dim - 0.5)
+    plt.tight_layout()
+    plt.savefig(f"control_law_visualization/fig_statistics_profiles_action_{n_clusters}clusters.png", dpi=300)
+    plt.close()
+
+# -------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
 
     ensemble   = "0"
-    case_dir   = "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_U10_3tavg0_5max_4state"
+    case_dir   = "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_U10_5tavg0_5max_4state_2"
     run_mode   = "train"
-    train_name = "train_2025-05-14--10-14-13--c1d6"
+    train_name = "train_2025-05-16--11-16-34--65bd"
     rl_n_envs  = 160
-    step       = "027040"
-    scatter_step = 20
+    step       = "007040"
+    scatter_step = 40
     
     time_data_dir   = f"{case_dir}/{run_mode}/{train_name}/time/"
     state_data_dir  = f"{case_dir}/{run_mode}/{train_name}/state/"

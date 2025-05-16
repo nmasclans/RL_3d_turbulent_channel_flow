@@ -1233,8 +1233,6 @@ class ChannelVisualizer():
         frames_ensavg.append(img_ensavg)
         return frames_plot, frames_pdf, frames_ensavg
 
-
-
     def build_rewards_gifs_from_frames(self, frames_plot, frames_pdf, frames_ensavg, reward_name = "local_reward"):
         # plot gif
         filename = os.path.join(self.postRlzDir, f"{reward_name}_plot_vs_global_steps.gif")
@@ -1248,6 +1246,35 @@ class ChannelVisualizer():
         filename = os.path.join(self.postRlzDir, f"{reward_name}_ensavg_vs_global_steps.gif")
         print(f"\nMAKING GIF ENSEMBLE AVERAGE {reward_name} along RL GLOBAL STEPS in {filename}" )
         frames_ensavg[0].save(filename, save_all=True, append_images=frames_ensavg[1:], duration=1000, loop=0)    
+
+# ------------------------------------------------------------------------
+
+    def build_rewards_terms_plot(self, avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
+        fig, ax = plt.subplots()
+        plt.semilogy(avg_time, local_reward, linewidth=2, label=r"Reward total")
+        plt.semilogy(avg_time, avg_u_reward, linewidth=2, label=r"Reward term $\overline{u}$")
+        plt.semilogy(avg_time, rms_u_reward, linewidth=2, label=r"Reward term $u_{\textrm{rms}}$")
+        plt.semilogy(avg_time, rms_v_reward, linewidth=2, label=r"Reward term $v_{\textrm{rms}}$")
+        plt.semilogy(avg_time, rms_w_reward, linewidth=2, label=r"Reward term $w_{\textrm{rms}}$")
+        plt.xlim(avg_time_lim)
+        plt.ylim(rewards_lim)
+        plt.xlabel("Averaging time", fontsize=16)
+        plt.grid(axis="y")
+        plt.title(f"RL step = {global_step}", fontsize=16)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout()
+        fig_plot = fig
+        plt.close()
+        return fig_plot
+   
+    def build_rewards_terms_frames(self, frames_plot, avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
+        # Ensemble average figure
+        fig_plot = self.build_rewards_terms_plot(avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step)
+        # Ensemble average frame
+        fig_plot.canvas.draw()
+        img_plot = Image.frombytes("RGB", fig_plot.canvas.get_width_height(), fig_plot.canvas.tostring_rgb())
+        frames_plot.append(img_plot)
+        return frames_plot
 
 # ------------------------------------------------------------------------
 
