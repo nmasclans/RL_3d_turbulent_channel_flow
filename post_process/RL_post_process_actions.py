@@ -168,10 +168,12 @@ print("\nBuilding actions gif frames...")
 
 # Allocate frames dictionary: empty list per each action dimension 
 frames_dict_scatter = {}
-frames_dict_pdf = {}
+frames_dict_pdf     = {}
+frames_dict_ensavg  = {}
 for i_act in range(action_dim):
     frames_dict_scatter[i_act] = []
     frames_dict_pdf[i_act] = []
+    frames_dict_ensavg[i_act] = []
 
 # Generate frames
 for i_RL in range(n_RL):
@@ -179,10 +181,10 @@ for i_RL in range(n_RL):
     if i_RL % (n_RL//10 or 1) == 0:
         print(f"{i_RL/n_RL*100:.0f}%")
     # Build frames
-    frames_dict_scatter, frames_dict_pdf = visualizer.build_actions_frames(frames_dict_scatter, frames_dict_pdf, avg_time_dict[i_RL], action_dict[i_RL], avg_time_lim, action_lim, global_step_list[i_RL])
+    frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg = visualizer.build_actions_frames(frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg, avg_time_dict[i_RL], action_dict[i_RL], avg_time_lim, action_lim, global_step_list[i_RL])
 
 print("\nBuilding gifs from frames...")
-visualizer.build_action_gifs_from_frames(frames_dict_scatter, frames_dict_pdf, action_dim)
+visualizer.build_action_gifs_from_frames(frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg, action_dim)
 print("Gifs plotted successfully!")
 
 

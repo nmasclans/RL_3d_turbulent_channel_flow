@@ -961,15 +961,46 @@ class ChannelVisualizer():
             figs_dict[i_act] = fig
             plt.close()
         return figs_dict
+
+    def build_actions_ensemble_average(self, avg_time, actions, avg_time_lim, actions_lim, global_step):
+        action_dict = {0: r"$\Delta Rkk$", 1:r"$\Delta \theta_z$", 2:r"$\Delta \theta_y$", 3:r"$\Delta \theta_x$", 4:r"$\Delta x_1$", 5:r"$\Delta x_2$" }
+        action_dim = actions.shape[1]
+        rl_n_envs  = actions.shape[2]
+        figs_dict  = {}
+        for i_act in range(action_dim):
+            fig = plt.figure()
+            action = actions[:, i_act, :]
+            # Calculate mean, standard deviation, min, max values across all agents
+            mean_action = np.mean(action, axis=1)
+            std_action  = np.std(action, axis=1)
+            min_action  = np.min(action, axis=1)
+            max_action  = np.max(action, axis=1)
+            # Build plot
+            plt.plot(avg_time, mean_action,                             color = plt.cm.tab10(3), label=r'$\mathbb{E}[a]$')
+            plt.plot(avg_time, mean_action + std_action, linestyle='-.', color = plt.cm.tab10(3), label=r'$\pm \mathbb{V}^{1/2}[a]$')
+            plt.plot(avg_time, mean_action - std_action, linestyle='-.', color = plt.cm.tab10(3))
+            plt.fill_between(avg_time, min_action, max_action, alpha=0.3,    color='gray',        label=r'$\{a\}$')
+            plt.xlabel(r'$t_{avg}^+$' )
+            plt.ylabel(rf"Action $a=${action_dict[i_act]}")
+            plt.xlim(avg_time_lim)
+            plt.ylim(actions_lim)
+            plt.title(f"RL step = {global_step}", fontsize=16)
+            plt.legend(loc='upper right', frameon=True)
+            plt.grid(which='both',axis='y')
+            plt.tight_layout()
+            figs_dict[i_act] = fig
+            plt.close()
+        return figs_dict
     
-    def build_actions_frames(self, frames_dict_scatter, frames_dict_pdf, avg_time, actions, avg_time_lim, actions_lim, global_step):
+    def build_actions_frames(self, frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg, avg_time, actions, avg_time_lim, actions_lim, global_step):
         """
-        frames_dict_scatter, frames_dict_pdf: dictionaries with keys 0, 1, ..., action_dim-1
+        frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg: dictionaries with keys 0, 1, ..., action_dim-1
         avg_time: np.array([num_time_steps])
         actions:  np.array([num_time_steps, action_dim, rl_n_envs])
         """
-        figs_dict_scatter = self.build_actions_scatter(avg_time, actions, avg_time_lim, actions_lim, global_step)
-        figs_dict_pdf     = self.build_actions_pdf(actions, actions_lim, global_step)
+        figs_dict_scatter  = self.build_actions_scatter(avg_time, actions, avg_time_lim, actions_lim, global_step)
+        figs_dict_pdf      = self.build_actions_pdf(actions, actions_lim, global_step)
+        figs_dict_ensavg   = self.build_actions_ensemble_average(avg_time, actions, avg_time_lim, actions_lim, global_step)
         action_dim = actions.shape[1]
         for i_act in range(action_dim):
             # Scatter frame
@@ -978,13 +1009,18 @@ class ChannelVisualizer():
             img_scatter = Image.frombytes("RGB", fig_scatter.canvas.get_width_height(), fig_scatter.canvas.tostring_rgb())
             frames_dict_scatter[i_act].append(img_scatter)
             # Pdf frame
-            fig_pdf     = figs_dict_pdf[i_act]
+            fig_pdf = figs_dict_pdf[i_act]
             fig_pdf.canvas.draw()
             img_pdf = Image.frombytes("RGB", fig_pdf.canvas.get_width_height(), fig_pdf.canvas.tostring_rgb())
             frames_dict_pdf[i_act].append(img_pdf)
-        return frames_dict_scatter, frames_dict_pdf
+            # Ensemble average frame
+            fig_ensavg = figs_dict_ensavg[i_act]
+            fig_ensavg.canvas.draw()
+            img_ensavg = Image.frombytes("RGB", fig_ensavg.canvas.get_width_height(), fig_ensavg.canvas.tostring_rgb())
+            frames_dict_ensavg[i_act].append(img_ensavg)
+        return frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg
     
-    def build_action_gifs_from_frames(self, frames_dict_scatter, frames_dict_pdf, action_dim):
+    def build_action_gifs_from_frames(self, frames_dict_scatter, frames_dict_pdf, frames_dict_ensavg, action_dim):
         for i_act in range(action_dim):
             # scatter gif
             filename = os.path.join(self.postRlzDir, f"action{i_act}_scatter_vs_global_steps.gif")
@@ -994,6 +1030,10 @@ class ChannelVisualizer():
             filename = os.path.join(self.postRlzDir, f"action{i_act}_pdf_vs_global_steps.gif")
             print(f"\nMAKING GIF PDF action {i_act} along RL GLOBAL STEPS in {filename}" )
             frames_dict_pdf[i_act][0].save(filename, save_all=True, append_images=frames_dict_pdf[i_act][1:], duration=1000, loop=0)    
+            # ensemble average gif
+            filename = os.path.join(self.postRlzDir, f"action{i_act}_ensavg_vs_global_steps.gif")
+            print(f"\nMAKING GIF ENSEMBLE AVERAGE action {i_act} along RL GLOBAL STEPS in {filename}" )
+            frames_dict_ensavg[i_act][0].save(filename, save_all=True, append_images=frames_dict_ensavg[i_act][1:], duration=1000, loop=0)    
 
 # ------------------------------------------------------------------------
 
