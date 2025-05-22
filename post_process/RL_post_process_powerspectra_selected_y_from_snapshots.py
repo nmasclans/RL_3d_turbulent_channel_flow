@@ -60,7 +60,7 @@ cfd_n_envs = 1
 simulation_time_per_train_step   = t_episode_train * cfd_n_envs       # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
-iteration_restart_data_file      = 3220000
+iteration_restart_data_file      = 3240000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
 assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
 print("\nRL parameters: \n- Simulation time per train step:", simulation_time_per_train_step, 

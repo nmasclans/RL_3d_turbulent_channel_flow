@@ -172,7 +172,7 @@ all_rewards = np.concatenate(list(itertools.chain.from_iterable([
 avg_time_min, avg_time_max = all_avg_time.min(), all_avg_time.max()
 reward_min, reward_max = all_rewards.min(), all_rewards.max()
 avg_time_lim = [avg_time_min, avg_time_max]
-rewards_lim  = [reward_min, reward_max]
+rewards_lim  = [reward_min, int(reward_max)+1]
 print(f"Averaging time limits: {avg_time_lim}")
 print(f"Reward terms limits: {rewards_lim}")
 

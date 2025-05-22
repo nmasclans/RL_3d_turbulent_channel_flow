@@ -236,12 +236,12 @@ def plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, 
 if __name__ == '__main__':
 
     ensemble   = "0"
-    case_dir   = "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_U10_5tavg0_5max_4state_3"
+    case_dir   = "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_10max_4state"
     run_mode   = "train"
-    train_name = "train_2025-05-16--16-15-24--18c4"
+    train_name = "train_2025-05-21--22-35-12--a0d2"
     rl_n_envs  = 160
-    step       = "040000"
-    scatter_step = 40
+    step       = "017120"
+    scatter_step = 4
     
     time_data_dir   = f"{case_dir}/{run_mode}/{train_name}/time/"
     state_data_dir  = f"{case_dir}/{run_mode}/{train_name}/state/"
