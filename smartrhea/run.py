@@ -15,7 +15,9 @@ from tf_agents.utils import common
 from tf_agents.metrics import tf_metrics
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.train.utils import spec_utils, strategy_utils
-from tf_agents.agents.ppo import ppo_actor_network, ppo_clip_agent
+#from tf_agents.agents.ppo import ppo_actor_network, ppo_clip_agent
+from tf_agents.agents.ppo import ppo_clip_agent
+from smartrhea import my_ppo_actor_network 
 from tf_agents.networks import value_network
 from tf_agents.eval import metric_utils
 from tf_agents.policies import policy_saver
@@ -151,10 +153,16 @@ logger.debug(f'Time Spec:\n{time_step_tensor_spec}')
     ppo_actor_network.PPOActorNetwork.__init__(self, seed_stream_class=<class 'tensorflow_probability.python.util.seed_stream.SeedStream'>)
     PPOActorNetwork.create_sequential_actor_net(self, fc_layer_units, action_tensor_spec, seed=None)
 """
-actor_net_builder = ppo_actor_network.PPOActorNetwork()         # TODO: Check ActorDistributionRnnNetwork otherwise
+#actor_net_builder = ppo_actor_network.PPOActorNetwork()         # TODO: Check ActorDistributionRnnNetwork otherwise
+#actor_net = actor_net_builder.create_sequential_actor_net(
+#    params["net"],
+#    action_tensor_spec,
+#)
+actor_net_builder = my_ppo_actor_network.MyPPOActorNetwork()
 actor_net = actor_net_builder.create_sequential_actor_net(
     params["net"],
     action_tensor_spec,
+    params["std_initial"],
 )
 """ Value Network:    
     value_network.ValueNetwork.__init__(self, input_tensor_spec, preprocessing_layers=None, 
