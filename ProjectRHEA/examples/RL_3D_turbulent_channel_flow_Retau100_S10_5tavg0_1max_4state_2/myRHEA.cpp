@@ -557,14 +557,18 @@ void myRHEA::initRLParams(const string &tag, const string &restart_data_file, co
     try {
         // Set actuation attributes, from string to double
         this->actuation_period        = std::stod(t_action);         
+        this->episode_period          = std::stod(t_episode);
         this->begin_actuation_time    = std::stod(t_begin_control);
         this->previous_actuation_time = 0.0;
+        this->initial_episode_time    = 0.0;
         this->final_time              = std::stod(t_episode);        // updated variable from previously defined value in FlowSolverRHEA::readConfigurationFile
         if (my_rank == 0) {
             cout << "[myRHEA::initRLParams] " 
                  << "actuation_period = " << scientific << this->actuation_period
+                 << ", episode_period = " << scientific << this->episode_period
                  << ", begin_actuation_time = " << scientific << this->begin_actuation_time
                  << ", previous_actuation_time = " << scientific << this->previous_actuation_time
+                 << ", initial_episode_time = " << scientific << this->initial_episode_time
                  << ", final_time = " << scientific << this->final_time << endl;
         }
     } catch (const invalid_argument& e) {
@@ -857,6 +861,7 @@ void myRHEA::initializeFromRestart() {
     // -------- Add additional functionality -------- 
     begin_actuation_time    += current_time;
     previous_actuation_time += current_time;
+    initial_episode_time    += current_time;
     final_time              += current_time;
 
     // Logging
@@ -2862,16 +2867,19 @@ void myRHEA::calculateReward() {
     l2_d_rmsf_u  = std::sqrt( l2_d_rmsf_u  / total_volume_local);
     l2_d_rmsf_v  = std::sqrt( l2_d_rmsf_v  / total_volume_local);
     l2_d_rmsf_w  = std::sqrt( l2_d_rmsf_w  / total_volume_local);
-    reward_local = b_param - (   c1 * ( ( l2_d_avg_u )  / l2_avg_u ) \
-                               + c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) \
-                               + c3 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) \
-                               + c4 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) );
+    reward_local = ( b_param - (   c1 * ( ( l2_d_avg_u )  / l2_avg_u ) \
+                                 + c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) \
+                                 + c3 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) \
+                                 + c4 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) ) ) * ( (current_time - initial_episode_time) / episode_period );
     /// Debugging
     cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: " << reward_local << ", with reward terms: "
          << c1 * ( ( l2_d_avg_u )  / l2_avg_u )  << " " 
 	     << c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) << " "
 	     << c3 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) << " "
          << c4 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) << endl;
+    if (my_rank == 0) {
+        cout << "[myRHEA::calculateReward] Reward temporal coefficient: " << (current_time - initial_episode_time) / episode_period << endl;
+    }
 
 }
 

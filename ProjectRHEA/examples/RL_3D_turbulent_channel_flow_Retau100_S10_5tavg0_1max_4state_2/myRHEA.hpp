@@ -117,8 +117,10 @@ class myRHEA : public FlowSolverRHEA {
         std::string action_key;
         std::string reward_key;
         double actuation_period;
+        double episode_period;
         double begin_actuation_time;
         double previous_actuation_time;
+        double initial_episode_time;
         bool db_clustered;
         bool first_actuation_time_done;
         bool first_actuation_period_done;
