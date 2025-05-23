@@ -118,7 +118,7 @@ const vector<vector<double>> Deltaij = {
 double avg_u_reference_profile[] = {   /// only inner points
     1.55709383,  4.51644795,  7.11151444,  9.19569225, 10.78991654,
     11.99097507, 12.90213012, 13.60423811, 14.15730877, 14.60330013, 14.97179154,
-    15.2827611,  15.55015016, 15.783e64801, 15.99015291, 16.17443148, 16.34001159,
+    15.2827611,  15.55015016, 15.78364801, 15.99015291, 16.17443148, 16.34001159,
     16.48963863, 16.62542141, 16.74885386, 16.86099819, 16.9626228,  17.05429558,
     17.13637771, 17.20905812, 17.2724196,  17.3265065,  17.37135753, 17.4070174,
     17.4335248,  17.45089525, 17.45912524, 17.45822559, 17.44824573, 17.42926455,
@@ -2673,10 +2673,10 @@ void myRHEA::calculateState() {
     state_local.resize(state_local_size2);
     std::fill(state_local.begin(), state_local.end(), 0.0);
     
-    double c1 = 1.0 / actuation_period;
-    double c2 = 0.1  / actuation_period;
-    double c3 = 0.1  / actuation_period;
-    double c4 = 0.1  / actuation_period;
+    double c1 = 0.1  / actuation_period;
+    double c2 = 0.05 / actuation_period;
+    double c3 = 0.05 / actuation_period;
+    double c4 = 0.05 / actuation_period;
 
     /// Initialize auxiliary variables
 #if _WITNESS_XYZ_AVG_
@@ -2809,10 +2809,10 @@ void myRHEA::calculateReward() {
     
     // Reward weight coefficients
     double b_param = 1.0;
-    double c1 = 1.0 / actuation_period;
-    double c2 = 0.15  / actuation_period;
-    double c3 = 0.1  / actuation_period;
-    double c4 = 0.1  / actuation_period;
+    double c1 = 0.1  / actuation_period;
+    double c2 = 0.01 / actuation_period;
+    double c3 = 0.01 / actuation_period;
+    double c4 = 0.01 / actuation_period;
 
     /// Initialize variables
     double l2_avg_u      = 0.0;
