@@ -2679,8 +2679,8 @@ void myRHEA::calculateState() {
     std::fill(state_local.begin(), state_local.end(), 0.0);
     
     double c1 = 0.1  / actuation_period;
-    double c2 = 0.05 / actuation_period;
-    double c3 = 0.05 / actuation_period;
+    double c2 = 0.1  / actuation_period;
+    double c3 = 0.1  / actuation_period;
     double c4 = 0.05 / actuation_period;
     double c5 = 0.05 / actuation_period;
     double c6 = 0.05 / actuation_period;
@@ -2689,6 +2689,7 @@ void myRHEA::calculateState() {
 #if _WITNESS_XYZ_AVG_
     double delta_x, delta_y, delta_z, delta_volume, total_volume_local;
     double l2_x, l2_y, l2_z;
+    double avg_v_bulk, avg_w_bulk;
     double l2_avg_u, l2_rmsf_u, l2_rmsf_v, l2_rmsf_w;
     double l2_avg_u_comp, l2_rmsf_u_comp, l2_rmsf_v_comp, l2_rmsf_w_comp;
     double l2_d_avg_u, l2_d_avg_v, l2_d_avg_w;
@@ -2706,6 +2707,7 @@ void myRHEA::calculateState() {
             /// Reset auxiliary variables
             total_volume_local = 0.0;
             ///l2_x = 0.0; l2_y = 0.0; l2_z = 0.0;  /// TODO: delete line if not used
+            avg_v_bulk    = 0.0; avg_w_bulk     = 0.0; 
             l2_avg_u      = 0.0; l2_rmsf_u      = 0.0; l2_rmsf_v      = 0.0; l2_rmsf_w      = 0.0;
             l2_avg_u_comp = 0.0; l2_rmsf_u_comp = 0.0; l2_rmsf_v_comp = 0.0; l2_rmsf_w_comp = 0.0;
             l2_d_avg_u    = 0.0; l2_d_avg_v     = 0.0; l2_d_avg_w     = 0.0;   
@@ -2725,6 +2727,8 @@ void myRHEA::calculateState() {
                         ///l2_y           += std::pow(y_field[I1D(i,j,k)], 2.0) * delta_volume;     /// TODO: delete line if not used
                         ///l2_z           += std::pow(z_field[I1D(i,j,k)], 2.0) * delta_volume;     /// TODO: delete line if not used
                         l2_avg_u       += std::pow(avg_u_field[I1D(i,j,k)],  2.0) * delta_volume;
+                        avg_v_bulk     += avg_v_field[I1D(i,j,k)] * delta_volume;
+                        avg_w_bulk     += avg_w_field[I1D(i,j,k)] * delta_volume;
                         l2_rmsf_u      += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_rmsf_v      += std::pow(rmsf_v_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_rmsf_w      += std::pow(rmsf_w_field[I1D(i,j,k)], 2.0) * delta_volume;
@@ -2773,8 +2777,8 @@ void myRHEA::calculateState() {
             l2_d_rmsf_w    = std::sqrt( l2_d_rmsf_w / total_volume_local);
             /// Update state
             state_local[state_local_size2_counter]   = c1 * ( l2_d_avg_u  / l2_avg_u )  * std::copysign(1.0, l2_avg_u  - l2_avg_u_comp);     /// std::copysign(1.0, l2_avg_u - l2_avg_u_comp) = +1.0 if l2_avg_u >= l2_avg_u_comp, -1.0 otherwise
-            state_local[state_local_size2_counter+1] = c2 * ( l2_d_avg_v );
-            state_local[state_local_size2_counter+2] = c3 * ( l2_d_avg_w );
+            state_local[state_local_size2_counter+1] = c2 * ( l2_d_avg_v )              * std::copysign(1.0, avg_v_bulk);
+            state_local[state_local_size2_counter+2] = c3 * ( l2_d_avg_w )              * std::copysign(1.0, avg_w_bulk);
             state_local[state_local_size2_counter+3] = c4 * ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
             state_local[state_local_size2_counter+4] = c5 * ( l2_d_rmsf_v / l2_rmsf_v ) * std::copysign(1.0, l2_rmsf_v - l2_rmsf_v_comp);
             state_local[state_local_size2_counter+5] = c6 * ( l2_d_rmsf_w / l2_rmsf_w ) * std::copysign(1.0, l2_rmsf_w - l2_rmsf_w_comp);
@@ -2826,7 +2830,7 @@ void myRHEA::calculateReward() {
     
     // Reward weight coefficients
     double b_param = 1.0;
-    double c1 = 0.1  / actuation_period;
+    double c1 = 0.06 / actuation_period;
     double c2 = 0.01 / actuation_period;
     double c3 = 0.01 / actuation_period;
     double c4 = 0.01 / actuation_period;
