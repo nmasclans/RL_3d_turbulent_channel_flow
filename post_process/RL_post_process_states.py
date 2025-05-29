@@ -30,7 +30,7 @@ try :
     case_dir   = sys.argv[3]
     run_mode   = sys.argv[4]
     rl_n_envs  = int(sys.argv[5])
-    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
     raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <case_dir> <rl_n_envs>")
 
@@ -142,7 +142,7 @@ for i_RL in range(n_RL):
         state_dim = state_dim_aux
     else:
         assert state_dim == state_dim_aux, f"Different state dimension found in '{state_file}', with {state_dim} != {state_dim_aux}"
-    
+
     # Logging    
     print(f"\nState data imported from file '{state_file}'")
     print(f"Time data imported from file '{time_file}'")

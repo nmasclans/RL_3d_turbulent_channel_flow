@@ -43,7 +43,7 @@ try :
     case_dir        = sys.argv[6]
     run_mode        = sys.argv[7]
     rl_n_envs       = int(sys.argv[8])
-    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
     raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <t_episode_train> <case_dir> <run_mode> <rl_n_envs>")
 

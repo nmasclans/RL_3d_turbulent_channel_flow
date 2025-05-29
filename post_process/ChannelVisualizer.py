@@ -963,7 +963,8 @@ class ChannelVisualizer():
         return figs_dict
 
     def build_actions_ensemble_average(self, avg_time, actions, avg_time_lim, actions_lim, global_step):
-        action_dict = {0: r"$\Delta Rkk$", 1:r"$\Delta \theta_z$", 2:r"$\Delta \theta_y$", 3:r"$\Delta \theta_x$", 4:r"$\Delta x_1$", 5:r"$\Delta x_2$" }
+        #action_dict = {0: r"$\Delta Rkk$", 1:r"$\Delta \theta_z$", 2:r"$\Delta \theta_y$", 3:r"$\Delta \theta_x$", 4:r"$\Delta x_1$", 5:r"$\Delta x_2$" }
+        action_dict = {0: r"$\Delta Rkk$", 1:r"$\Delta x_1$", 2:r"$\Delta x_2$" }
         action_dim = actions.shape[1]
         rl_n_envs  = actions.shape[2]
         figs_dict  = {}
@@ -1042,7 +1043,7 @@ class ChannelVisualizer():
         avg_time: np.array([num_time_steps])
         states:  np.array([num_time_steps, state_dim, rl_n_envs])
         """
-        state_dict = {0: r"$\Delta \overline{u}$", 1:r"$\Delta u_{\textrm{rms}}$", 2:r"$\Delta v_{\textrm{rms}}$", 3:r"$\Delta w_{\textrm{rms}}$", 4:r"$x/L_x$", 5:r"$y/L_y$", 6:r"$z/L_z$"}
+        state_dict = {0: r"$\Delta \overline{u}$", 1: r"$\Delta \overline{v}$", 2: r"$\Delta \overline{w}$", 3:r"$\Delta u_{\textrm{rms}}$", 4:r"$\Delta v_{\textrm{rms}}$", 5:r"$\Delta w_{\textrm{rms}}$", 6:r"$x/L_x$", 7:r"$y/L_y$", 8:r"$z/L_z$"}
         state_dim  = states.shape[1]
         rl_n_envs  = states.shape[2]
         figs_dict  = {}
@@ -1068,7 +1069,7 @@ class ChannelVisualizer():
         avg_time: np.array([num_time_steps])
         states:  np.array([num_time_steps, state_dim, rl_n_envs])
         """
-        state_dict = {0: r"$\Delta \overline{u}$", 1:r"$\Delta u_{\textrm{rms}}$", 2:r"$\Delta v_{\textrm{rms}}$", 3:r"$\Delta w_{\textrm{rms}}$", 4:r"$x/L_x$", 5:r"$y/L_y$", 6:r"$z/L_z$"}
+        state_dict = {0: r"$\Delta \overline{u}$", 1: r"$\Delta \overline{v}$", 2: r"$\Delta \overline{w}$", 3:r"$\Delta u_{\textrm{rms}}$", 4:r"$\Delta v_{\textrm{rms}}$", 5:r"$\Delta w_{\textrm{rms}}$", 6:r"$x/L_x$", 7:r"$y/L_y$", 8:r"$z/L_z$"}
         state_dim  = states.shape[1]
         rl_n_envs  = states.shape[2]
         figs_dict  = {}
@@ -1099,7 +1100,7 @@ class ChannelVisualizer():
         return figs_dict 
 
     def build_states_ensemble_average(self, avg_time, states, avg_time_lim, states_lim, global_step):
-        state_dict = {0: r"$\Delta \overline{u}$", 1:r"$\Delta u_{\textrm{rms}}$", 2:r"$\Delta v_{\textrm{rms}}$", 3:r"$\Delta w_{\textrm{rms}}$", 4:r"$x/L_x$", 5:r"$y/L_y$", 6:r"$z/L_z$"}
+        state_dict = {0: r"$\Delta \overline{u}$", 1: r"$\Delta \overline{v}$", 2: r"$\Delta \overline{w}$", 3:r"$\Delta u_{\textrm{rms}}$", 4:r"$\Delta v_{\textrm{rms}}$", 5:r"$\Delta w_{\textrm{rms}}$", 6:r"$x/L_x$", 7:r"$y/L_y$", 8:r"$z/L_z$"}
         state_dim  = states.shape[1]
         rl_n_envs  = states.shape[2]
         figs_dict  = {}
@@ -1289,10 +1290,12 @@ class ChannelVisualizer():
 
 # ------------------------------------------------------------------------
 
-    def build_rewards_terms_plot(self, avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
+    def build_rewards_terms_plot(self, avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
         fig, ax = plt.subplots()
         plt.plot(avg_time, local_reward, linewidth=2, label=r"Reward total")
         plt.plot(avg_time, avg_u_reward, linewidth=2, label=r"Reward term $\overline{u}$")
+        plt.plot(avg_time, avg_v_reward, linewidth=2, label=r"Reward term $\overline{v}$")
+        plt.plot(avg_time, avg_w_reward, linewidth=2, label=r"Reward term $\overline{w}$")
         plt.plot(avg_time, rms_u_reward, linewidth=2, label=r"Reward term $u_{\textrm{rms}}$")
         plt.plot(avg_time, rms_v_reward, linewidth=2, label=r"Reward term $v_{\textrm{rms}}$")
         plt.plot(avg_time, rms_w_reward, linewidth=2, label=r"Reward term $w_{\textrm{rms}}$")
@@ -1307,9 +1310,9 @@ class ChannelVisualizer():
         plt.close()
         return fig_plot
    
-    def build_rewards_terms_frames(self, frames_plot, avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
+    def build_rewards_terms_frames(self, frames_plot, avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
         # Ensemble average figure
-        fig_plot = self.build_rewards_terms_plot(avg_time, local_reward, avg_u_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step)
+        fig_plot = self.build_rewards_terms_plot(avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step)
         # Ensemble average frame
         fig_plot.canvas.draw()
         img_plot = Image.frombytes("RGB", fig_plot.canvas.get_width_height(), fig_plot.canvas.tostring_rgb())
@@ -2238,8 +2241,8 @@ class ChannelVisualizer():
         plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
         plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
         plt.ylabel( r'Numerical $\overline{u}^{+}_b$' )
-        plt.ylim(14,14.8)
-        plt.yticks(np.arange(14,14.8,0.1))
+        #plt.ylim(14,14.8)
+        #plt.yticks(np.arange(14,14.8,0.1))
         plt.grid(which='major',axis='y')
         plt.tick_params( axis = 'both', pad = 7.5 )
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -2253,13 +2256,13 @@ class ChannelVisualizer():
         plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                zorder = 1, linewidth = 1, color = "k",             label = r'$\overline{u}^{+}_b$ Reference' )
         plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '-',  marker = 's', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(0), label = r'$\overline{u}^{+}_b$ Uncontrolled' )
         plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = '-',  marker = 'v', markersize = 4, zorder = 1, linewidth = 1, color = plt.cm.tab10(3), label = r'$\overline{u}^{+}_b$ RL Framework' )
-        plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL),     linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
+        #plt.plot( averaging_time_nonRL,    u_b_ref * np.ones(N_nonRL),     linestyle = '--',                               zorder = 0, linewidth = 1, color = "k",             label = r'${u}^{+}_b$ Reference' )
         plt.plot( averaging_time_nonRL,    u_b_nonRL,                      linestyle = '--', marker = 'o', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(0), label = r'${u}^{+}_b$ Uncontrolled' )
         plt.plot( averaging_time_accum_RL, u_b_RL,                         linestyle = '--', marker = '^', markersize = 4, zorder = 0, linewidth = 1, color = plt.cm.tab10(3), label = r'${u}^{+}_b$ RL Framework' )
         plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
         plt.ylabel( r'Numerical avg. $\overline{u}^{+}_b$ and inst. $\overline{u}^{+}_b$' )
-        plt.ylim(12,17)
-        plt.yticks(np.arange(12,17,1.0))
+        #plt.ylim(12,17)
+        #plt.yticks(np.arange(12,17,1.0))
         plt.grid(which='major',axis='y')
         plt.tick_params( axis = 'both', pad = 7.5 )
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))

@@ -50,7 +50,7 @@ try :
     iteration  = sys.argv[1]
     ensemble   = sys.argv[2]
     train_name = sys.argv[3]
-    print(f"Script parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name}")
+    print(f"\nScript parameters: \n- Iteration: {iteration} \n- Ensemble: {ensemble}\n- Train name: {train_name}")
 except :
     raise ValueError("Missing call arguments, should be: <iteration> <ensemble> <train_name>")
 

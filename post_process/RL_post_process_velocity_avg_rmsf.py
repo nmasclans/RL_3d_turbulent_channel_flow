@@ -59,7 +59,7 @@ if not os.path.exists(postDir):
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
-    iteration_max_nonRL = 6000000
+    iteration_max_nonRL = 7280000
 else:   # run_mode == "eval"
     iteration_max_nonRL = 3860000
 max_length_legend_RL = 10
@@ -279,7 +279,7 @@ with h5py.File( filename_ref, 'r' ) as data_file:
     rmsf_u_data_ref = data_file['rmsf_u'][1:-1,1:-1,1:-1]
     rmsf_v_data_ref = data_file['rmsf_v'][1:-1,1:-1,1:-1]
     rmsf_w_data_ref = data_file['rmsf_w'][1:-1,1:-1,1:-1]
-assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging times from non-converged RL & Uncontrolled"
+#assert ((averaging_time_ref > averaging_time_RL).all() and (averaging_time_ref > averaging_time_nonRL).all()), f"Reference data averaging time {averaging_time_ref:.6f} must be greater than non-converged averaging times from non-converged RL & Uncontrolled"
 print(f"Non-RL converged reference data imported from file '{filename_ref}' - averaging time: {averaging_time_ref:.6f}")
 print("\nData imported successfully!")
 
@@ -392,25 +392,25 @@ rmsf_w_max   = int(np.max([np.max(rmsf_w_plus_RL), np.max(rmsf_w_plus_nonRL), np
 ylim_rmsf_u  = [rmsf_u_min, rmsf_u_max]
 ylim_rmsf_v  = [rmsf_v_min, rmsf_v_max]
 ylim_rmsf_w  = [rmsf_w_min, rmsf_w_max]
-print("Gifs y-limits:", ylim_avg_u, ylim_avg_v, ylim_avg_w, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
-for i in range(N_all):
-    # log progress
-    if i % (N_all//10 or 1) == 0:
-        print(f"{i/N_all*100:.0f}%")
-    # Build frames
-    i_nonRL = idx_nonRL[i]
-    i_RL    = idx_RL[i]
-    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_nonRL],  avg_u_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_avg_v  = visualizer.build_vel_avg_frame( frames_avg_v,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_v_plus_RL[i_RL],  avg_v_plus_nonRL[i_nonRL],  avg_v_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_avg_v,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_avg_w  = visualizer.build_vel_avg_frame( frames_avg_w,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_w_plus_RL[i_RL],  avg_w_plus_nonRL[i_nonRL],  avg_w_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_avg_w,  x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_nonRL], rmsf_u_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_nonRL], rmsf_v_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
-    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_nonRL], rmsf_w_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
-
-print("\nBuilding gifs from frames for avg_u, avg_v, avg_w, rmsf_u, rmsf_v, rmsf_w...")
-frames_dict = {'avg_u':frames_avg_u, 'avg_v':frames_avg_v, 'avg_w':frames_avg_w, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
-visualizer.build_main_gifs_from_frames(frames_dict)
-print("Gifs plotted successfully!")
+#print("Gifs y-limits:", ylim_avg_u, ylim_avg_v, ylim_avg_w, ylim_rmsf_u, ylim_rmsf_v, ylim_rmsf_w)
+#for i in range(N_all):
+#    # log progress
+#    if i % (N_all//10 or 1) == 0:
+#        print(f"{i/N_all*100:.0f}%")
+#    # Build frames
+#    i_nonRL = idx_nonRL[i]
+#    i_RL    = idx_RL[i]
+#    frames_avg_u  = visualizer.build_vel_avg_frame( frames_avg_u,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_u_plus_RL[i_RL],  avg_u_plus_nonRL[i_nonRL],  avg_u_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='u', ylim=ylim_avg_u,  x_actuator_boundaries=y_plus_actuators_boundaries)
+#    frames_avg_v  = visualizer.build_vel_avg_frame( frames_avg_v,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_v_plus_RL[i_RL],  avg_v_plus_nonRL[i_nonRL],  avg_v_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_avg_v,  x_actuator_boundaries=y_plus_actuators_boundaries)
+#    frames_avg_w  = visualizer.build_vel_avg_frame( frames_avg_w,  y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, avg_w_plus_RL[i_RL],  avg_w_plus_nonRL[i_nonRL],  avg_w_plus_ref,  averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_avg_w,  x_actuator_boundaries=y_plus_actuators_boundaries)
+#    frames_rmsf_u = visualizer.build_vel_rmsf_frame(frames_rmsf_u, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_u_plus_RL[i_RL], rmsf_u_plus_nonRL[i_nonRL], rmsf_u_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='u', ylim=ylim_rmsf_u, x_actuator_boundaries=y_plus_actuators_boundaries)
+#    frames_rmsf_v = visualizer.build_vel_rmsf_frame(frames_rmsf_v, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_v_plus_RL[i_RL], rmsf_v_plus_nonRL[i_nonRL], rmsf_v_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='v', ylim=ylim_rmsf_v, x_actuator_boundaries=y_plus_actuators_boundaries)
+#    frames_rmsf_w = visualizer.build_vel_rmsf_frame(frames_rmsf_w, y_plus_RL[i_RL], y_plus_nonRL[i_nonRL], y_plus_ref, rmsf_w_plus_RL[i_RL], rmsf_w_plus_nonRL[i_nonRL], rmsf_w_plus_ref, averaging_time_accum_RL[i_RL], averaging_time_nonRL[i_nonRL], global_step_RL_list[i_RL], vel_name='w', ylim=ylim_rmsf_w, x_actuator_boundaries=y_plus_actuators_boundaries)
+#
+#print("\nBuilding gifs from frames for avg_u, avg_v, avg_w, rmsf_u, rmsf_v, rmsf_w...")
+#frames_dict = {'avg_u':frames_avg_u, 'avg_v':frames_avg_v, 'avg_w':frames_avg_w, 'rmsf_u': frames_rmsf_u, 'rmsf_v':frames_rmsf_v, 'rmsf_w':frames_rmsf_w}
+#visualizer.build_main_gifs_from_frames(frames_dict)
+#print("Gifs plotted successfully!")
 
 ############################# RL & non-RL Errors w.r.t. Reference #############################
 

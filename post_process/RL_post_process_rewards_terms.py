@@ -33,7 +33,7 @@ try :
     case_dir   = sys.argv[3]
     run_mode   = sys.argv[4]
     rl_n_envs  = int(sys.argv[5])
-    print(f"Script parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
     raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <case_dir> <run_mode> <rl_n_envs>")
 
@@ -110,6 +110,8 @@ n_RL              = len(filepath_list)
 avg_time_dict     = dict.fromkeys(np.arange(n_RL))
 local_reward_dict = dict.fromkeys(np.arange(n_RL))
 avg_u_reward_dict = dict.fromkeys(np.arange(n_RL))
+avg_v_reward_dict = dict.fromkeys(np.arange(n_RL))
+avg_w_reward_dict = dict.fromkeys(np.arange(n_RL))
 rms_u_reward_dict = dict.fromkeys(np.arange(n_RL))
 rms_v_reward_dict = dict.fromkeys(np.arange(n_RL))
 rms_w_reward_dict = dict.fromkeys(np.arange(n_RL))
@@ -117,7 +119,7 @@ rms_w_reward_dict = dict.fromkeys(np.arange(n_RL))
 #[myRHEA::calculateSourceTerms] Performing SmartRedis communications (state, action, reward) at time instant 324.2039999903
 #[myRHEA::calculateReward] [Rank 147] Local reward: 0.1887369033, with reward terms: 0.2620923375 0.0108779954 0.0212083778 0.0170843860
 data_pattern_time   = re.compile(r"Performing SmartRedis communications \(state, action, reward\) at time instant\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)")
-data_pattern_reward = re.compile(r"\[Rank\s+(\d+)\] Local reward:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*with reward terms:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)")
+data_pattern_reward = re.compile(r"\[Rank\s+(\d+)\] Local reward:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*with reward terms:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)")
 for i_RL in range(n_RL):
     
     # Read file
@@ -129,6 +131,8 @@ for i_RL in range(n_RL):
     time_list             = []
     local_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
     avg_u_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
+    avg_v_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
+    avg_w_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
     rms_u_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
     rms_v_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
     rms_w_reward_per_rank = {k: [] for k in np.arange(rl_n_envs)}
@@ -141,15 +145,19 @@ for i_RL in range(n_RL):
             rank_id = int(match_reward.group(1))
             local_reward_per_rank[rank_id].append(float(match_reward.group(2))) 
             avg_u_reward_per_rank[rank_id].append(float(match_reward.group(3))) 
-            rms_u_reward_per_rank[rank_id].append(float(match_reward.group(4))) 
-            rms_v_reward_per_rank[rank_id].append(float(match_reward.group(5))) 
-            rms_w_reward_per_rank[rank_id].append(float(match_reward.group(6))) 
+            avg_v_reward_per_rank[rank_id].append(float(match_reward.group(4))) 
+            avg_w_reward_per_rank[rank_id].append(float(match_reward.group(5))) 
+            rms_u_reward_per_rank[rank_id].append(float(match_reward.group(6))) 
+            rms_v_reward_per_rank[rank_id].append(float(match_reward.group(7))) 
+            rms_w_reward_per_rank[rank_id].append(float(match_reward.group(8))) 
 
     # Averaged values across all ranks / rl_n_envs
     n_t = len(time_list)
     avg_time_dict[i_RL]     = np.array(time_list) - t_avg_0
     local_reward_dict[i_RL] = np.mean(np.stack(list(local_reward_per_rank.values())), axis=0)[-n_t:]
     avg_u_reward_dict[i_RL] = np.mean(np.stack(list(avg_u_reward_per_rank.values())), axis=0)[-n_t:]
+    avg_v_reward_dict[i_RL] = np.mean(np.stack(list(avg_v_reward_per_rank.values())), axis=0)[-n_t:]
+    avg_w_reward_dict[i_RL] = np.mean(np.stack(list(avg_w_reward_per_rank.values())), axis=0)[-n_t:]
     rms_u_reward_dict[i_RL] = np.mean(np.stack(list(rms_u_reward_per_rank.values())), axis=0)[-n_t:]
     rms_v_reward_dict[i_RL] = np.mean(np.stack(list(rms_v_reward_per_rank.values())), axis=0)[-n_t:]
     rms_w_reward_dict[i_RL] = np.mean(np.stack(list(rms_w_reward_per_rank.values())), axis=0)[-n_t:]
@@ -165,6 +173,8 @@ all_avg_time = np.concatenate(list(itertools.chain.from_iterable([
 all_rewards = np.concatenate(list(itertools.chain.from_iterable([
     local_reward_dict.values(),
     avg_u_reward_dict.values(),
+    avg_v_reward_dict.values(),
+    avg_w_reward_dict.values(),
     rms_u_reward_dict.values(),
     rms_v_reward_dict.values(),
     rms_w_reward_dict.values()
@@ -190,6 +200,8 @@ for i_RL in range(n_RL):
         avg_time_dict[i_RL],
         local_reward_dict[i_RL],
         avg_u_reward_dict[i_RL],
+        avg_v_reward_dict[i_RL],
+        avg_w_reward_dict[i_RL],
         rms_u_reward_dict[i_RL],
         rms_v_reward_dict[i_RL],
         rms_w_reward_dict[i_RL], 
