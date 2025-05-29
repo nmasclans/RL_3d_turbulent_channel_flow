@@ -49,7 +49,6 @@ else:
 restart_data_file_time = 323.99999999   # restart_data_file attribute 'Time'
 restart_data_file_averaging_time = 5.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0        = restart_data_file_time - restart_data_file_averaging_time 
-avg_u_bulk_ref = 14.647
 
 # --- Post-processing parameters ---
 
