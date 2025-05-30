@@ -110,10 +110,11 @@ const vector<vector<double>> Deltaij = {
 
 #if _RL_CONTROL_IS_SUPERVISED_
 // Reference profiles (_ALL_ coordinates, not including boundaries)
-/* From snapshot '3d_turbulent_channel_flow_6540000.h5 (enforcing symmetry in the y-direction)
-        AveragingTime: [334.99999999]
-        Iteration: [6540000]
-        Time: [653.99999991]
+/* From snapshot '3d_turbulent_channel_flow_7190000.h5, with
+    Averaging Time: 399.9999999712278
+    Time: 718.9999998911522
+    Iteration: 7190000
+    // TODO: impose y-dir symmetry in reference profile
 */
 double avg_u_reference_profile[] = {   /// only inner points
     1.55103536,  4.49881709,  7.08583421,  9.16711614,  10.76237806,

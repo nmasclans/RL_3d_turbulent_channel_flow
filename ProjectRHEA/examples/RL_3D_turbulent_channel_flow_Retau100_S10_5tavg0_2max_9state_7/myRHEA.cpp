@@ -78,7 +78,7 @@ const double avg_u_bulk_min = u_b * (1.0 - 0.05);
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 int action_dim = 3;
-int state_dim  = 6;
+int state_dim  = 9;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -110,10 +110,11 @@ const vector<vector<double>> Deltaij = {
 
 #if _RL_CONTROL_IS_SUPERVISED_
 // Reference profiles (_ALL_ coordinates, not including boundaries)
-/* From snapshot '3d_turbulent_channel_flow_6540000.h5 (enforcing symmetry in the y-direction)
-        AveragingTime: [334.99999999]
-        Iteration: [6540000]
-        Time: [653.99999991]
+/* From snapshot '3d_turbulent_channel_flow_7190000.h5, with
+    Averaging Time: 399.9999999712278
+    Time: 718.9999998911522
+    Iteration: 7190000
+    // TODO: impose y-dir symmetry in reference profile
 */
 double avg_u_reference_profile[] = {   /// only inner points
     1.55103536,  4.49881709,  7.08583421,  9.16711614,  10.76237806,
@@ -2706,7 +2707,7 @@ void myRHEA::calculateState() {
 #if _WITNESS_XYZ_AVG_
             /// Reset auxiliary variables
             total_volume_local = 0.0;
-            ///l2_x = 0.0; l2_y = 0.0; l2_z = 0.0;  /// TODO: delete line if not used
+            l2_x = 0.0; l2_y = 0.0; l2_z = 0.0;
             avg_v_bulk    = 0.0; avg_w_bulk     = 0.0; 
             l2_avg_u      = 0.0; l2_rmsf_u      = 0.0; l2_rmsf_v      = 0.0; l2_rmsf_w      = 0.0;
             l2_avg_u_comp = 0.0; l2_rmsf_u_comp = 0.0; l2_rmsf_v_comp = 0.0; l2_rmsf_w_comp = 0.0;
@@ -2723,9 +2724,9 @@ void myRHEA::calculateState() {
                         delta_volume =  delta_x * delta_y * delta_z;
                         total_volume_local += delta_volume;
                         /// Spatial average
-                        ///l2_x           += std::pow(x_field[I1D(i,j,k)], 2.0) * delta_volume;     /// TODO: delete line if not used
-                        ///l2_y           += std::pow(y_field[I1D(i,j,k)], 2.0) * delta_volume;     /// TODO: delete line if not used
-                        ///l2_z           += std::pow(z_field[I1D(i,j,k)], 2.0) * delta_volume;     /// TODO: delete line if not used
+                        l2_x           += std::pow(x_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_y           += std::pow(y_field[I1D(i,j,k)], 2.0) * delta_volume;
+                        l2_z           += std::pow(z_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_avg_u       += std::pow(avg_u_field[I1D(i,j,k)],  2.0) * delta_volume;
                         avg_v_bulk     += avg_v_field[I1D(i,j,k)] * delta_volume;
                         avg_w_bulk     += avg_w_field[I1D(i,j,k)] * delta_volume;
@@ -2758,9 +2759,9 @@ void myRHEA::calculateState() {
                     }
                 }
             }
-            ///l2_x           = std::sqrt( l2_x / total_volume_local);      /// TODO: delete line if not used
-            ///l2_y           = std::sqrt( l2_y / total_volume_local);      /// TODO: delete line if not used
-            ///l2_z           = std::sqrt( l2_z / total_volume_local);      /// TODO: delete line if not used
+            l2_x           = std::sqrt( l2_x / total_volume_local);
+            l2_y           = std::sqrt( l2_y / total_volume_local);
+            l2_z           = std::sqrt( l2_z / total_volume_local);
             l2_avg_u       = std::sqrt( l2_avg_u  / total_volume_local);
             l2_rmsf_u      = std::sqrt( l2_rmsf_u / total_volume_local);
             l2_rmsf_v      = std::sqrt( l2_rmsf_v / total_volume_local);
@@ -2782,9 +2783,9 @@ void myRHEA::calculateState() {
             state_local[state_local_size2_counter+3] = c4 * ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
             state_local[state_local_size2_counter+4] = c5 * ( l2_d_rmsf_v / l2_rmsf_v ) * std::copysign(1.0, l2_rmsf_v - l2_rmsf_v_comp);
             state_local[state_local_size2_counter+5] = c6 * ( l2_d_rmsf_w / l2_rmsf_w ) * std::copysign(1.0, l2_rmsf_w - l2_rmsf_w_comp);
-            ///state_local[state_local_size2_counter+4] = 2.0 * ( l2_x / L_x ) - 1.0;   /// TODO: delete line if not used  /// range (-1,1)
-            ///state_local[state_local_size2_counter+5] = 2.0 * ( l2_y / L_y ) - 1.0;   /// TODO: delete line if not used
-            ///state_local[state_local_size2_counter+6] = 2.0 * ( l2_z / L_z ) - 1.0;   /// TODO: delete line if not used
+            state_local[state_local_size2_counter+6] = 2.0 * ( l2_x / L_x ) - 1.0;      /// range (-1,1)
+            state_local[state_local_size2_counter+7] = 2.0 * ( l2_y / L_y ) - 1.0;
+            state_local[state_local_size2_counter+8] = 2.0 * ( l2_z / L_z ) - 1.0;
 
 #else /// _WITNESS_XYZ_AVG_ 0
             /// Get local indices i, j, k

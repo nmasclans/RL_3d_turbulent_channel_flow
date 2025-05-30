@@ -2237,8 +2237,8 @@ class ChannelVisualizer():
 
         # --- avg_u_bulk plot ---
         plt.plot( averaging_time_nonRL,    avg_u_b_ref * np.ones(N_nonRL), linestyle = '-',                                linewidth = 2, color = "k",             label = r'Reference' )
-        plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '--', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
-        plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = ':',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
+        plt.plot( averaging_time_nonRL,    avg_u_b_nonRL,                  linestyle = '-', marker = 's', markersize = 4, linewidth = 2, color = plt.cm.tab10(0), label = r'Uncontrolled' )
+        plt.plot( averaging_time_accum_RL, avg_u_b_RL,                     linestyle = '-',  marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
         plt.xlabel( r'Cummulative averaging time $t_{avg}^+$' )
         plt.ylabel( r'Numerical $\overline{u}^{+}_b$' )
         #plt.ylim(14,14.8)
