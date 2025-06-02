@@ -2909,7 +2909,7 @@ void myRHEA::calculateReward() {
                                  + c3 * ( ( l2_d_avg_w ) ) \
                                  + c4 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) \
                                  + c5 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) \
-                                 + c6 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) ) ) * ( (current_time - initial_episode_time) / episode_period );
+                                 + c6 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) ) ) * 1.0; /// * ( (current_time - initial_episode_time) / episode_period );
     /// Debugging
     cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: " << reward_local << ", with reward terms: "
          << c1 * ( ( l2_d_avg_u )  / l2_avg_u )  << " " 

@@ -48,6 +48,8 @@ restart_data_file_time = 323.99999999   # restart_data_file attribute 'Time'
 restart_data_file_averaging_time = 5.0  # restart_data_file attribute 'AveragingTime'
 t_avg_0        = restart_data_file_time - restart_data_file_averaging_time 
 avg_u_bulk_ref = 14.612998708455182
+avg_v_bulk_ref = 0.0
+avg_w_bulk_ref = 0.0
 
 # --- Post-processing parameters ---
 
@@ -106,9 +108,13 @@ for file in filepath_list:
 print("\nImporting numerical avg_u_bulk data from .out files...")
 n_RL                = len(filepath_list)
 avg_u_bulk_num_dict = dict.fromkeys(np.arange(n_RL))
+avg_v_bulk_num_dict = dict.fromkeys(np.arange(n_RL))
+avg_w_bulk_num_dict = dict.fromkeys(np.arange(n_RL))
 avg_time_dict       = dict.fromkeys(np.arange(n_RL))
-data_pattern        = re.compile(r"Numerical avg_u_bulk:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*time:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)")
+data_pattern        = re.compile(r"Numerical avg_u_bulk:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*avg_v_bulk:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*avg_w_bulk:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?),\s*time:\s*([+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?)")
 avg_u_bulk_num_min, avg_u_bulk_num_max  = (1e8,-1e8)
+avg_v_bulk_num_min, avg_v_bulk_num_max  = (1e8,-1e8)
+avg_w_bulk_num_min, avg_w_bulk_num_max  = (1e8,-1e8)
 avg_time_min, avg_time_max              = (1e8,-1e8)
 for i_RL in range(n_RL):
     
@@ -119,19 +125,29 @@ for i_RL in range(n_RL):
     
     # Get values of interest: numerical avg_u_bulk & time
     avg_u_bulk_num_aux = []
+    avg_v_bulk_num_aux = []
+    avg_w_bulk_num_aux = []
     avg_time_aux       = []
     for line in lines:
         match = data_pattern.search(line)
         if match:
             avg_u_bulk_num_aux.append( float(match.group(1)) )
-            avg_time_aux.append( float(match.group(2)) - t_avg_0 )
+            avg_v_bulk_num_aux.append( float(match.group(2)) )
+            avg_w_bulk_num_aux.append( float(match.group(3)) )
+            avg_time_aux.append( float(match.group(4)) - t_avg_0 )
 
     avg_u_bulk_num_min = np.min([avg_u_bulk_num_min, np.min(avg_u_bulk_num_aux), avg_u_bulk_ref])
     avg_u_bulk_num_max = np.max([avg_u_bulk_num_max, np.max(avg_u_bulk_num_aux), avg_u_bulk_ref])
+    avg_v_bulk_num_min = np.min([avg_v_bulk_num_min, np.min(avg_v_bulk_num_aux), avg_v_bulk_ref])
+    avg_v_bulk_num_max = np.max([avg_v_bulk_num_max, np.max(avg_v_bulk_num_aux), avg_v_bulk_ref])
+    avg_w_bulk_num_min = np.min([avg_w_bulk_num_min, np.min(avg_w_bulk_num_aux), avg_w_bulk_ref])
+    avg_w_bulk_num_max = np.max([avg_w_bulk_num_max, np.max(avg_w_bulk_num_aux), avg_w_bulk_ref])
     avg_time_min       = np.min([avg_time_min,       np.min(avg_time_aux)])
     avg_time_max       = np.max([avg_time_max,       np.max(avg_time_aux)])
 
     avg_u_bulk_num_dict[i_RL] = avg_u_bulk_num_aux
+    avg_v_bulk_num_dict[i_RL] = avg_v_bulk_num_aux
+    avg_w_bulk_num_dict[i_RL] = avg_w_bulk_num_aux
     avg_time_dict[i_RL]       = avg_time_aux
 
     print(f"Numerical avg_u_bulk and Time data imported from file '{filepath}'")
@@ -143,6 +159,8 @@ print("\nData imported successfully!")
 #-----------------------------------------------------------------------------------------
 
 avg_u_bulk_num_lim = (avg_u_bulk_num_min, avg_u_bulk_num_max)
+avg_v_bulk_num_lim = (avg_v_bulk_num_min, avg_v_bulk_num_max)
+avg_w_bulk_num_lim = (avg_w_bulk_num_min, avg_w_bulk_num_max)
 avg_time_lim       = (avg_time_min, avg_time_max)
 print(f"\nNumerical avg_u_bulk limits: {avg_u_bulk_num_lim}")
 print(f"\nAveraging Time limits: {avg_time_lim}")
@@ -150,18 +168,31 @@ print(f"\nAveraging Time limits: {avg_time_lim}")
 # ----------------- Plot Animation Frames of each action dimension for increasing RL global step (specific ensemble) -----------------
 
 print("\nBuilding numerical avg_u_bulk vs avg_time image frames...")
-frames_plot = []
+frames_plot_u = []
+frames_plot_v = []
+frames_plot_w = []
 for i_RL in range(n_RL):
     # log progress
     if i_RL % (n_RL//10 or 1) == 0:
         print(f"{i_RL/n_RL*100:.0f}%")
     # Build image frames
-    frames_plot = visualizer.build_avg_u_bulk_frames(frames_plot, avg_time_dict[i_RL], avg_u_bulk_num_dict[i_RL], avg_u_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_u_bulk_num_lim)
+    frames_plot_u = visualizer.build_avg_vel_bulk_frames(frames_plot_u, avg_time_dict[i_RL], avg_u_bulk_num_dict[i_RL], avg_u_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_u_bulk_num_lim, vel_comp='u')
+    frames_plot_v = visualizer.build_avg_vel_bulk_frames(frames_plot_v, avg_time_dict[i_RL], avg_v_bulk_num_dict[i_RL], avg_v_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_v_bulk_num_lim, vel_comp='v')
+    frames_plot_w = visualizer.build_avg_vel_bulk_frames(frames_plot_w, avg_time_dict[i_RL], avg_w_bulk_num_dict[i_RL], avg_w_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_w_bulk_num_lim, vel_comp='w')
 
 print("\nBuilding gifs from frames...")
+
 filename = os.path.join(postDir, f"avg_u_bulk_numerical_vs_avg_time.gif")
-frames_plot[0].save(filename, save_all=True, append_images=frames_plot[1:], duration=1000, loop=0)
+frames_plot_u[0].save(filename, save_all=True, append_images=frames_plot_u[1:], duration=1000, loop=0)
 print(f"MAKING GIF of numerical averaged u_bulk vs averaging time along training steps in '{filename}'" )
+
+filename = os.path.join(postDir, f"avg_v_bulk_numerical_vs_avg_time.gif")
+frames_plot_v[0].save(filename, save_all=True, append_images=frames_plot_v[1:], duration=1000, loop=0)
+print(f"MAKING GIF of numerical averaged v_bulk vs averaging time along training steps in '{filename}'" )
+
+filename = os.path.join(postDir, f"avg_w_bulk_numerical_vs_avg_time.gif")
+frames_plot_w[0].save(filename, save_all=True, append_images=frames_plot_w[1:], duration=1000, loop=0)
+print(f"MAKING GIF of numerical averaged w_bulk vs averaging time along training steps in '{filename}'" )
 
 print("\nGifs plotted successfully!")
 

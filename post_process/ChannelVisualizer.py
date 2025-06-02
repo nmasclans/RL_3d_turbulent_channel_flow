@@ -1321,13 +1321,13 @@ class ChannelVisualizer():
 
 # ------------------------------------------------------------------------
 
-    def build_avg_u_bulk_frames(self, frames_plot, avg_time, avg_u_bulk_num, avg_u_bulk_ref, global_step, xlim, ylim):
+    def build_avg_vel_bulk_frames(self, frames_plot, avg_time, avg_vel_bulk_num, avg_vel_bulk_ref, global_step, xlim, ylim, vel_comp='u'):
         # Build figure
         fig, ax = plt.subplots()
-        plt.hlines(avg_u_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2, color='black', label=r"Reference")
-        plt.plot(avg_time, avg_u_bulk_num,           linestyle = '-', linewidth=2, color=plt.cm.tab10(1), label=r"RL Framework")
-        plt.xlabel( r'Averaging time $t_{avg}^+$', fontsize=16)
-        plt.ylabel( r'$\overline{u}^{+}_b$', fontsize=16)
+        plt.hlines(avg_vel_bulk_ref, xlim[0], xlim[1], linestyle = '-', linewidth=2, color='black', label=r"Reference")
+        plt.plot(avg_time, avg_vel_bulk_num,           linestyle = '-', linewidth=2, color=plt.cm.tab10(1), label=r"RL Framework")
+        plt.xlabel( r'Averaging time $t_{avg}^{+}$', fontsize=16)
+        plt.ylabel( rf'$\overline{{{vel_comp}}}^{{+}}_b$', fontsize=16)
         plt.xlim(xlim)
         plt.ylim(ylim)
         plt.grid(which='major',axis='y')
