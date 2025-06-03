@@ -2412,6 +2412,7 @@ void myRHEA::readWitnessPoints() {
 
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
     if (my_rank == 0){
         cout << "\nReading witness points..." << endl;
 
@@ -2471,6 +2472,12 @@ void myRHEA::preproceWitnessPoints() {
         cout << "\nPreprocessing witness points..." << endl;
     }
 
+    /// Debugging: boundaries of RL environments / mpi processes
+    cout << "[Rank " << my_rank << "] RL environment / mpi process domain inner boundaries: "  
+         << "x in (" << x_field[I1D(topo->iter_common[_INNER_][_INIX_],0,0)] << ", " << x_field[I1D(topo->iter_common[_INNER_][_ENDX_],0,0)] << "), "
+         << "y in (" << y_field[I1D(0,topo->iter_common[_INNER_][_INIY_],0)] << ", " << y_field[I1D(0,topo->iter_common[_INNER_][_ENDY_],0)] << "), "
+         << "z in (" << z_field[I1D(0,0,topo->iter_common[_INNER_][_INIZ_])] << ", " << z_field[I1D(0,0,topo->iter_common[_INNER_][_ENDZ_])] << ")" << endl;
+
     /// Construct (initialize) temporal point probes for witness points
     TemporalPointProbe temporal_witness_probe(mesh, topo);
     temporal_witness_probes.resize( num_witness_probes );
@@ -2487,10 +2494,23 @@ void myRHEA::preproceWitnessPoints() {
 
     /// Calculate state local size (num witness probes of my_rank) and debugging logs
     int state_local_size2_counter = 0;
+    double i_index, j_index, k_index;
     for(int twp = 0; twp < num_witness_probes; ++twp) {
         /// Owner rank writes to file
         if( temporal_witness_probes[twp].getGlobalOwnerRank() == my_rank ) {
             state_local_size2_counter += 1;
+            /// Debugging, TODO: remove lines
+            i_index = temporal_witness_probes[twp].getLocalIndexI(); 
+            j_index = temporal_witness_probes[twp].getLocalIndexJ(); 
+            k_index = temporal_witness_probes[twp].getLocalIndexK();            
+            cout << "[Rank " << my_rank << "] Owns witness point #" << twp << ": " 
+                 << twp_x_positions[twp] << " "
+                 << twp_y_positions[twp] << " " 
+                 << twp_z_positions[twp]
+                 << ", with closest grid point: " 
+                 << x_field[I1D(i_index,j_index,k_index)] << " "
+                 << y_field[I1D(i_index,j_index,k_index)] << " "
+                 << z_field[I1D(i_index,j_index,k_index)] << endl;
         }
     }
     

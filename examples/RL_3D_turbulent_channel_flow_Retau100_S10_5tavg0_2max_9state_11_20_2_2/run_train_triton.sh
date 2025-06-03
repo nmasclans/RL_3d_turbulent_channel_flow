@@ -14,8 +14,8 @@ trap cleanup SIGINT SIGTERM
 # Environmental variables
 REPO_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
-export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_2max_9state_12_40_2_2
-export TRAIN_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_2max_9state_12_40_2_2
+export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_2max_9state_11_20_2_2
+export TRAIN_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_2max_9state_11_20_2_2
 export EVAL_RL_CASE_PATH=""
 export SMARTRHEA_PATH=$REPO_DIR/smartrhea
 export RUN_MODE=train
