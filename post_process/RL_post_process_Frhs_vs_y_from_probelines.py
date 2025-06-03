@@ -50,12 +50,14 @@ tavg0_RL = 318.99999999
 
 # Probes y-coordinates at RL agent location - center y-coordinate of control cubes
 # > probes distributed along z-axis:
-n_probes_z_coord = 5
-z_coord_name_list = [f"{i+1:.0f}" for i in range(n_probes_z_coord)] 
+n_probes_x_coord   = 2
+n_probes_z_coord   = 2
+n_probes_xz_coord  = n_probes_x_coord * n_probes_z_coord
+xz_coord_name_list = [f"{i+1:.0f}" for i in range(n_probes_xz_coord)] 
 # > probes distributed along y-axis:
 if Re_tau == 100.0:
     # Selected y-coordinates at RL agents center of action domain
-    probes_y_coord = np.sort(np.array([0.125, 0.375, 0.625, 0.875])) #, 1.125, 1.375, 1.625, 1.875]))
+    probes_y_coord = np.sort(np.array([0.1, 0.3, 0.5, 0.7, 0.9]))
     num_grid_y     = 64
     num_grid_x     = 64
 elif Re_tau == 180.0:
@@ -64,16 +66,16 @@ elif Re_tau == 180.0:
     num_grid_x     = 128
 else:
     raise ValueError(f"Unknown 'y_probes' for Re_tau = {Re_tau}")
-y_coord_name_list = [f"{y_coord:.3f}".replace(".", "") for y_coord in probes_y_coord]
+y_coord_name_list = [f"{y_coord:.1f}".replace(".", "") for y_coord in probes_y_coord]
 n_probes_y_coord  = len(y_coord_name_list)
 print(f"\nSelected probelines y-coords: \nValues: {probes_y_coord} \nFormatted name: {y_coord_name_list}")
 # > all probes
-n_probes    = n_probes_y_coord * n_probes_z_coord
+n_probes    = n_probes_y_coord * n_probes_xz_coord
 probes_name = []
 y_coord_name_vs_probes_name_dict = {key:[] for key in y_coord_name_list}
 for j in range(n_probes_y_coord):
-    for k in range(n_probes_z_coord):
-        probe_name = f"{y_coord_name_list[j]}_{z_coord_name_list[k]}"
+    for ik in range(n_probes_xz_coord):
+        probe_name = f"{y_coord_name_list[j]}_{xz_coord_name_list[ik]}"
         probes_name.append(probe_name)
         y_coord_name_vs_probes_name_dict[y_coord_name_list[j]].append(probe_name)
 # Debugging

@@ -1994,8 +1994,8 @@ class ChannelVisualizer():
         #import pdb; pdb.set_trace()
         y_coord_name_list = list(avg_y_plus_dict.keys()) 
         n_y_coord         = len(y_coord_name_list)
-        colors_list       = ['black','tab:blue','tab:green','tab:orange']
-        assert n_y_coord == 4
+        colors_list       = ['black','tab:blue','tab:orange','tab:green','tab:red']
+        assert n_y_coord <= 5
         colors_dict       = dict(map(lambda k,v : (k,v), y_coord_name_list, colors_list))
         # Plot Euu vs kplus
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -2064,12 +2064,12 @@ class ChannelVisualizer():
         #import pdb; pdb.set_trace()
         y_coord_name_list = list(ensemble_dict.keys()) 
         n_y_coord         = len(y_coord_name_list)
-        assert n_y_coord == 4
-        colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
+        colors_list       = ['black','tab:blue','tab:orange','tab:green','tab:red']
+        assert n_y_coord <= 6
         figs_list         = []
         for dim in range(n_dim):
             vel_name = vel_names[dim]
-            fig, ax = plt.subplots(2,2,figsize=(12,6))
+            fig, ax = plt.subplots((n_y_coord+1)//2, 2, figsize=(12,6))
             for i in range(n_y_coord):
                 y_coord = y_coord_name_list[i]
                 y_plus_value = ensemble_dict[y_coord][y_plus_key]
@@ -2134,8 +2134,8 @@ class ChannelVisualizer():
         #import pdb; pdb.set_trace()
         y_coord_name_list = list(ensemble_dict.keys()) 
         n_y_coord         = len(y_coord_name_list)
-        colors_list       = ['black','tab:blue','tab:orange','tab:green', 'tab:red']
-        assert n_y_coord == 4
+        colors_list       = ['black','tab:blue','tab:orange','tab:green','tab:red']
+        assert n_y_coord <= 5
         fig, ax = plt.subplots(3,4,figsize=(16,10))
         for i in range(n_y_coord):
             y_coord = y_coord_name_list[i]
