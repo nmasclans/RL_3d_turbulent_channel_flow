@@ -170,7 +170,7 @@ all_avg_time = np.concatenate(list(itertools.chain.from_iterable([
     avg_time_dict.values(),
 ])))
 all_rewards = np.concatenate(list(itertools.chain.from_iterable([
-    local_reward_dict.values(),
+#   local_reward_dict.values(),
     avg_u_reward_dict.values(),
     avg_v_reward_dict.values(),
     avg_w_reward_dict.values(),
