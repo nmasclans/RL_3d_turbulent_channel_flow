@@ -91,7 +91,7 @@ num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step /
 if run_mode == "train":
     iteration_restart_data_file  = 3240000
 else:   # run_mode == "eval"
-    iteration_restart_data_file  = 2840000
+    iteration_restart_data_file  = 3240000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
 assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
 print("\nRL parameters: \n- Simulation time per train step:", simulation_time_per_train_step, 

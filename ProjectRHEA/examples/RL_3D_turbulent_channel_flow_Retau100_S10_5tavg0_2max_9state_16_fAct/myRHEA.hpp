@@ -34,6 +34,9 @@ class myRHEA : public FlowSolverRHEA {
         /// Set initial conditions: u, v, w, P and T ... needs to be modified/overwritten according to the problem under consideration
         void setInitialConditions() override;
 
+        /// Initialize from restart file: x, y, z, rho, u, v, w, E, P, T, sos, mu and kappa
+        void initializeFromRestart() override;
+
         /// Calculate rhou, rhov, rhow and rhoE source terms ... needs to be modified/overwritten according to the problem under consideration
         void calculateSourceTerms() override;
 
@@ -85,11 +88,8 @@ class myRHEA : public FlowSolverRHEA {
         DistributedArray rmsf_w_reference_field;       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
         DistributedArray avg_u_previous_field;         /// only if _RL_CONTROL_IS_SUPERVISED_ 0
         DistributedArray rmsf_u_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
-
-        /// Reward calculation
-        double l2_err_avg_u_previous;                  /// only if _RL_CONTROL_IS_SUPERVISED_ 1
-        double l2_err_rmsf_u_previous;                 /// only if _RL_CONTROL_IS_SUPERVISED_ 1
-        double l2_rl_f_previous;                       /// only if _RL_CONTROL_IS_SUPERVISED_ 1
+        DistributedArray rmsf_v_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
+        DistributedArray rmsf_w_previous_field;        /// only if _RL_CONTROL_IS_SUPERVISED_ 0
 
         /// Witness points
         std::string witness_file;
@@ -117,8 +117,10 @@ class myRHEA : public FlowSolverRHEA {
         std::string action_key;
         std::string reward_key;
         double actuation_period;
+        double episode_period;
         double begin_actuation_time;
         double previous_actuation_time;
+        double initial_episode_time;
         bool db_clustered;
         bool first_actuation_time_done;
         bool first_actuation_period_done;
@@ -139,10 +141,10 @@ class myRHEA : public FlowSolverRHEA {
         void preproceWitnessPoints();
         void readControlPoints();
         void preproceControlPoints();
-        void initializeFromRestart();           /// override FlowSolverRHEA::initializeFromRestart method
-        void updateState();
+        void calculateStateAndReward();
+        void calculateState();
         void calculateReward();
-        void updatePreviousActuationVariables();
+        void updatePreviousActuationFields();
 
     private:
 
