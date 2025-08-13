@@ -44,12 +44,20 @@ else:
 
 # --- Simulation parameters ---
 
-restart_data_file_time = 323.99999999   # restart_data_file attribute 'Time'
-restart_data_file_averaging_time = 5.0  # restart_data_file attribute 'AveragingTime'
-t_avg_0        = restart_data_file_time - restart_data_file_averaging_time 
-avg_u_bulk_ref = 14.612998708455182
-avg_v_bulk_ref = 0.0
-avg_w_bulk_ref = 0.0
+if run_mode == 'train':
+    restart_data_file_time = 323.99999999   # restart_data_file attribute 'Time'
+    restart_data_file_averaging_time = 5.0  # restart_data_file attribute 'AveragingTime'
+    t_avg_0        = restart_data_file_time - restart_data_file_averaging_time 
+    avg_u_bulk_ref = 14.612998708455182
+    avg_v_bulk_ref = 0.0
+    avg_w_bulk_ref = 0.0
+else:
+    restart_data_file_time = 200.0623152
+    restart_data_file_averaging_time = 0.0
+    t_avg_0        = restart_data_file_time - restart_data_file_averaging_time 
+    avg_u_bulk_ref = 15.942190755168479
+    avg_v_bulk_ref = 0.0
+    avg_w_bulk_ref = 0.0
 
 # --- Post-processing parameters ---
 
@@ -179,6 +187,10 @@ for i_RL in range(n_RL):
     frames_plot_u = visualizer.build_avg_vel_bulk_frames(frames_plot_u, avg_time_dict[i_RL], avg_u_bulk_num_dict[i_RL], avg_u_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_u_bulk_num_lim, vel_comp='u')
     frames_plot_v = visualizer.build_avg_vel_bulk_frames(frames_plot_v, avg_time_dict[i_RL], avg_v_bulk_num_dict[i_RL], avg_v_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_v_bulk_num_lim, vel_comp='v')
     frames_plot_w = visualizer.build_avg_vel_bulk_frames(frames_plot_w, avg_time_dict[i_RL], avg_w_bulk_num_dict[i_RL], avg_w_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_w_bulk_num_lim, vel_comp='w')
+
+
+import pdb
+pdb.set_trace()
 
 print("\nBuilding gifs from frames...")
 

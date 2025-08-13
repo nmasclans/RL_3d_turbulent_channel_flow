@@ -4,20 +4,19 @@ import time, random, os, numpy as np
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
 t_action = 0.05         # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(2.0 + t_action + dt_phys, 8)
-t_episode_eval = round(2.0 + t_action + dt_phys, 8)
+t_episode_train = round(10.0 + t_action + dt_phys, 8)
+t_episode_eval = round(10.0 + t_action + dt_phys, 8)
 cfd_n_envs = 1          # num. cfd simulations run in parallel
-rl_n_envs = 256         # 160 (for S16), or 256 (for S18);  num. regions del domini en wall-normal direction -> gets the witness points
+rl_n_envs = 160         # num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
     # smartsim params
-    "run_id": "2025-06-14--10-16-13--10d2",# "2025-06-05--15-17-55--c7a4" (for S16) or "2025-06-14--10-16-13--10d2" (for S18),
+    "run_id": "",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 34048, # 3680 (for S16), or 34048 (for S18),
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
