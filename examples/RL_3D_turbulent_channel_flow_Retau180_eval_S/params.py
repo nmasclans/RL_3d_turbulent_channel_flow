@@ -4,8 +4,8 @@ import time, random, os, numpy as np
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
 t_action = 0.05         # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(2.0 + t_action + dt_phys, 8)
-t_episode_eval = round(2.0 + t_action + dt_phys, 8)
+t_episode_train = round(1.0 + t_action + dt_phys, 8)
+t_episode_eval = round(1.0 + t_action + dt_phys, 8)
 cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 160         # 160 (for S16), or 256 (for S18);  num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
