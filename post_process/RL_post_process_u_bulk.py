@@ -187,11 +187,6 @@ for i_RL in range(n_RL):
     frames_plot_u = visualizer.build_avg_vel_bulk_frames(frames_plot_u, avg_time_dict[i_RL], avg_u_bulk_num_dict[i_RL], avg_u_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_u_bulk_num_lim, vel_comp='u')
     frames_plot_v = visualizer.build_avg_vel_bulk_frames(frames_plot_v, avg_time_dict[i_RL], avg_v_bulk_num_dict[i_RL], avg_v_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_v_bulk_num_lim, vel_comp='v')
     frames_plot_w = visualizer.build_avg_vel_bulk_frames(frames_plot_w, avg_time_dict[i_RL], avg_w_bulk_num_dict[i_RL], avg_w_bulk_ref, global_step_list[i_RL], avg_time_lim, avg_w_bulk_num_lim, vel_comp='w')
-
-
-import pdb
-pdb.set_trace()
-
 print("\nBuilding gifs from frames...")
 
 filename = os.path.join(postDir, f"avg_u_bulk_numerical_vs_avg_time.gif")
