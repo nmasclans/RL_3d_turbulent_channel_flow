@@ -173,6 +173,9 @@ for i in range(N_nonRL):
 # ----------- Get RL and non-RL data ------------
 
 # --- Check if RL & non-RL files exists ---
+
+print("\nCheking files...")
+
 for filename_RL in filename_RL_list:
     if not os.path.isfile(filename_RL):
         print(f"Error: File '{filename_RL}' not found.")
