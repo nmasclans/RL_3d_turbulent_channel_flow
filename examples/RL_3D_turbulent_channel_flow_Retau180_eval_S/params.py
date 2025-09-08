@@ -17,7 +17,7 @@ params = {
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 2560, # 3680 (for S16), or 34048 (for S18), 15360 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
+    "eval_checkpoint_step": 15040, # 3680 (for S16), or 34048 (for S18), 15360 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,

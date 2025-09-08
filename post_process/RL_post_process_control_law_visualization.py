@@ -29,7 +29,7 @@ logger.setLevel(logging.DEBUG)
 
 # -------------------------------------------------------------------------------------------------
 
-def cluster_control_analysis(X, U, n_clusters=10, random_state=42, agent_id=None):
+def cluster_control_analysis(X, U, n_clusters=10, random_state=42, figs_dir='control_law_visualization', agent_id=None):
 
     # Step 1: Flatten input for clustering
     n_steps, n_agents, state_dim = X.shape
@@ -76,7 +76,7 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42, agent_id=None
         std_u[i] = np.std( U_flat[cluster_indices], axis=0)
         min_u[i] = np.min( U_flat[cluster_indices], axis=0)
         max_u[i] = np.max( U_flat[cluster_indices], axis=0)
-    with open(f"control_law_visualization/data_control_action_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
+    with open(f"{figs_dir}/data_control_action_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Cluster", "ActionDim", "Mean", "Std", "Min", "Max"])
         for i in range(n_clusters):
@@ -93,7 +93,7 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42, agent_id=None
         std_x[i] = np.std( X_flat[cluster_indices], axis=0)
         min_x[i] = np.min( X_flat[cluster_indices], axis=0)
         max_x[i] = np.max( X_flat[cluster_indices], axis=0)
-    with open(f"control_law_visualization/data_control_state_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
+    with open(f"{figs_dir}/data_control_state_statistics_{n_clusters}clusters.csv",'w',newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Cluster", "ActionDim", "Mean", "Std", "Min", "Max"])
         for i in range(n_clusters):
@@ -130,7 +130,7 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42, agent_id=None
     ax.set_xlabel(r'$\gamma_1$')
     ax.set_ylabel(r'$\gamma_2$')
     plt.tight_layout()
-    plt.savefig(f"control_law_visualization/fig_control_law_visualization_{n_clusters}clusters_proximity_map.jpg", dpi=600)
+    plt.savefig(f"{figs_dir}/fig_control_law_visualization_{n_clusters}clusters_proximity_map.jpg", dpi=600)
     plt.close()
 
     # Step 6.2: transition matrix figure
@@ -150,7 +150,7 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42, agent_id=None
     ax.set_yticks(np.arange(n_clusters))
     fig.colorbar(im, ax=ax)
     plt.tight_layout()
-    plt.savefig(f"control_law_visualization/fig_control_law_visualization_{n_clusters}clusters_transition_matrix.jpg", dpi=600)
+    plt.savefig(f"{figs_dir}/fig_control_law_visualization_{n_clusters}clusters_transition_matrix.jpg", dpi=600)
     plt.close()
 
     ### # Step 6.3: Control Network figure (Action Norms with Transitions)
@@ -183,32 +183,32 @@ def cluster_control_analysis(X, U, n_clusters=10, random_state=42, agent_id=None
     ### ax.set_ylabel('MDS Dimension 2')
     ### fig.colorbar(scatter2, ax=ax, label='Avg Actuation Norm per Cluster')
     ### plt.tight_layout()
-    ### plt.savefig(f"control_law_visualization/fig_control_law_visualization_{n_clusters}clusters_control_network.jpg", _action_normdpi=600)
+    ### plt.savefig(f"{figs_dir}/fig_control_law_visualization_{n_clusters}clusters_control_network.jpg", _action_normdpi=600)
     ### plt.close()
 
-    ### # Step 7: Proximity Map (MDS), different subplot for the data projections of each cluster
-    ### logger.debug("Building proximity map per cluster")
-    ### fig, axes = plt.subplots(nrows=(n_clusters+4)//5, ncols=5, figsize=(18, 3.5*((n_clusters + 4)//5)), sharex=True, sharey=True)
-    ### axes = axes.flatten()
-    ### xall = np.concatenate([X_proj[:,0], centroids_2d[:,0]])
-    ### yall = np.concatenate([X_proj[:,1], centroids_2d[:,1]])
-    ### xlim = (xall.min(), xall.max())
-    ### ylim = (yall.min(), yall.max())
-    ### for i in range(n_clusters):
-    ###     ax = axes[i]
-    ###     idx = (labels_proj==i)
-    ###     ax.scatter(X_proj[idx,0], X_proj[idx,1], s=10, alpha=0.6, c=f"C{i}")
-    ###     ax.scatter(*centroids_2d[i], s=100, c='white', edgecolors='k', linewidths=2, zorder=5)
-    ###     ax.plot(*centroids_2d[i], marker='x', color='red', markersize=8, zorder=6)
-    ###     ax.set_title(f"Cluster {i}")
-    ###     ax.set_xlim(xlim)
-    ###     ax.set_ylim(ylim)
-    ### for i in range(n_clusters, len(axes)):
-    ###     fig.delaxes(axes[i])  
-    ### fig.suptitle("Cluster-wise Proximity Map (MDS)", fontsize=16)
-    ### plt.tight_layout(rect=[0, 0, 1, 0.97])
-    ### plt.savefig(f"control_law_visualization/fig_proximity_map_per_cluster_{n_clusters}clusters.jpg", dpi=600)
-    ### plt.close()
+    # Step 7: Proximity Map (MDS), different subplot for the data projections of each cluster
+    logger.debug("Building proximity map per cluster")
+    fig, axes = plt.subplots(nrows=(n_clusters+4)//5, ncols=5, figsize=(18, 3.5*((n_clusters + 4)//5)), sharex=True, sharey=True)
+    axes = axes.flatten()
+    xall = np.concatenate([X_proj[:,0], centroids_2d[:,0]])
+    yall = np.concatenate([X_proj[:,1], centroids_2d[:,1]])
+    xlim = (xall.min(), xall.max())
+    ylim = (yall.min(), yall.max())
+    for i in range(n_clusters):
+        ax = axes[i]
+        idx = (labels_proj==i)
+        ax.scatter(X_proj[idx,0], X_proj[idx,1], s=10, alpha=0.6, c=f"C{i}")
+        ax.scatter(*centroids_2d[i], s=100, c='white', edgecolors='k', linewidths=2, zorder=5)
+        ax.plot(*centroids_2d[i], marker='x', color='red', markersize=8, zorder=6)
+        ax.set_title(f"Cluster {i}")
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+    for i in range(n_clusters, len(axes)):
+        fig.delaxes(axes[i])  
+    fig.suptitle("Cluster-wise Proximity Map (MDS)", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.savefig(f"{figs_dir}/fig_proximity_map_per_cluster_{n_clusters}clusters.jpg", dpi=600)
+    plt.close()
 
     return labels, centroids, P, avg_u, centroids_2d
 
@@ -229,17 +229,17 @@ def plot_cluster_statistics(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, max
         x_stat, u_stat = stats[stat]
 
         sns.heatmap(x_stat.T, ax=axes[row][0], cmap="viridis", cbar=True)
-        #axes[row][0].set_title(f"State {stat} per Cluster")
+        axes[row][0].set_title(f"State {stat} per Cluster")
         axes[row][0].set_xlabel("Cluster")
         axes[row][0].set_ylabel("State Dimension")
 
         sns.heatmap(u_stat.T, ax=axes[row][1], cmap="viridis", cbar=True)
-        #axes[row][1].set_title(f"Action {stat} per Cluster")
+        axes[row][1].set_title(f"Action {stat} per Cluster")
         axes[row][1].set_xlabel("Cluster")
         axes[row][1].set_ylabel("Action Dimension")
 
     plt.tight_layout()
-    plt.savefig(f"control_law_visualization/fig_statistics_summary_{n_clusters}clusters.jpg", dpi=300)
+    plt.savefig(f"{figs_dir}/fig_statistics_summary_{n_clusters}clusters.jpg", dpi=300)
     plt.close()
 
 def plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, max_u, n_clusters):
@@ -267,7 +267,7 @@ def plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, 
     ax.set_xticks(np.arange(state_dim))
     ax.set_xlim(-0.5, state_dim - 0.5)
     plt.tight_layout()
-    plt.savefig(f"control_law_visualization/fig_statistics_profiles_state_{n_clusters}clusters.jpg", dpi=300)
+    plt.savefig(f"{figs_dir}/fig_statistics_profiles_state_{n_clusters}clusters.jpg", dpi=300)
     plt.close()
 
     # Plot ACTION statistics as pseudo-violin style per dimension
@@ -290,7 +290,7 @@ def plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, 
     ax.set_xticks(np.arange(action_dim))
     ax.set_xlim(-0.5, action_dim - 0.5)
     plt.tight_layout()
-    plt.savefig(f"control_law_visualization/fig_statistics_profiles_action_{n_clusters}clusters.jpg", dpi=300)
+    plt.savefig(f"{figs_dir}/fig_statistics_profiles_action_{n_clusters}clusters.jpg", dpi=300)
     plt.close()
 
 # -------------------------------------------------------------------------------------------------
@@ -298,12 +298,18 @@ def plot_cluster_stat_profiles(avg_x, std_x, min_x, max_x, avg_u, std_u, min_u, 
 if __name__ == '__main__':
 
     ensemble   = "0"
-    case_dir   = "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17"
+    case_name  = "RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17"
+    train_name = "train_2025-09-04--15-26-04--16ed"
+    case_dir   = f"/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/{case_name}"
     run_mode   = "train"
-    train_name = "train_2025-09-04--09-48-06--0c85"
     rl_n_envs  = 160
-    step       = "004320"
-    scatter_step = 2
+    step       = "002560"
+    scatter_step = 1
+
+    # Directory for generated figures
+    figs_dir = f"control_law_visualization/{case_name}/{train_name}/step{step}"
+    if not os.path.exists(figs_dir):
+        os.makedirs(figs_dir)
     
     time_data_dir   = f"{case_dir}/{run_mode}/{train_name}/time/"
     state_data_dir  = f"{case_dir}/{run_mode}/{train_name}/state/"
@@ -320,6 +326,6 @@ if __name__ == '__main__':
     state  = state_data.reshape( num_time_steps, rl_n_envs, -1)  # shape [num_time_steps, rl_n_envs, state_dim]
     action = action_data.reshape(num_time_steps, rl_n_envs, -1)  # shape [num_time_steps, rl_n_envs, action_dim]
     
-    for n_clusters in np.linspace(2,20,19,dtype='int'):
+    for n_clusters in np.linspace(2,10,9,dtype='int'):
         logger.info(f"Using {n_clusters} clusters")
-        cluster_control_analysis(state, action, n_clusters=n_clusters, agent_id=None)
+        cluster_control_analysis(state, action, n_clusters=n_clusters, figs_dir=figs_dir, agent_id=None)
