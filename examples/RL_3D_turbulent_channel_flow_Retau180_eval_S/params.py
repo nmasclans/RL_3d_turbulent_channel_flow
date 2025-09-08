@@ -12,12 +12,12 @@ run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
     # smartsim params
-    "run_id": "2025-06-05--15-17-55--c7a4",# "2025-06-05--15-17-55--c7a4" (for S16) or "2025-06-14--10-16-13--10d2" (for S18),
+    "run_id": "2025-09-04--15-26-04--16ed",# "2025-06-05--15-17-55--c7a4" (for S16) or "2025-06-14--10-16-13--10d2" (for S18), "2025-09-04--15-26-04--16ed" (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 3680, # 3680 (for S16), or 34048 (for S18),
+    "eval_checkpoint_step": 2560, # 3680 (for S16), or 34048 (for S18), 15360 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
@@ -62,7 +62,7 @@ params = {
     "state_dim": 9,
     "reward_norm": 1.0,
     "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
-    "restart_file": "restart_data_file.h5", # 'random_choice' or filename as restart_data_file.h5
+    "restart_file": "restart_data_file.h5",         # 'random_choice' or filename as restart_data_file.h5
     "net": (128, 128),                              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
     "std_initial": 0.20,
     "learning_rate": 0.002,                                                            
