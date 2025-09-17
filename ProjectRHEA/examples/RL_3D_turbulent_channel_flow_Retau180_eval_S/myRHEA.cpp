@@ -20,7 +20,7 @@ using namespace std;
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
 #define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
-#define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
+#define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 1
 
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
