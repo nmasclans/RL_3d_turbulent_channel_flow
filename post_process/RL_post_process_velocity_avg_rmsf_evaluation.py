@@ -23,13 +23,13 @@ try :
     train_name      = sys.argv[2]
     Re_tau          = float(sys.argv[3])     # Friction Reynolds number [-]
     dt_phys         = float(sys.argv[4])
-    t_episode_train = float(sys.argv[5])
+    t_episode       = float(sys.argv[5])
     case_dir        = sys.argv[6]
     run_mode        = sys.argv[7]
     rl_n_envs       = int(sys.argv[8])
-    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode_train} \n- Case directory: {case_dir} \n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name} \n- Re_tau: {Re_tau} \n- dt_phys: {dt_phys} \n- Train episode period: {t_episode} \n- Case directory: {case_dir} \n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
-    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <t_episode_train> <case_dir> <run_mode> <rl_n_envs>")
+    raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <Re_tau> <dt_phys> <t_episode> <case_dir> <run_mode> <rl_n_envs>")
 
 if run_mode == "train":
     print("Run mode is set to training")
@@ -61,26 +61,26 @@ compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
     iteration_max_nonRL = 4190000 # 7280000
 else:   # run_mode == "eval"
-    iteration_max_nonRL = 2880000
+    iteration_max_nonRL = 2823000
 max_length_legend_RL = 10
 
 # RL parameters
 cfd_n_envs = 1
-simulation_time_per_train_step   = t_episode_train                    # total cfd simulated time per training step (in parallel per each cfd_n_envs)
-num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
-num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
+simulation_time_per_step   = t_episode                          # total cfd simulated time per training step (in parallel per each cfd_n_envs)
+num_global_steps_per_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
+num_iterations_per_step    = int(np.round(simulation_time_per_step / dt_phys))
 if run_mode == "train":
     iteration_restart_data_file  = 3240000
     delta_iteration_nonRL        = 10000
 else:   # run_mode == "eval"
     iteration_restart_data_file  = 2820000
-iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
-assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
-print("\nRL parameters: \n- Simulation time per train step:", simulation_time_per_train_step, 
-      "\n- Num. global steps per train step:", num_global_steps_per_train_step,
-      "\n- Num. iterations per train step:", num_iterations_per_train_step,
+    delta_iteration_nonRL        = 1000
+iteration_end_step = np.min([iteration_restart_data_file + num_iterations_per_step, iteration_max_nonRL])
+print("\nRL parameters: \n- Simulation time per step:", simulation_time_per_step, 
+      "\n- Num. global steps per step:", num_global_steps_per_step,
+      "\n- Num. iterations per step:", num_iterations_per_step,
       "\n- Iteration restart data file (init train step):", iteration_restart_data_file,
-      "\n- Iteration end train step:", iteration_end_train_step,
+      "\n- Iteration end step:", iteration_end_step,
 ) 
 
 # --- RL pseudo-environments / actuators boundaries ---
@@ -142,9 +142,9 @@ if matching_files:
     filename_RL_list    = [filepath for _, _, filepath in all_files]
 
     # Append restart data file to RL files list
-    filename_RL_list.insert(0,filename_rst)
-    iteration_RL_list.insert(0,iteration_restart_data_file) 
-    global_step_RL_list.insert(0,'restart file') 
+    ###iteration_RL_list.insert(0,iteration_restart_data_file) 
+    ###global_step_RL_list.insert(0,'restart file') 
+    ###filename_RL_list.insert(0,filename_rst)
     N_RL = len(filename_RL_list)
 
     # Print selected files
@@ -155,23 +155,23 @@ else:
 
 iter_simulated = []
 for i in range(N_RL):
-    iter = iteration_RL_list[i]
+    iteration = iteration_RL_list[i]
     if i == 0:
-        iter_simulated.append(iter - iteration_restart_data_file)
+        iter_simulated.append(iteration - iteration_restart_data_file)
     else:
-        iter_simulated.append(iter - iter_simulated[i-1])
+        iter_simulated.append(iteration - iteration_RL_list[i-1])
 iter_accumulated = np.sum(iter_simulated)
 iter_max_nonRL   = iteration_restart_data_file + iter_accumulated
-print(f"\nA total of {iter_accumulated} iterations have been simulated through the RL episodes, \nwhich account for restart file {iteration_restart_data_file} iterations \nis equivalent to final non-RL {iter_max_nonRL} iterations.")
 iteration_max_nonRL = np.min([iter_max_nonRL, iteration_max_nonRL])
+print("\niteration_RL_list:", iteration_RL_list)
+print("global_step_RL_list:", global_step_RL_list)
+print("filename_RL_list:", filename_RL_list)
+print(f"\nA total of {iter_accumulated} iterations have been simulated through the RL episodes, \nwhich account for restart file {iteration_restart_data_file} iterations \nis equivalent to final non-RL {iter_max_nonRL} iterations.")
 print(f"Last non-RL iteration: {iteration_max_nonRL}")
 
 # --- non-RL filenames ---
 
-if run_mode == "train":
-    iteration_nonRL_list = np.arange(iteration_restart_data_file, iteration_max_nonRL, delta_iteration_nonRL)
-else:   # run_mode == "eval"
-    iteration_nonRL_list = [ iteration_restart_data_file, iteration_end_train_step ]
+iteration_nonRL_list = np.arange(iteration_restart_data_file, iteration_max_nonRL, delta_iteration_nonRL)
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
 N_nonRL = len(filename_nonRL_list)
 print("\nnon-RL files:")
@@ -247,7 +247,7 @@ for i in range(N_RL):
     else:
         averaging_time_simulated_RL[i] = averaging_time_RL[i] - averaging_time_RL[i-1]
 averaging_time_accum_RL = np.cumsum(averaging_time_simulated_RL)
-print("averaging_time_RL:", averaging_time_RL)
+print("\naveraging_time_RL:", averaging_time_RL)
 print("averaging_time_simulated_RL:", averaging_time_simulated_RL)
 print("averaging_time_accum_RL:", averaging_time_accum_RL)
 

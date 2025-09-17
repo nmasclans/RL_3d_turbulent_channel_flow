@@ -55,19 +55,20 @@ compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
     iteration_max_nonRL = 4190000 # 6000000
 else:   # run_mode == "eval"
-    iteration_max_nonRL = 2880000
+    iteration_max_nonRL = 28230000
 max_length_legend_RL = 10
 
 # RL parameters
 cfd_n_envs = 1
-delta_iteration_nonRL            = 10000
 simulation_time_per_train_step   = t_episode_eval                     # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
 if run_mode == "train":
     iteration_restart_data_file  = 3240000
+    delta_iteration_nonRL        = 10000
 else:   # run_mode == "eval"
     iteration_restart_data_file  = 2820000
+    delta_iteration_nonRL        = 1000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
 assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
 print("\nRL parameters: \n- Simulation time per train step:", simulation_time_per_train_step, 
@@ -132,19 +133,23 @@ if matching_files:
 else:
     print(f"No files found matching the pattern: {pattern}")
 
-iter_simulated   = [iter - iteration_restart_data_file for iter in iteration_RL_list]
+iter_simulated = []
+for i in range(N_RL):
+    iteration = iteration_RL_list[i]
+    if i == 0:
+        iter_simulated.append(iteration - iteration_restart_data_file)
+    else:
+        iter_simulated.append(iteration - iteration_RL_list[i-1])
 iter_accumulated = np.sum(iter_simulated)
 iter_max_nonRL   = iteration_restart_data_file + iter_accumulated
-print(f"\nA total of {iter_accumulated} iterations have been simulated through the RL episodes, \nwhich accounting for restart file {iteration_restart_data_file} iterations \nis equivalent to final non-RL {iter_max_nonRL} iterations.")
 iteration_max_nonRL = np.min([iter_max_nonRL, iteration_max_nonRL])
+print(f"\nA total of {iter_accumulated} iterations have been simulated through the RL episodes, \nwhich account for restart file {iteration_restart_data_file} iterations \nis equivalent to final non-RL {iter_max_nonRL} iterations.")
 print(f"Last non-RL iteration: {iteration_max_nonRL}")
+
 
 # --- non-RL filenames ---
 
-if run_mode == "train":
-    iteration_nonRL_list = np.arange(iteration_restart_data_file, iteration_max_nonRL, delta_iteration_nonRL)
-else:   # run_mode == "eval"
-    iteration_nonRL_list = [ iteration_restart_data_file, iteration_end_train_step ]
+iteration_nonRL_list = np.arange(iteration_restart_data_file, iteration_max_nonRL, delta_iteration_nonRL)
 filename_nonRL_list  = [f"{compareDatasetDir}/3d_turbulent_channel_flow_{iter}.h5" for iter in iteration_nonRL_list] 
 N_nonRL = len(filename_nonRL_list)
 print("\nnon-RL files:")

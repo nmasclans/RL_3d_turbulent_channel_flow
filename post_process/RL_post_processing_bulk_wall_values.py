@@ -249,7 +249,8 @@ sum_avg_u_volume_nonRL = np.zeros(N_nonRL); sum_u_volume_nonRL = np.zeros(N_nonR
 sum_avg_u_volume_ref   = 0.0;               sum_u_volume_ref   = 0.0
 sum_volume = 0.0
 for i in range( 1, num_points_x-1 ):
-    print(f"{i/num_points_x*100:.0f}%")
+    if i % (num_points_x // 10) == 0:
+        print(f"{i / num_points_x * 100:.0f}%")
     for j in range( 1, num_points_y-1 ):
         for k in range( 1, num_points_z-1 ):
             # Geometric stuff
