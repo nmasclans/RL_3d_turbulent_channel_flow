@@ -1,6 +1,6 @@
 /__pycache__
 /data_Retau100
-/data_Retau180
+/data_Retau180*
 /results_ensemble_average
 *.csv
 *.h5

@@ -61,7 +61,7 @@ compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
 if run_mode == "train":
     iteration_max_nonRL = 4190000 # 7280000
 else:   # run_mode == "eval"
-    iteration_max_nonRL = 2823000
+    iteration_max_nonRL = 2840001
 max_length_legend_RL = 10
 
 # RL parameters
