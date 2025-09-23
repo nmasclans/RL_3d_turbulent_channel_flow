@@ -27,10 +27,11 @@ from ChannelVisualizer import ChannelVisualizer
 try :
     ensemble   = sys.argv[1]
     train_name = sys.argv[2]
-    case_dir   = sys.argv[3]
-    run_mode   = sys.argv[4]
-    rl_n_envs  = int(sys.argv[5])
-    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
+    Re_tau     = float(sys.argv[3])     # Friction Reynolds number [-]
+    case_dir   = sys.argv[4]
+    run_mode   = sys.argv[5]
+    rl_n_envs  = int(sys.argv[6])
+    print(f"\nScript parameters: \n- Ensemble: {ensemble}\n- Train name: {train_name}\n- Re_tau: {Re_tau} \n- Case directory: {case_dir}\n- Run mode: {run_mode}\n- Num. RL environments / Parallelization cores: {rl_n_envs}")
 except :
     raise ValueError("Missing call arguments, should be: <ensemble> <train_name> <case_dir> <rl_n_envs>")
 
@@ -42,7 +43,7 @@ else:
     raise ValueError(f"Unrecognized input argument run_mode = `{run_mode}`")
 
 # --- Simulation parameters ---
-if run_mode == 'train':
+if Re_tau == 100:
     restart_data_file_time = 323.999999999  # restart_data_file attribute 'Time'
     restart_data_file_averaging_time = 5.0  # restart_data_file attribute 'AveragingTime'
 else:

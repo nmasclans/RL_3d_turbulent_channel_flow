@@ -1290,7 +1290,7 @@ class ChannelVisualizer():
 
 # ------------------------------------------------------------------------
 
-    def build_rewards_terms_plot(self, avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
+    def build_rewards_terms_plot(self, avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_total_lim, rewards_lim, global_step):
         fig, ax = plt.subplots(2)
         ax[0].plot(avg_time, local_reward, color='black', linewidth=2, label=r"Reward total")
         ax[1].plot(avg_time, avg_u_reward, linewidth=2, label=r"Reward term $\overline{u}$")
@@ -1299,6 +1299,7 @@ class ChannelVisualizer():
         ax[1].plot(avg_time, rms_u_reward, linewidth=2, label=r"Reward term $u_{\textrm{rms}}$")
         ax[1].plot(avg_time, rms_v_reward, linewidth=2, label=r"Reward term $v_{\textrm{rms}}$")
         ax[1].plot(avg_time, rms_w_reward, linewidth=2, label=r"Reward term $w_{\textrm{rms}}$")
+        ax[0].set_ylim(rewards_total_lim)
         ax[1].set_ylim(rewards_lim)
         ax[1].set_xlabel("Averaging time", fontsize=16)
         for axis in range(2):
@@ -1311,9 +1312,9 @@ class ChannelVisualizer():
         plt.close()
         return fig_plot
    
-    def build_rewards_terms_frames(self, frames_plot, avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step):
+    def build_rewards_terms_frames(self, frames_plot, avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_total_lim, rewards_lim, global_step):
         # Ensemble average figure
-        fig_plot = self.build_rewards_terms_plot(avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_lim, global_step)
+        fig_plot = self.build_rewards_terms_plot(avg_time, local_reward, avg_u_reward, avg_v_reward, avg_w_reward, rms_u_reward, rms_v_reward, rms_w_reward, avg_time_lim, rewards_total_lim, rewards_lim, global_step)
         # Ensemble average frame
         fig_plot.canvas.draw()
         img_plot = Image.frombytes("RGB", fig_plot.canvas.get_width_height(), fig_plot.canvas.tostring_rgb())
@@ -2230,7 +2231,7 @@ class ChannelVisualizer():
         plt.grid(which='both',axis='y')
         plt.tick_params( axis = 'both', pad = 7.5 )
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.legend(loc='upper right', frameon=True)
+        plt.legend(loc='best', frameon=True)
         filename = os.path.join(self.postRlzDir, f'numerical_u_bulk.{self.format}')
         plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
         plt.clf()
@@ -2247,7 +2248,7 @@ class ChannelVisualizer():
         plt.grid(which='major',axis='y')
         plt.tick_params( axis = 'both', pad = 7.5 )
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.legend(loc='upper right', frameon=True)
+        plt.legend(loc='best', frameon=True)
         filename = os.path.join(self.postRlzDir, f'numerical_avg_u_bulk.{self.format}')
         plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
         plt.clf()
@@ -2267,7 +2268,7 @@ class ChannelVisualizer():
         plt.grid(which='major',axis='y')
         plt.tick_params( axis = 'both', pad = 7.5 )
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.legend(loc='upper right', frameon=True)
+        plt.legend(loc='best', frameon=True)
         filename = os.path.join(self.postRlzDir, f'numerical_inst_avg_u_bulk.{self.format}')
         plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
         plt.clf()
@@ -2279,10 +2280,10 @@ class ChannelVisualizer():
         plt.plot( averaging_time_accum_RL, tau_w_num_RL,                linestyle=':',      marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
         plt.xlabel( r'Cumulative averaging time $t_{avg}^+$' )
         plt.ylabel( r'Numerical $\tau_w$' )
-        plt.ylim([0.0, 1.1])
+        #plt.ylim([0.0, 1.1])
         plt.grid(which='both',axis='y')
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.legend(loc='upper right', frameon=True)
+        plt.legend(loc='best', frameon=True)
         plt.tick_params( axis = 'both', pad = 7.5 )
         filename = os.path.join(self.postRlzDir, f'numerical_tau_w.{self.format}')
         plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
@@ -2295,10 +2296,10 @@ class ChannelVisualizer():
         plt.plot( averaging_time_accum_RL, u_tau_num_RL,                linestyle=':',     marker = '^', markersize = 4, linewidth = 2, color = plt.cm.tab10(3), label = r'RL Framework' )
         plt.xlabel( r'Cumulative averaging time $t_{avg}^+$' )
         plt.ylabel( r'Numerical $u_\tau$' )
-        plt.ylim([0.0, 1.1])
+        #plt.ylim([0.0, 1.1])
         plt.grid(which='both',axis='y')
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.legend(loc='upper right', frameon=True)
+        plt.legend(loc='best', frameon=True)
         plt.tick_params( axis = 'both', pad = 7.5 )
         filename = os.path.join(self.postRlzDir, f'numerical_u_tau.{self.format}')
         plt.savefig( filename, format = self.format, bbox_inches = 'tight' )
@@ -2472,7 +2473,7 @@ class ChannelVisualizer():
         plt.ylabel(rf'$L_{error_num}$ Error' )
         plt.grid(which='both',axis='y')
         #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
-        plt.legend(loc='upper right', frameon=True)
+        plt.legend(loc='best', frameon=True)
         plt.tick_params( axis = 'both', pad = 7.5 )
         plt.tight_layout()
         filename = os.path.join(self.postRlzDir, f'L{error_num}_error_{vel_component}.{self.format}')

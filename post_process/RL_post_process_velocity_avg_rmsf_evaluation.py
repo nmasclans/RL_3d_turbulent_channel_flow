@@ -58,10 +58,10 @@ if not os.path.exists(postDir):
 # Reference & non-RL data directory
 filePath = os.path.dirname(os.path.abspath(__file__))
 compareDatasetDir = os.path.join(filePath, f"data_Retau{Re_tau:.0f}")
-if run_mode == "train":
+if Re_tau == 100:
     iteration_max_nonRL = 4190000 # 7280000
 else:   # run_mode == "eval"
-    iteration_max_nonRL = 2840001
+    iteration_max_nonRL = 2900001
 max_length_legend_RL = 10
 
 # RL parameters
@@ -69,10 +69,10 @@ cfd_n_envs = 1
 simulation_time_per_step   = t_episode                          # total cfd simulated time per training step (in parallel per each cfd_n_envs)
 num_global_steps_per_step  = int(cfd_n_envs * rl_n_envs)        # num. global steps per training step
 num_iterations_per_step    = int(np.round(simulation_time_per_step / dt_phys))
-if run_mode == "train":
+if Re_tau == 100:
     iteration_restart_data_file  = 3240000
     delta_iteration_nonRL        = 10000
-else:   # run_mode == "eval"
+else:
     iteration_restart_data_file  = 2820000
     delta_iteration_nonRL        = 1000
 iteration_end_step = np.min([iteration_restart_data_file + num_iterations_per_step, iteration_max_nonRL])

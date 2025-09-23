@@ -25,7 +25,7 @@ verbose = False
 # --- Case parameters ---
 
 restart_iteration = 2820000
-Re_tau  = 180
+Re_tau  = 100
 dt_phys = 5e-5
 
 rho_0   = 1.0				# Reference density [kg/m3]
@@ -59,18 +59,18 @@ filename_rst = f"{compareDatasetDir}/3d_turbulent_channel_flow_{restart_iteratio
 # --- RL filenames ---
 filename_RL_list = [
     os.path.join(
-        "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau180_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep2560_oldRewardCoeff/rhea_exp/output_data",
-        "RL_3d_turbulent_channel_flow_2830026_ensemble0_step002720.h5",
+        "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17/rhea_exp/output_data",
+        "RL_3d_turbulent_channel_flow_3250020_ensemble0_step002560.h5",
     ),
     os.path.join(
-        "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau180_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep15040_oldRewardCoeff/rhea_exp/output_data",
-        "RL_3d_turbulent_channel_flow_2830026_ensemble0_step015200.h5",
+        "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17/rhea_exp/output_data",
+        "RL_3d_turbulent_channel_flow_3250020_ensemble0_step015040.h5",
     ),
 ]
 N_RL = len(filename_RL_list)
 
 # --- RL filenames ---
-filename_nonRL_list = [f"{compareDatasetDir}/3d_turbulent_channel_flow_2830000.h5"]
+filename_nonRL_list = [f"{compareDatasetDir}/3d_turbulent_channel_flow_3250000.h5"]
 N_nonRL = len(filename_nonRL_list)
 
 #--------------------------------------------------------------------------------------------
@@ -359,10 +359,10 @@ cmap  = matplotlib.colormaps['Greys']
 norm  = colors.Normalize(vmin = 0, vmax = 1.0)
 
 # Plot data into the barycentric map
-plt.scatter( xmap1_ref,   xmap2_ref,   c = y_delta_ref,   cmap = cmap, norm = norm, zorder = 3, marker = 'o', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"Baseline, Converged, $t_{\textrm{avg}}^{+}=173$" )
+plt.scatter( xmap1_ref,   xmap2_ref,   c = y_delta_ref,   cmap = cmap, norm = norm, zorder = 3, marker = 'o', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"Baseline, $t_{\textrm{avg}}^{+}=173$" )
 plt.scatter(xmap1_nonRL, xmap2_nonRL,  c = y_delta_nonRL, cmap = cmap, norm = norm, zorder = 3, marker = 's', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"Baseline, $t_{\textrm{avg}}^{+}=0.5$" )
-plt.scatter( xmap1_RL[0], xmap2_RL[0], c = y_delta_RL[0], cmap = cmap, norm = norm, zorder = 3, marker = '^', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"RL-based control, $t_{\textrm{avg}}^{+}=0.5$, Test I" )
-plt.scatter( xmap1_RL[1], xmap2_RL[1], c = y_delta_RL[1], cmap = cmap, norm = norm, zorder = 3, marker = 'v', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"RL-based control, $t_{\textrm{avg}}^{+}=0.5$, Test II" )
+plt.scatter( xmap1_RL[0], xmap2_RL[0], c = y_delta_RL[0], cmap = cmap, norm = norm, zorder = 3, marker = '^', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"RL-based control, $t_{\textrm{avg}}^{+}=0.5$, Ep. 16" )
+plt.scatter( xmap1_RL[1], xmap2_RL[1], c = y_delta_RL[1], cmap = cmap, norm = norm, zorder = 3, marker = 'v', s = 50, edgecolor = 'black', linewidth = 0.8, label=r"RL-based control, $t_{\textrm{avg}}^{+}=0.5$, Ep. 94" )
 
 # Plot barycentric map lines
 plt.plot( [x1c[0], x2c[0]],[x1c[1], x2c[1]], zorder = 1, color = 'black', linestyle = '-', linewidth = 2 )
@@ -379,11 +379,13 @@ plt.text( 1.02,   -0.05,  r'$\textbf{x}_{1_{c}}$' )
 plt.text( -0.065, -0.05,  r'$\textbf{x}_{2_{c}}$' )
 plt.text( 0.45,   0.9000, r'$\textbf{x}_{3_{c}}$' )
 cbar = plt.colorbar()
-cbar.set_label( r'$y/\delta$' )
-plt.legend(loc='upper right')
+cbar.ax.tick_params(labelsize=16)
+cbar.set_label( r'$y/\delta$', size=16  )
+plt.legend(loc='center right', frameon=True, fontsize=16) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
+#plt.legend(loc='best')
 plt.tight_layout()
 ###plt.clim( 0.0, 20.0 )
-filename = os.path.join(postDir, f"anisotropy_tensor_barycentric_xmap_triang.svg")
+filename = os.path.join(postDir, f"anisotropy_tensor_barycentric_xmap_triang_Retau{Re_tau}_training.svg")
 plt.savefig(filename)
 plt.close()
 
