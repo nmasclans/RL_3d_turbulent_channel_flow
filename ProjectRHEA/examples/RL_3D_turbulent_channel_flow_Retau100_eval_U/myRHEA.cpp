@@ -16,7 +16,7 @@ using namespace std;
 #define _CORRECT_U_BULK_ 0                          /// Activate correction of u_bulk
 #define _FIXED_TIME_STEP_ 1                         /// Activate fixed time step
 #define _ACTIVE_CONTROL_BODY_FORCE_ 1               /// Activate active control for the body force
-#define _RL_CONTROL_IS_SUPERVISED_ 1
+#define _RL_CONTROL_IS_SUPERVISED_ 0
 #define _TEMPORAL_SMOOTHING_RL_ACTION_ 1
 #define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
@@ -55,12 +55,14 @@ const double alpha_P    = 0.1;                      /// Magnitude of pressure pe
 const double fixed_time_step = 1.0e-4;              /// Time step value [s]
 const int cout_precision = 10;		                /// Output precision (fixed) 
 
-const double u_bulk_reference = 14.612998708455182;
 #if _FEEDBACK_LOOP_BODY_FORCE_
 /// Estimated uniform body force to drive the flow
 double controller_output = tau_w/delta;			    /// Initialize controller output
 double controller_error  = 0.0;			        	/// Initialize controller error
 double controller_K_p    = 1.0e-1;		        	/// Controller proportional gain
+#endif
+#if _CORRECT_U_BULK_
+const double u_bulk_reference = 14.647;
 #endif
 #if _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_
 const double avg_u_bulk_max = u_b * (1.0 + 0.05);
@@ -887,48 +889,13 @@ void myRHEA::calculateSourceTerms() {
     cout << fixed << setprecision(cout_precision);
 
 #if _FEEDBACK_LOOP_BODY_FORCE_
-    
-    /// --- Calculate avg_u_bulk ---
-    double delta_x, delta_y, delta_z, delta_volume;
-    double local_volume = 0.0;
-    double local_u_volume = 0.0;
-    double local_avg_u_volume = 0.0;
-
-    for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
-        for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
-            for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {
-                /// Geometric stuff
-                delta_x = 0.5*( x_field[I1D(i+1,j,k)] - x_field[I1D(i-1,j,k)] ); 
-                delta_y = 0.5*( y_field[I1D(i,j+1,k)] - y_field[I1D(i,j-1,k)] ); 
-                delta_z = 0.5*( z_field[I1D(i,j,k+1)] - z_field[I1D(i,j,k-1)] );
-                delta_volume =  delta_x * delta_y * delta_z;
-                /// Update values
-                local_volume       += delta_volume;
-                local_u_volume     += u_field[I1D(i,j,k)] * delta_volume;
-                local_avg_u_volume += avg_u_field[I1D(i,j,k)] * delta_volume;
-            }
-        }
-    }
-
-    /// Communicate local values to obtain global & average values
-    double global_volume       = 0.0;
-    double global_u_volume     = 0.0;
-    double global_avg_u_volume = 0.0;
-    MPI_Allreduce(&local_volume,       &global_volume,       1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(&local_u_volume,     &global_u_volume,     1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(&local_avg_u_volume, &global_avg_u_volume, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    
-    /// Calculate u_bulk numeric
-    double u_bulk_numeric     = global_u_volume     / global_volume;
-    double avg_u_bulk_numeric = global_avg_u_volume / global_volume;
-
-    /// --- Evaluate numerical shear stress at walls ---
+    /// Evaluate numerical shear stress at walls
 
     /// Calculate local values
     double local_sum_u_boundary_w = 0.0;
     double local_sum_u_inner_w    = 0.0;
     double local_number_grid_points_w = 0.0;
-    
+
     /// South boundary
     for(int i = topo->iter_bound[_SOUTH_][_INIX_]; i <= topo->iter_bound[_SOUTH_][_ENDX_]; i++) {
         for(int j = topo->iter_bound[_SOUTH_][_INIY_]; j <= topo->iter_bound[_SOUTH_][_ENDY_]; j++) {
@@ -988,8 +955,7 @@ void myRHEA::calculateSourceTerms() {
     double tau_w_numerical = mu*( global_avg_u_inner_w - global_avg_u_boundary_w )/delta_y_wall;
     
     /// Update controller variables
-    /// controller_error   = ( tau_w - tau_w_numerical )/delta;
-    controller_error   = ( tau_w - tau_w_numerical )/delta + (u_bulk_reference - avg_u_bulk_numeric);
+    controller_error   = ( tau_w - tau_w_numerical )/delta;
     controller_output += controller_K_p*controller_error;
 
     //int my_rank, world_size;
