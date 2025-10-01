@@ -12,12 +12,12 @@ run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
     # smartsim params
-    "run_id": "2025-09-04--15-26-04--16ed",# "2025-06-05--15-17-55--c7a4" (for S16) or "2025-06-14--10-16-13--10d2" (for S18), "2025-09-04--15-26-04--16ed" (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
+    "run_id": "2025-09-04--15-26-04--16ed",# "2025-06-05--15-17-55--c7a4" (for S16) or "2025-06-14--10-16-13--10d2" (for S18), "2025-09-04--15-26-04--16ed" (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17), "2025-09-23--12-19-18--c292" (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_10max_9state_17_feedbackloop_utau_ubulk)
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 15040, # 3680 (for S16), or 34048 (for S18), 15040 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
+    "eval_checkpoint_step": 2560, # 3680 (for S16), or 34048 (for S18), 15040 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17), 3840 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_10max_9state_17_feedbackloop_utau_ubulk)
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,

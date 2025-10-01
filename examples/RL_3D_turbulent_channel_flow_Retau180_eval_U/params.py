@@ -4,8 +4,8 @@ import time, random, os, numpy as np
 dt_phys  = 5e-5         # not taken from here, defined in myRHEA.cpp
 t_action = 0.0278       # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(0.5 + t_action + dt_phys, 8)
-t_episode_eval = round(0.5 + t_action + dt_phys, 8)
+t_episode_train = round(5.0 + t_action + dt_phys, 8)
+t_episode_eval = round(5.0 + t_action + dt_phys, 8)
 cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 160         # num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
@@ -17,7 +17,7 @@ params = {
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 2560, # 3680 (for S16), or 34048 (for S18), 15360 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
+    "eval_checkpoint_step": 15040, # 3680 (for S16), or 34048 (for S18), 15360 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,

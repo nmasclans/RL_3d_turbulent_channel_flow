@@ -95,14 +95,14 @@ boundary_conditions:
 
 ##### PRINT/WRITE/READ PARAMETERS #####
 print_write_read_parameters:
-   print_frequency_iter: 10000000            				   # Print information iteration frequency
+   print_frequency_iter: 1000            				   # Print information iteration frequency
    output_data_file_name: 'RL_3d_turbulent_channel_flow'    # Name of output data file
-   output_frequency_iter: 10000000   					         # Data output iteration frequency
+   output_frequency_iter: 1000   					         # Data output iteration frequency
    generate_xdmf_file: 'TRUE'          				         # Generate xdmf file reader
    use_restart: 'TRUE'                					         # Use restart to initialize problem
    restart_data_file: 'restart_data_file.h5' 			      # Restart data file
    time_averaging_active: 'TRUE'          				      # Activate time averaging
-   reset_time_averaging: 'FALSE'              		         # Reset time averaging
+   reset_time_averaging: 'TRUE'              		         # Reset time averaging
 
 
 ##### TWO-DIMENSIONAL DATA OUTPUT SLICES #####
