@@ -38,7 +38,7 @@ if Re_tau == 100:
     iteration_max_nonRL = 7180000
 elif Re_tau == 180:
     iteration_min_nonRL = 2820000 
-    iteration_max_nonRL = 3030000
+    iteration_max_nonRL = 3250000
 else:
     raise ValueError(f"Invalid Re_tau: {Re_tau}. Must be one of [100, 180].")
 
@@ -391,7 +391,7 @@ def build_velocity_error_nonRL_plot(avg_time_nonRL, err_avg_u_nonRL, err_avg_v_n
     plt.legend(loc='upper right', frameon=True)
     plt.tick_params( axis = 'both', pad = 7.5 )
     plt.tight_layout()
-    filename = os.path.join(postDir, f'L{error_num}_error_nonRL_Retau{Re_tau:.0f}.svg')
+    filename = os.path.join(postDir, f'1_L{error_num}_error_nonRL_Retau{Re_tau:.0f}.svg')
     plt.savefig( filename, format = 'svg', bbox_inches = 'tight' )
     plt.close()
     print(f"\nBuild plot: '{filename}'")

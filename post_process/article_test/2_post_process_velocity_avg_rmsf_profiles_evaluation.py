@@ -13,6 +13,7 @@ plt.rc( 'text',       usetex = True )
 plt.rc( 'font',       size = 18 )
 plt.rc( 'axes',       labelsize = 18)
 plt.rc( 'legend',     fontsize = 12, frameon = False)
+plt.rc( 'axes',       axisbelow=True)
 plt.rc( 'text.latex', preamble = r'\usepackage{amsmath} \usepackage{amssymb} \usepackage{color}')
 #plt.rc( 'savefig',    format = "jpg", dpi = 600)
 
@@ -41,22 +42,40 @@ compareDatasetDir = os.path.join("/home/jofre/Nuria/repositories/RL_3d_turbulent
 
 # Evaluation directories
 if Re_tau == 100:
-    iteration_min_nonRL = 3240000
-    iteration_max_nonRL = 3260000
+    iteration_min_nonRL   = 3240000
+    iteration_max_nonRL   = 3270000
+    diter_snapshots_nonRL = 1000
+    diter_snapshots_RL    = 1000
     RLdatasetDict = {
         "Superv. Ep. 2560": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep2560_normal/rhea_exp/output_data",
-        "Superv. Ep. 15040": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep15040_normal/rhea_exp/output_data",
         "Unsuper. Ep. 2560": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_eval_U/post_process/eval_2025-09-04--15-26-04--16ed_globalStep2560_normal/rhea_exp/output_data",
+        "Superv. Ep. 15040": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep15040_normal/rhea_exp/output_data",
         "Unsuperv. Ep. 15040": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau100_eval_U/post_process/eval_2025-09-04--15-26-04--16ed_globalStep15040_normal/rhea_exp/output_data",
     }
-    N_RL_datasets = len(RLdatasetDict) 
+    # Plots dataset colormap
+    isUnsuperv = [0,1,0,1]
+    setEpochs  = [0,0,1,1]
+
 elif Re_tau == 180:
     iteration_min_nonRL = 2820000 
-    iteration_max_nonRL = ""
-    raise ValueError("Re_tau = 180 not implemented yet.")
+    iteration_max_nonRL = 2850000
+    diter_snapshots_nonRL = 5000
+    diter_snapshots_RL    = 5000
+    RLdatasetDict = {
+        "Superv. Ep. 2560": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau180_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep2560_feedbackloop_utau_ubulk/rhea_exp/output_data",
+        #"Unsuper. Ep. 2560": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau180_eval_U/post_process/eval_2025-09-04--15-26-04--16ed_globalStep2560_normal/rhea_exp/output_data",
+        "Superv. Ep. 15040": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau180_eval_S/post_process/eval_2025-09-04--15-26-04--16ed_globalStep15040_feedbackloop_utau_ubulk/rhea_exp/output_data",
+        "Unsuperv. Ep. 15040": "/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/examples/RL_3D_turbulent_channel_flow_Retau180_eval_U/post_process/eval_2025-09-04--15-26-04--16ed_globalStep15040_normal/rhea_exp/output_data",
+    }
+    # Plots dataset colormap
+    isUnsuperv = [0,0,1]
+    setEpochs  = [0,1,1]
+
 else:
     raise ValueError(f"Invalid Re_tau: {Re_tau}. Must be one of [100, 180].")
 
+N_RL_datasets = len(RLdatasetDict) 
+dataset_colormap_tab20 = [i+2*j for i,j in zip(isUnsuperv, setEpochs)]  # [0,1,2,3]
 
 # Directory of build plots
 postDir = f"/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/post_process/article_test/"
@@ -65,6 +84,16 @@ postDir = f"/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow/post_pro
 
 # ----------- Build data h5 filenames ------------
 
+def iter_patterns_from_diter(diter:int) -> list[str]:
+    if diter==1000:
+        return ["000"]
+    elif diter==5000:
+        return ["0000", "5000"]
+    elif diter==10000:
+        return ["0000"]
+    else:
+        raise ValueError(f"Unsupported diter value: {diter}")
+
 # --- non-RL converged reference filename ---
 
 print("\nReference, Converged file:")
@@ -72,8 +101,12 @@ filename_ref = f"{compareDatasetDir}/3d_turbulent_channel_flow_reference.h5"
 
 # --- non-RL filenames ---
 
-pattern = f"{compareDatasetDir}/3d_turbulent_channel_flow_*.h5"
-matching_files = sorted(glob.glob(pattern))
+matching_files = []
+for pat in iter_patterns_from_diter(diter_snapshots_nonRL):
+    pattern = f"{compareDatasetDir}/3d_turbulent_channel_flow_*{pat}.h5"
+    matching_files.extend(glob.glob(pattern))
+matching_files = sorted(matching_files)
+
 all_files = []
 if matching_files:
     print("\n\n--------------------------- Non-RL files: ---------------------------")
@@ -104,8 +137,13 @@ filename_RL_dict  = {}
 N_RL_dict = {}
 for dataset_name, dataset_dir in RLdatasetDict.items():
     print("\nRL Dataset directory:\n", dataset_dir)
-    pattern = f"{dataset_dir}/RL_3d_turbulent_channel_flow_*_ensemble0_step*.h5"
-    matching_files = sorted(glob.glob(pattern))
+
+    matching_files = []
+    for pat in iter_patterns_from_diter(diter_snapshots_RL):
+        pattern = f"{dataset_dir}/RL_3d_turbulent_channel_flow_*{pat}_ensemble0_step*.h5"
+        matching_files.extend(glob.glob(pattern))
+    matching_files = sorted(matching_files)
+
     all_files = []
     if matching_files:
         print("RL files:")
@@ -367,7 +405,7 @@ for database_name in RLdatasetDict.keys():
     for j in range(ny):
         dy = np.abs(0.5 * (y_plus[j+2]-y_plus[j]))
         ylength += dy
-        for i in range(N_nonRL):
+        for i in range(N_RL):
             L2_error_avg_u_plus_RL_dict[database_name][i]  += ( ( avg_u_plus_RL_dict[database_name][i,j]  - avg_u_plus_ref[j])**2 )  * dy
             L2_error_avg_v_plus_RL_dict[database_name][i]  += ( ( avg_v_plus_RL_dict[database_name][i,j]  - avg_v_plus_ref[j])**2 )  * dy
             L2_error_avg_w_plus_RL_dict[database_name][i]  += ( ( avg_w_plus_RL_dict[database_name][i,j]  - avg_w_plus_ref[j])**2 )  * dy
@@ -410,28 +448,80 @@ def build_velocity_error_plot(avg_time_RL_dict, avg_time_nonRL,
                               err_avg_u_nonRL, err_avg_v_nonRL, err_avg_w_nonRL, 
                               err_rmsf_u_nonRL, err_rmsf_v_nonRL, err_rmsf_w_nonRL, 
                               error_num='2'):
+    # u-component
     plt.clf()
-    plt.semilogy( avg_time_nonRL, err_avg_u_nonRL,  linestyle = '-', linewidth = 1, color = plt.cm.tab10(0), zorder = 1, label = r'non-RL $\overline{u}^+$' )
-    plt.semilogy( avg_time_nonRL, err_rmsf_u_nonRL, linestyle = ':', linewidth = 1, color = plt.cm.tab10(0), zorder = 2, label = r'non-RL ${u}_{\textrm{rms}}^+$' )
-    aux = 1
+    plt.figure(figsize=(10, 5))
+    plt.semilogy( avg_time_nonRL, err_avg_u_nonRL,  linestyle = '-', linewidth = 2, color = 'black', zorder = 1, label = r'non-RL $\overline{u}^+$' )
+    plt.semilogy( avg_time_nonRL, err_rmsf_u_nonRL, linestyle = ':', linewidth = 2, color = 'black', zorder = 2, label = r'non-RL ${u}_{\textrm{rms}}^+$' )
+    aux = 0
     for database_name in RLdatasetDict.keys():
-        plt.semilogy( avg_time_RL_dict[database_name], err_avg_u_RL_dict[database_name],  linestyle = '-', linewidth = 1, color = plt.cm.tab10(1), zorder = 1, label = r'RL $\overline{u}^+$' )
-        plt.semilogy( avg_time_RL_dict[database_name], err_rmsf_u_RL_dict[database_name], linestyle = ':', linewidth = 1, color = plt.cm.tab10(1), zorder = 2, label = r'RL ${u}_{\textrm{rms}}^+$' )
+        plt.semilogy( avg_time_RL_dict[database_name], err_avg_u_RL_dict[database_name],  linestyle = '-', linewidth = 2, color = plt.cm.tab20(dataset_colormap_tab20[aux]), zorder = 1, label = rf'RL $\overline{{u}}^+$ {database_name}' )
+        plt.semilogy( avg_time_RL_dict[database_name], err_rmsf_u_RL_dict[database_name], linestyle = ':', linewidth = 2, color = plt.cm.tab20(dataset_colormap_tab20[aux]), zorder = 2, label = rf'RL $u_{{\textrm{{rms}}}}^+$ {database_name}' )
         aux += 1
     plt.xlabel(r'$\textrm{Averaging time } t_{avg}^+$' )
     if error_num == "2":
-        plt.ylabel(r'$\textrm{NRMSE }(\overline{u}_i^{+}, u_{i_{\textrm{rms}}}^{+})$')
+        plt.ylabel(r'$\textrm{NRMSE }(\overline{u}^{+}, u_{\textrm{rms}}^{+})$')
     else:
         plt.ylabel(rf'$L_{{{error_num}}}$ Error' )
     plt.grid(which='both',axis='y')
-    #plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
-    plt.legend(loc='upper right', frameon=True)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
+    #plt.legend(loc='upper right', frameon=True)
     plt.tick_params( axis = 'both', pad = 7.5 )
     plt.tight_layout()
-    filename = os.path.join(postDir, f'L{error_num}_error_Retau{Re_tau:.0f}.svg')
+    filename = os.path.join(postDir, f'2_L{error_num}_error_u_Retau{Re_tau:.0f}_evaluation.svg')
     plt.savefig( filename, format = 'svg', bbox_inches = 'tight' )
     plt.close()
     print(f"\nBuild plot: '{filename}'")
+
+    # v-component
+    plt.figure(figsize=(10, 5))
+    plt.semilogy( avg_time_nonRL, err_avg_v_nonRL,  linestyle = '-', linewidth = 2, color = 'black', zorder = 1, label = r'non-RL $\overline{v}^+$' )
+    plt.semilogy( avg_time_nonRL, err_rmsf_v_nonRL, linestyle = ':', linewidth = 2, color = 'black', zorder = 2, label = r'non-RL ${v}_{\textrm{rms}}^+$' )
+    aux = 0
+    for database_name in RLdatasetDict.keys():
+        plt.semilogy( avg_time_RL_dict[database_name], err_avg_v_RL_dict[database_name],  linestyle = '-', linewidth = 2, color = plt.cm.tab20(dataset_colormap_tab20[aux]), zorder = 1, label = rf'RL $\overline{{v}}^+$ {database_name}' )
+        plt.semilogy( avg_time_RL_dict[database_name], err_rmsf_v_RL_dict[database_name], linestyle = ':', linewidth = 2, color = plt.cm.tab20(dataset_colormap_tab20[aux]), zorder = 2, label = rf'RL $v_{{\textrm{{rms}}}}^+$ {database_name}' )
+        aux += 1
+    plt.xlabel(r'$\textrm{Averaging time } t_{avg}^+$' )
+    if error_num == "2":
+        plt.ylabel(r'$\textrm{NRMSE }(\overline{v}^{+}, v_{\textrm{rms}}^{+})$')
+    else:
+        plt.ylabel(rf'$L_{{{error_num}}}$ Error' )
+    plt.grid(which='both',axis='y')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
+    #plt.legend(loc='upper right', frameon=True)
+    plt.tick_params( axis = 'both', pad = 7.5 )
+    plt.tight_layout()
+    filename = os.path.join(postDir, f'2_L{error_num}_error_v_Retau{Re_tau:.0f}_evaluation.svg')
+    plt.savefig( filename, format = 'svg', bbox_inches = 'tight' )
+    plt.close()
+    print(f"\nBuild plot: '{filename}'")
+
+    # w-component
+    plt.figure(figsize=(10, 5))
+    plt.semilogy( avg_time_nonRL, err_avg_w_nonRL,  linestyle = '-', linewidth = 2, color = 'black', zorder = 1, label = r'non-RL $\overline{w}^+$' )
+    plt.semilogy( avg_time_nonRL, err_rmsf_w_nonRL, linestyle = ':', linewidth = 2, color = 'black', zorder = 2, label = r'non-RL ${w}_{\textrm{rms}}^+$' )
+    aux = 0
+    for database_name in RLdatasetDict.keys():
+        plt.semilogy( avg_time_RL_dict[database_name], err_avg_w_RL_dict[database_name],  linestyle = '-', linewidth = 2, color = plt.cm.tab20(dataset_colormap_tab20[aux]), zorder = 1, label = rf'RL $\overline{{w}}^+$ {database_name}' )
+        plt.semilogy( avg_time_RL_dict[database_name], err_rmsf_w_RL_dict[database_name], linestyle = ':', linewidth = 2, color = plt.cm.tab20(dataset_colormap_tab20[aux]), zorder = 2, label = rf'RL $w_{{\textrm{{rms}}}}^+$ {database_name}' )
+        aux += 1
+    plt.xlabel(r'$\textrm{Averaging time } t_{avg}^+$' )
+    if error_num == "2":
+        plt.ylabel(r'$\textrm{NRMSE }(\overline{w}^{+}, w_{\textrm{rms}}^{+})$')
+    else:
+        plt.ylabel(rf'$L_{{{error_num}}}$ Error' )
+    plt.grid(which='both',axis='y')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True) # (loc='upper right', frameon=True, framealpha=1.0, fancybox=True)
+    #plt.legend(loc='upper right', frameon=True)
+    plt.tick_params( axis = 'both', pad = 7.5 )
+    plt.tight_layout()
+    filename = os.path.join(postDir, f'2_L{error_num}_error_w_Retau{Re_tau:.0f}_evaluation.svg')
+    plt.savefig( filename, format = 'svg', bbox_inches = 'tight' )
+    plt.close()
+    print(f"\nBuild plot: '{filename}'")
+
+
 
 print("\nBuilding error plots...")
 
