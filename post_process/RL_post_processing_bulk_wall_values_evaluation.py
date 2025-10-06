@@ -65,10 +65,10 @@ num_global_steps_per_train_step  = int(cfd_n_envs * rl_n_envs)        # num. glo
 num_iterations_per_train_step    = int(np.round(simulation_time_per_train_step / dt_phys))
 if Re_tau == 100:
     iteration_restart_data_file  = 3240000
-    delta_iteration_nonRL        = 10000
+    delta_iteration_nonRL        = 1000
 else:
     iteration_restart_data_file  = 2820000
-    delta_iteration_nonRL        = 1000
+    delta_iteration_nonRL        = 2000
 iteration_end_train_step         = iteration_restart_data_file + num_iterations_per_train_step
 assert iteration_restart_data_file + num_iterations_per_train_step == iteration_end_train_step
 print("\nRL parameters: \n- Simulation time per train step:", simulation_time_per_train_step, 

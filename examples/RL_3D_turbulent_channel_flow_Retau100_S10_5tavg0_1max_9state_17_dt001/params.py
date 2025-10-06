@@ -2,22 +2,21 @@ import time, random, os, numpy as np
 
 # t_phys  = delta / u_tau = 1
 dt_phys  = 1.0e-4       # not taken from here, defined in myRHEA.cpp
-t_action = 0.05         # action period
+t_action = 0.01         # action period
 t_begin_control = 0.0   # controls begin after this value
-t_episode_train = round(10.0 + t_action + dt_phys, 8)
-t_episode_eval = round(10.0 + t_action + dt_phys, 8)
+t_episode_train = round(1.0 + t_action + dt_phys, 8)
+t_episode_eval = 1.0
 cfd_n_envs = 1          # num. cfd simulations run in parallel
 rl_n_envs = 160         # num. regions del domini en wall-normal direction -> gets the witness points
 run_mode = os.environ["RUN_MODE"]          # "train" or "eval"
 
 params = {
     # smartsim params
-    "run_id": "2025-09-04--15-26-04--16ed",# "2025-06-05--15-17-55--c7a4" (for S16) or "2025-06-14--10-16-13--10d2" (for S18), "2025-09-04--15-26-04--16ed" (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
+    "run_id": "",
     "rhea_exe": "RHEA.exe",
     "rhea_case_path": os.environ["RHEA_CASE_PATH"],
     "train_rl_case_path": os.environ["TRAIN_RL_CASE_PATH"],
     "eval_rl_case_path": os.environ["EVAL_RL_CASE_PATH"],
-    "eval_checkpoint_step": 2560, # 3680 (for S16), or 34048 (for S18), 15040 or 2560 (RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_1max_9state_17)
     "port": random.randint(6000, 7000), # generate a random port number
     "network_interface": "ib0",
     "use_XLA": True,
@@ -32,10 +31,11 @@ params = {
     "episode_walltime": None,
     "cfd_n_envs": cfd_n_envs,
     "rl_n_envs": rl_n_envs,
+    ###"n_tasks_per_env": 1,            # TODO: remove param, equivalent to "-np" argument of mpirun_np
     "config_dir": "config_control_witness",
     "control_filename": f"controlPoints{rl_n_envs}.txt",   # used in Python if n_rl_envs == 1, but used in C++ independently of n_rl_envs
     "witness_filename": f"witnessPoints{rl_n_envs}.txt",
-    "rl_neighbors": 0,                  # 0 is local state only
+    "rl_neighbors": 0,                  # 0 is local state only, # TODO: set custom value
     "model_dtype": np.float32,
     "rhea_dtype": np.float64,
     "poll_n_tries": 1000000,            # num. tries of database poll
@@ -60,9 +60,9 @@ params = {
     "action_dim": 3,
     "state_dim": 9,
     "reward_norm": 1.0,
-    "reward_beta": 0.0,                                     # reward = beta * reward_global + (1.0 - beta) * reward_local,
-    "restart_file": "restart_data_file_3240000.h5",        # 'random_choice' or filename as restart_data_file.h5
-    "net": (128, 128),                                      # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
+    "reward_beta": 0.0,                             # reward = beta * reward_global + (1.0 - beta) * reward_local,
+    "restart_file": "restart_data_file_3240000.h5", # 'random_choice' or filename as restart_data_file.h5
+    "net": (128, 128),                              # action net parameter 'fc_layer_units' & value net parameter 'fc_layer_params'
     "std_initial": 0.20,
     "learning_rate": 0.002,                                                            
     # Recommended: 1e-4 - 1e-3
@@ -89,6 +89,9 @@ params = {
     # Recommended: 0.5
     # If the value function is underperforming, you can increase it to give more weight to value function learning 
     # If the policy is underperforming, decrease this value
+    #"actor_net_activation_fn": "relu", # TODO: remove if not used
+    #"actor_net_l2_reg": 1e-4,          # TODO: remove if not used
+    #"actor_net_std_init": 0.35,        # TODO: remove if not used
     "normalize_rewards": True,
     "normalize_observations": True,
     "replay_buffer_capacity": int(t_episode_train / t_action) + 1, # TODO: multiply by *(cfd_n_envs * rl_n_envs) ???    # trajectories buffer expand a full train episode
@@ -97,6 +100,7 @@ params = {
     "seed": int(time.time()%(2**32)),
     "ckpt_num": int(1e6),
     "ckpt_interval": 1,
+    #"do_profile": False,               # TODO: remove if not used
     "use_tf_functions": True
 }
 

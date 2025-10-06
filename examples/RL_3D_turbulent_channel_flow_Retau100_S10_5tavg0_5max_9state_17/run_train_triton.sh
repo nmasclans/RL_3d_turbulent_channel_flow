@@ -14,11 +14,11 @@ trap cleanup SIGINT SIGTERM
 # Environmental variables
 REPO_DIR=/home/jofre/Nuria/repositories/RL_3d_turbulent_channel_flow
 export RHEA_PATH=/home/jofre/Nuria/flowsolverrhea
-export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_eval_S
+export RHEA_CASE_PATH=$REPO_DIR/ProjectRHEA/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_5max_9state_17
 export TRAIN_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_S10_5tavg0_5max_9state_17
-export EVAL_RL_CASE_PATH=$REPO_DIR/examples/RL_3D_turbulent_channel_flow_Retau100_eval_S
+export EVAL_RL_CASE_PATH=""
 export SMARTRHEA_PATH=$REPO_DIR/smartrhea
-export RUN_MODE=eval 
+export RUN_MODE=train
 
 # add shared dynamic libraries
 export SMARTREDIS_PATH=/apps/smartredis/0.4.0
@@ -42,12 +42,12 @@ rm -f temporal_point_probe_*.csv
 echo ">>> Compiling ProjectRHEA..."
 cd "$RHEA_CASE_PATH"
 make clean
-if ! make RL_CASE_PATH=$EVAL_RL_CASE_PATH RHEA_PATH=$RHEA_PATH; then
+if ! make RL_CASE_PATH=$TRAIN_RL_CASE_PATH RHEA_PATH=$RHEA_PATH; then
     echo ">>> Compilation failed. Exiting script."
     exit 1
 fi
 echo ">>> ProjectRHEA compiled!"
-cd "$EVAL_RL_CASE_PATH"
+cd "$TRAIN_RL_CASE_PATH"
 
 # Activate conda environment for the current session
 eval "$(conda shell.bash hook)"

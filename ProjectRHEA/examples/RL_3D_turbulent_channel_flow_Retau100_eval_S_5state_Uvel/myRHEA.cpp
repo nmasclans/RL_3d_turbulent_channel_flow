@@ -21,7 +21,7 @@ using namespace std;
 #define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
-#define _ZERO_PERTURBATION_LOAD_Y_Z_DIRS_ 0
+#define _ZERO_PERTURBATION_LOAD_Y_Z_DIRS_ 1
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
@@ -76,7 +76,7 @@ const double avg_u_bulk_min = u_b * (1.0 - 0.05);
 const char* rl_case_path = RL_CASE_PATH;  // Use compile-time constant value
 
 int action_dim = 3;
-int state_dim  = 9;
+int state_dim  = 5;
 
 /// eigen-values barycentric map coordinates - corners of realizable region
 const double EPS     = numeric_limits<double>::epsilon();
@@ -2729,22 +2729,16 @@ void myRHEA::calculateState() {
     state_local.resize(state_local_size2);
     std::fill(state_local.begin(), state_local.end(), 0.0);
     
-    double c1 = 0.2 / actuation_period;
+    double c1 = 0.4 / actuation_period;
     double c2 = 0.2 / actuation_period;
-    double c3 = 0.2 / actuation_period;
-    double c4 = 0.1 / actuation_period;
-    double c5 = 0.1 / actuation_period;
-    double c6 = 0.1 / actuation_period;
 
     /// Initialize auxiliary variables
 #if _WITNESS_XYZ_AVG_
     double delta_x, delta_y, delta_z, delta_volume, total_volume_local;
     double l2_x, l2_y, l2_z;
-    double avg_v_bulk, avg_w_bulk;
-    double l2_avg_u, l2_rmsf_u, l2_rmsf_v, l2_rmsf_w;
-    double l2_avg_u_comp, l2_rmsf_u_comp, l2_rmsf_v_comp, l2_rmsf_w_comp;
-    double l2_d_avg_u, l2_d_avg_v, l2_d_avg_w;
-    double l2_d_rmsf_u, l2_d_rmsf_v, l2_d_rmsf_w;
+    double l2_avg_u, l2_rmsf_u;
+    double l2_avg_u_comp, l2_rmsf_u_comp;
+    double l2_d_avg_u, l2_d_rmsf_u;
 #else
     int i_index, j_index, k_index;
 #endif  /// of _WITNESS_XYZ_AVG_
@@ -2758,11 +2752,9 @@ void myRHEA::calculateState() {
             /// Reset auxiliary variables
             total_volume_local = 0.0;
             l2_x = 0.0; l2_y = 0.0; l2_z = 0.0;
-            avg_v_bulk    = 0.0; avg_w_bulk     = 0.0; 
-            l2_avg_u      = 0.0; l2_rmsf_u      = 0.0; l2_rmsf_v      = 0.0; l2_rmsf_w      = 0.0;
-            l2_avg_u_comp = 0.0; l2_rmsf_u_comp = 0.0; l2_rmsf_v_comp = 0.0; l2_rmsf_w_comp = 0.0;
-            l2_d_avg_u    = 0.0; l2_d_avg_v     = 0.0; l2_d_avg_w     = 0.0;   
-            l2_d_rmsf_u   = 0.0; l2_d_rmsf_v    = 0.0; l2_d_rmsf_w    = 0.0;
+            l2_avg_u      = 0.0; l2_rmsf_u      = 0.0;
+            l2_avg_u_comp = 0.0; l2_rmsf_u_comp = 0.0;
+            l2_d_avg_u    = 0.0; l2_d_rmsf_u   = 0.0;
             /// Calculate state value from averaging field values along local mesh of the TCP mpi process
             for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
                 for(int j = topo->iter_common[_INNER_][_INIY_]; j <= topo->iter_common[_INNER_][_ENDY_]; j++) {
@@ -2778,33 +2770,17 @@ void myRHEA::calculateState() {
                         l2_y           += std::pow(y_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_z           += std::pow(z_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_avg_u       += std::pow(avg_u_field[I1D(i,j,k)],  2.0) * delta_volume;
-                        avg_v_bulk     += avg_v_field[I1D(i,j,k)] * delta_volume;
-                        avg_w_bulk     += avg_w_field[I1D(i,j,k)] * delta_volume;
                         l2_rmsf_u      += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_rmsf_v      += std::pow(rmsf_v_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_rmsf_w      += std::pow(rmsf_w_field[I1D(i,j,k)], 2.0) * delta_volume;
 #if _RL_CONTROL_IS_SUPERVISED_
                         l2_avg_u_comp  += std::pow(avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_volume;
                         l2_rmsf_u_comp += std::pow(rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_rmsf_v_comp += std::pow(rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_rmsf_w_comp += std::pow(rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_d_avg_u     += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)],  2.0) * delta_volume;
-                        l2_d_avg_v     += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0,  2.0) * delta_volume;
-                        l2_d_avg_w     += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0,  2.0) * delta_volume;
                         l2_d_rmsf_u    += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_d_rmsf_v    += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_d_rmsf_w    += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
 #else   /// _RL_CONTROL_IS_SUPERVISED_ 0
                         l2_avg_u_comp  += std::pow(avg_u_previous_field[I1D(i,j,k)],  2.0) * delta_volume;
                         l2_rmsf_u_comp += std::pow(rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_rmsf_v_comp += std::pow(rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_rmsf_w_comp += std::pow(rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
                         l2_d_avg_u     += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)],  2.0) * delta_volume;
-                        l2_d_avg_v     += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0,  2.0) * delta_volume;
-                        l2_d_avg_w     += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0,  2.0) * delta_volume;
                         l2_d_rmsf_u    += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_d_rmsf_v    += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                        l2_d_rmsf_w    += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
 #endif  /// _RL_CONTROL_IS_SUPERVISED_
                     }
                 }
@@ -2814,28 +2790,16 @@ void myRHEA::calculateState() {
             l2_z           = std::sqrt( l2_z / total_volume_local);
             l2_avg_u       = std::sqrt( l2_avg_u  / total_volume_local);
             l2_rmsf_u      = std::sqrt( l2_rmsf_u / total_volume_local);
-            l2_rmsf_v      = std::sqrt( l2_rmsf_v / total_volume_local);
-            l2_rmsf_w      = std::sqrt( l2_rmsf_w / total_volume_local);
             l2_avg_u_comp  = std::sqrt( l2_avg_u_comp  / total_volume_local);
             l2_rmsf_u_comp = std::sqrt( l2_rmsf_u_comp / total_volume_local);
-            l2_rmsf_v_comp = std::sqrt( l2_rmsf_v_comp / total_volume_local);
-            l2_rmsf_w_comp = std::sqrt( l2_rmsf_w_comp / total_volume_local);
             l2_d_avg_u     = std::sqrt( l2_d_avg_u  / total_volume_local);
-            l2_d_avg_v     = std::sqrt( l2_d_avg_v  / total_volume_local);
-            l2_d_avg_w     = std::sqrt( l2_d_avg_w  / total_volume_local);
             l2_d_rmsf_u    = std::sqrt( l2_d_rmsf_u / total_volume_local);
-            l2_d_rmsf_v    = std::sqrt( l2_d_rmsf_v / total_volume_local);
-            l2_d_rmsf_w    = std::sqrt( l2_d_rmsf_w / total_volume_local);
             /// Update state
             state_local[state_local_size2_counter]   = c1 * ( l2_d_avg_u  / l2_avg_u )  * std::copysign(1.0, l2_avg_u  - l2_avg_u_comp);     /// std::copysign(1.0, l2_avg_u - l2_avg_u_comp) = +1.0 if l2_avg_u >= l2_avg_u_comp, -1.0 otherwise
-            state_local[state_local_size2_counter+1] = c2 * ( l2_d_avg_v )              * std::copysign(1.0, avg_v_bulk);
-            state_local[state_local_size2_counter+2] = c3 * ( l2_d_avg_w )              * std::copysign(1.0, avg_w_bulk);
-            state_local[state_local_size2_counter+3] = c4 * ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
-            state_local[state_local_size2_counter+4] = c5 * ( l2_d_rmsf_v / l2_rmsf_v ) * std::copysign(1.0, l2_rmsf_v - l2_rmsf_v_comp);
-            state_local[state_local_size2_counter+5] = c6 * ( l2_d_rmsf_w / l2_rmsf_w ) * std::copysign(1.0, l2_rmsf_w - l2_rmsf_w_comp);
-            state_local[state_local_size2_counter+6] = 2.0 * ( l2_x / L_x ) - 1.0;      /// range (-1,1)
-            state_local[state_local_size2_counter+7] = 2.0 * ( l2_y / L_y ) - 1.0;
-            state_local[state_local_size2_counter+8] = 2.0 * ( l2_z / L_z ) - 1.0;
+            state_local[state_local_size2_counter+1] = c2 * ( l2_d_rmsf_u / l2_rmsf_u ) * std::copysign(1.0, l2_rmsf_u - l2_rmsf_u_comp);
+            state_local[state_local_size2_counter+2] = 2.0 * ( l2_x / L_x ) - 1.0;      /// range (-1,1)
+            state_local[state_local_size2_counter+3] = 2.0 * ( l2_y / L_y ) - 1.0;
+            state_local[state_local_size2_counter+4] = 2.0 * ( l2_z / L_z ) - 1.0;
 
 #else /// _WITNESS_XYZ_AVG_ 0
             /// Get local indices i, j, k
@@ -2882,23 +2846,13 @@ void myRHEA::calculateReward() {
     // Reward weight coefficients
     double b_param = 1.0;
     double c1 = 0.1 / actuation_period;
-    double c2 = 0.04 / actuation_period;
-    double c3 = 0.04 / actuation_period;
-    double c4 = 0.02 / actuation_period;
-    double c5 = 0.02 / actuation_period;
-    double c6 = 0.02 / actuation_period;
+    double c2 = 0.02 / actuation_period;
 
     /// Initialize variables
     double l2_avg_u      = 0.0;
     double l2_rmsf_u     = 0.0;
-    double l2_rmsf_v     = 0.0;
-    double l2_rmsf_w     = 0.0;
     double l2_d_avg_u    = 0.0;
-    double l2_d_avg_v    = 0.0;
-    double l2_d_avg_w    = 0.0;
     double l2_d_rmsf_u   = 0.0;
-    double l2_d_rmsf_v   = 0.0;
-    double l2_d_rmsf_w   = 0.0;
     double total_volume_local = 0.0;
     double delta_x, delta_y, delta_z, delta_volume;
     for(int i = topo->iter_common[_INNER_][_INIX_]; i <= topo->iter_common[_INNER_][_ENDX_]; i++) {
@@ -2913,51 +2867,27 @@ void myRHEA::calculateReward() {
 #if _RL_CONTROL_IS_SUPERVISED_
                 /// Supervised error
                 l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_reference_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
-                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
                 l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_reference_field[I1D(i,j,k)], 2.0) * delta_volume;
 #else   /// _RL_CONTROL_IS_SUPERVISED_ 0
                 /// Unsupervised error
                 l2_d_avg_u         += std::pow(avg_u_field[I1D(i,j,k)]  - avg_u_previous_field[I1D(i,j,k)], 2.0)  * delta_volume;
-                l2_d_avg_v         += std::pow(avg_v_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
-                l2_d_avg_w         += std::pow(avg_w_field[I1D(i,j,k)]  - 0.0, 2.0)  * delta_volume;
                 l2_d_rmsf_u        += std::pow(rmsf_u_field[I1D(i,j,k)] - rmsf_u_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_d_rmsf_v        += std::pow(rmsf_v_field[I1D(i,j,k)] - rmsf_v_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_d_rmsf_w        += std::pow(rmsf_w_field[I1D(i,j,k)] - rmsf_w_previous_field[I1D(i,j,k)], 2.0) * delta_volume;
 #endif
                 l2_avg_u           += std::pow(avg_u_field[I1D(i,j,k)],  2.0) * delta_volume;
                 l2_rmsf_u          += std::pow(rmsf_u_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_rmsf_v          += std::pow(rmsf_v_field[I1D(i,j,k)], 2.0) * delta_volume;
-                l2_rmsf_w          += std::pow(rmsf_w_field[I1D(i,j,k)], 2.0) * delta_volume;
             }
         }
     }
     l2_avg_u     = std::sqrt( l2_avg_u     / total_volume_local);
     l2_rmsf_u    = std::sqrt( l2_rmsf_u    / total_volume_local);
-    l2_rmsf_v    = std::sqrt( l2_rmsf_v    / total_volume_local);
-    l2_rmsf_w    = std::sqrt( l2_rmsf_w    / total_volume_local);    
     l2_d_avg_u   = std::sqrt( l2_d_avg_u   / total_volume_local);
-    l2_d_avg_v   = std::sqrt( l2_d_avg_v   / total_volume_local);
-    l2_d_avg_w   = std::sqrt( l2_d_avg_w   / total_volume_local);
     l2_d_rmsf_u  = std::sqrt( l2_d_rmsf_u  / total_volume_local);
-    l2_d_rmsf_v  = std::sqrt( l2_d_rmsf_v  / total_volume_local);
-    l2_d_rmsf_w  = std::sqrt( l2_d_rmsf_w  / total_volume_local);
     reward_local = ( b_param - (   c1 * ( ( l2_d_avg_u )  / l2_avg_u ) \
-                                 + c2 * ( ( l2_d_avg_v ) ) \
-                                 + c3 * ( ( l2_d_avg_w ) ) \
-                                 + c4 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) \
-                                 + c5 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) \
-                                 + c6 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) ) ) * 1.0; /// * ( (current_time - initial_episode_time) / episode_period );
+                                 + c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) ) ) * 1.0; /// * ( (current_time - initial_episode_time) / episode_period );
     /// Debugging
     cout << "[myRHEA::calculateReward] [Rank " << my_rank << "] Local reward: " << reward_local << ", with reward terms: "
          << c1 * ( ( l2_d_avg_u )  / l2_avg_u )  << " " 
-	     << c2 * ( ( l2_d_avg_v ) ) << " "
-	     << c3 * ( ( l2_d_avg_w ) ) << " "
-	     << c4 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) << " "
-	     << c5 * ( ( l2_d_rmsf_v ) / l2_rmsf_v ) << " "
-         << c6 * ( ( l2_d_rmsf_w ) / l2_rmsf_w ) << endl;
+	     << c2 * ( ( l2_d_rmsf_u ) / l2_rmsf_u ) << endl;
     if (my_rank == 0) {
         cout << "[myRHEA::calculateReward] Reward temporal coefficient: " << (current_time - initial_episode_time) / episode_period << endl;
     }

@@ -21,7 +21,7 @@ using namespace std;
 #define _WITNESS_XYZ_AVG_ 1
 #define _RL_EARLY_EPISODE_TERMINATION_FUNC_U_BULK_ 1
 #define _ZERO_NET_FLUX_PERTURBATION_LOAD_ 0
-
+#define _ZERO_PERTURBATION_LOAD_Y_Z_DIRS_ 1
 
 const int fstream_precision = 15;	                /// Fstream precision (fixed)
 
@@ -1043,8 +1043,8 @@ void myRHEA::calculateSourceTerms() {
     double tau_w_numerical = mu*( global_avg_u_inner_w - global_avg_u_boundary_w )/delta_y_wall;
     
     /// Update controller variables
-    controller_error   = ( tau_w - tau_w_numerical )/delta;
-    /// controller_error   = ( tau_w - tau_w_numerical )/delta + (u_bulk_reference - avg_u_bulk_numeric);
+    /// controller_error   = ( tau_w - tau_w_numerical )/delta;
+    controller_error   = ( tau_w - tau_w_numerical )/delta + (u_bulk_reference - avg_u_bulk_numeric);
     controller_output += controller_K_p*controller_error;
 
     //int my_rank, world_size;
@@ -1349,9 +1349,15 @@ void myRHEA::calculateSourceTerms() {
                             for(int k = topo->iter_common[_INNER_][_INIZ_]; k <= topo->iter_common[_INNER_][_ENDZ_]; k++) {                             
 
                                 /// Apply perturbation load (\partial DeltaRij / \partial xj) into ui momentum equation
+#if _ZERO_PERTURBATION_LOAD_Y_Z_DIRS_
+                                rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxj_j_field[I1D(i,j,k)] );
+                                rl_f_rhov_field[I1D(i,j,k)] = 0.0;
+                                rl_f_rhow_field[I1D(i,j,k)] = 0.0;
+#else                         
                                 rl_f_rhou_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRxj_j_field[I1D(i,j,k)] );
                                 rl_f_rhov_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRyj_j_field[I1D(i,j,k)] );
                                 rl_f_rhow_field[I1D(i,j,k)] = ( -1.0 ) * rho_field[I1D(i,j,k)] * ( d_DeltaRzj_j_field[I1D(i,j,k)] );
+#endif
                             }
                         }
                     }
